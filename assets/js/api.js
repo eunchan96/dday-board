@@ -36,6 +36,7 @@ export const api = {
   importTasks: (code, tasks) => rpc('dday_import', { p_code: code, p_tasks: tasks }),
   lmsStatus: code => rpc('dday_canvas_status', { p_code: code }),
   setFeed: (code, url) => rpc('dday_set_canvas_feed', { p_code: code, p_url: url }),
+  setToken: (code, token) => rpc('dday_set_canvas_token', { p_code: code, p_token: token }),
   lmsSync: code => post(LMS_SYNC_URL, { code }),
   canvasImport: (code, items) => rpc('dday_canvas_import', { p_code: code, p_items: items }),
   pushSubscribe: (code, sub, leads) => rpc('dday_push_subscribe', { p_code: code, p_sub: sub, p_leads: leads }),
@@ -55,6 +56,10 @@ export function errText(e) {
     case 'no_feed': return '스마트캠퍼스 피드가 등록되지 않았어요';
     case 'feed_invalid': return '피드 내용을 읽을 수 없어요. 주소를 다시 복사해 주세요';
     case 'feed_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';
+    case 'invalid_token': return '토큰 모양이 아니에요. 숫자~영문 형태의 토큰 전체를 붙여 넣어 주세요';
+    case 'token_invalid': return '토큰이 만료됐거나 지워졌어요. 스마트캠퍼스에서 새 토큰을 만들어 넣어 주세요';
+    case 'api_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';
+    case 'api_unexpected': return '스마트캠퍼스가 예상과 다른 응답을 보냈어요. 잠시 후 다시 시도해 주세요';
     case 'push_denied': return '알림이 차단돼 있어요. 브라우저 주소창의 사이트 설정에서 알림을 허용해 주세요';
     case 'push_dismissed': return '알림 권한 요청을 닫았어요. 다시 눌러 허용해 주세요';
     case 'not_subscribed': case 'subscription_gone': return '이 기기의 알림 연결이 끊겼어요. 알림을 다시 켜 주세요';
@@ -63,6 +68,7 @@ export function errText(e) {
     case 'invalid_subscription': return '이 브라우저의 알림 정보를 읽지 못했어요';
   }
   if (/^feed_http_(401|403|404)$/.test(m)) return '피드 주소가 더 이상 유효하지 않아요. 스마트캠퍼스에서 새로 복사해 주세요';
+  if (/^api_http_/.test(m)) return `스마트캠퍼스가 오류로 응답했어요 (${m.slice(9)})`;
   if (/^feed_http_/.test(m)) return `스마트캠퍼스가 오류로 응답했어요 (${m.slice(10)})`;
   return `문제가 생겼어요 (${m})`;
 }

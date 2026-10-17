@@ -2,7 +2,7 @@
 
 import {
   state, subscribe, setPref, pull, saveTask, toggleDone, toggleStar, removeTask, undoRemove,
-  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, importBackup, exportBackup, canvasImport,
+  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, importBackup, exportBackup, canvasImport,
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
@@ -265,17 +265,23 @@ function renderStatus() {
 
 function renderLms() {
   const l = state.lms;
+  const feed = l.feed ?? (l.connected && !l.token), token = !!l.token;
   $('#btnLms').hidden = !l.connected;
   $('#btnLmsNow').hidden = !l.connected;
-  $('#btnFeedClear').hidden = !l.connected;
-  $('#btnFeedSave').textContent = l.connected ? '주소 바꾸기' : '연동하기';
+  $('#btnFeedClear').hidden = !feed;
+  $('#btnFeedSave').textContent = feed ? '주소 바꾸기' : '연동하기';
+  $('#btnTokenClear').hidden = !token;
+  $('#btnTokenSave').textContent = token ? '토큰 바꾸기' : '연결하기';
+  $('#tokenSteps').hidden = token;
+  $('#bookmarkletSection').hidden = token;          // 토큰이 있으면 북마클릿은 필요 없음
   const st = $('#lmsState');
   st.className = 'lms-state';
+  const how = token ? `액세스 토큰(…${l.tokenHint})으로 연동됨` : feed ? '캘린더 피드로 연동됨' : '';
   if (!l.connected) st.textContent = '아직 연동하지 않았어요.';
-  else if (l.error) { st.classList.add('err'); st.textContent = `연동됨 · 마지막 시도 실패: ${errText(new Error(l.error))}`; }
+  else if (l.error) { st.classList.add('err'); st.textContent = `${how} · 마지막 시도 실패: ${errText(new Error(l.error))}`; }
   else {
     st.classList.add('ok');
-    st.textContent = l.syncedAt ? `연동됨 · 마지막으로 가져온 시각 ${fmtDate(new Date(l.syncedAt))}` : '연동됨 · 아직 가져오기 전이에요';
+    st.textContent = l.syncedAt ? `${how} · 마지막으로 가져온 시각 ${fmtDate(new Date(l.syncedAt))}` : `${how} · 아직 가져오기 전이에요`;
   }
 }
 
@@ -528,7 +534,7 @@ function openSettings() {
   codeShown = false;
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
-  ['#feedMsg', '#importMsg', '#copyMsg'].forEach(s => { $(s).textContent = ''; });
+  ['#feedMsg', '#tokenMsg', '#lmsMsg', '#importMsg', '#copyMsg'].forEach(s => { $(s).textContent = ''; });
   $('#pushMsg').textContent = '';
   renderLms(); renderPush(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
@@ -743,8 +749,32 @@ function bind() {
     } catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
   });
   $('#btnLmsNow').addEventListener('click', e => runLmsSync(e.currentTarget));
-  armTwice($('#btnFeedClear'), '연동 해제', '한 번 더 누르면 해제돼요', async () => {
-    try { await setFeed(null); $('#feedMsg').className = 'msg'; $('#feedMsg').textContent = '연동을 해제했어요. 가져온 과제는 남아 있어요.'; }
+  $('#btnTokenSave').addEventListener('click', async () => {
+    const input = $('#tokenInput'), msg = $('#tokenMsg'), btn = $('#btnTokenSave');
+    const token = input.value.trim();
+    if (!token) { msg.className = 'msg err'; msg.textContent = '스마트캠퍼스에서 만든 토큰을 붙여 넣어 주세요'; return; }
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = '연결하고 과제를 불러오는 중…';
+    try {
+      await setToken(token);
+      input.value = '';
+      const r = await lmsSync();
+      const parts = [];
+      if (r.added) parts.push(`새 과제 ${r.added}개`);
+      if (r.updated) parts.push(`바뀐 과제 ${r.updated}개`);
+      msg.className = 'msg ok';
+      msg.textContent = `연결했어요. 과제 ${r.total ?? 0}개를 확인했고${parts.length ? ` ${parts.join(', ')}를 반영했어요` : ' 바뀐 건 없어요'}.`;
+    } catch (e) {
+      msg.className = 'msg err'; msg.textContent = errText(e);
+    } finally { btn.disabled = false; }
+  });
+  $('#tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#btnTokenSave').click(); });
+  armTwice($('#btnTokenClear'), '토큰 해제', '한 번 더 누르면 해제돼요', async () => {
+    const msg = $('#tokenMsg');
+    try { await setToken(null); msg.className = 'msg'; msg.textContent = '토큰을 지웠어요. 스마트캠퍼스 설정에서도 그 토큰을 삭제해 주세요.'; }
+    catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
+  });
+  armTwice($('#btnFeedClear'), '피드 해제', '한 번 더 누르면 해제돼요', async () => {
+    try { await setFeed(null); $('#feedMsg').className = 'msg'; $('#feedMsg').textContent = '피드 연동을 해제했어요. 가져온 과제는 남아 있어요.'; }
     catch (e) { $('#feedMsg').className = 'msg err'; $('#feedMsg').textContent = errText(e); }
   });
 

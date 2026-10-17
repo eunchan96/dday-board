@@ -1,14 +1,19 @@
-// canvas-sync: 스마트캠퍼스(Canvas) 캘린더 피드를 읽어 D-day 보드에 병합한다.
+// canvas-sync: 스마트캠퍼스(Canvas) 과제를 D-day 보드에 병합한다.
+//
+// 가져오는 방법 (보드마다 하나)
+//  - 액세스 토큰이 있으면: REST API로 수강 과목의 학기 전체 과제 + 제출 정보
+//  - 없으면 캘린더 피드(.ics): 최근 30일 과제
 //
 // 호출 방법
 //  - 위젯 버튼:  POST { "code": "<보드 코드>" }          → 그 보드만 동기화
-//  - 예약 실행:  POST + 헤더 x-cron-secret → 피드가 등록된 모든 보드 동기화
+//  - 예약 실행:  POST + 헤더 x-cron-secret → 연동된 모든 보드 동기화
 //                (비밀값은 DB Vault의 dday_cron_secret, pg_cron이 같은 값을 읽어 보냄)
 //
 // 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (Supabase가 자동 제공)
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { parseCanvasFeed } from "./ics.ts";
+import { CanvasApiError, fetchCanvasApi } from "./canvas-api.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -23,30 +28,37 @@ function json(body: unknown, status = 200) {
   });
 }
 
-type Target = { board_id: string; feed_url: string | null };
+type Target = { board_id: string; feed_url: string | null; api_origin: string; token: string | null };
+
+async function readFeed(url: string) {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "dday-board-sync/1.0", "Accept": "text/calendar" },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`feed_http_${res.status}`);
+  return parseCanvasFeed(await res.text(), url);
+}
 
 async function syncOne(supa: SupabaseClient, t: Target) {
+  const via = t.token ? "token" : "feed";
   let items;
   try {
-    const res = await fetch(t.feed_url!, {
-      headers: { "User-Agent": "dday-board-sync/1.0", "Accept": "text/calendar" },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) throw new Error(`feed_http_${res.status}`);
-    items = parseCanvasFeed(await res.text(), t.feed_url!);
+    items = t.token ? await fetchCanvasApi(t.api_origin, t.token) : await readFeed(t.feed_url!);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    const code = msg.startsWith("feed_") ? msg : "feed_fetch_failed";
+    const code = e instanceof CanvasApiError || msg.startsWith("feed_")
+      ? msg
+      : (t.token ? "api_fetch_failed" : "feed_fetch_failed");
     await supa.rpc("dday_svc_canvas_merge", { p_board: t.board_id, p_items: [], p_error: code });
-    return { error: code };
+    return { via, error: code };
   }
 
   const { data, error } = await supa.rpc("dday_svc_canvas_merge", {
     p_board: t.board_id,
     p_items: items,
   });
-  if (error) return { error: "merge_failed" };
-  return { ...data, total: items.length };
+  if (error) return { via, error: "merge_failed" };
+  return { via, ...data, total: items.length };
 }
 
 Deno.serve(async (req) => {
@@ -59,12 +71,12 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
-  // 예약 실행: 피드가 등록된 모든 보드
+  // 예약 실행: 연동된 모든 보드
   const given = req.headers.get("x-cron-secret");
   if (given) {
     const { data: ok } = await supa.rpc("dday_svc_cron_ok", { p_secret: given });
     if (ok !== true) return json({ error: "unauthorized" }, 401);
-    const { data, error } = await supa.rpc("dday_svc_feeds");
+    const { data, error } = await supa.rpc("dday_svc_canvas_targets");
     if (error) return json({ error: "lookup_failed" }, 500);
     const results = [];
     for (const t of (data ?? []) as Target[]) results.push(await syncOne(supa, t));
@@ -76,11 +88,11 @@ Deno.serve(async (req) => {
   const code = typeof body?.code === "string" ? body.code : "";
   if (!code) return json({ error: "missing_code" }, 400);
 
-  const { data, error } = await supa.rpc("dday_svc_board_feed", { p_code: code });
+  const { data, error } = await supa.rpc("dday_svc_canvas_targets", { p_code: code });
   if (error) return json({ error: "lookup_failed" }, 500);
   const target = (data ?? [])[0] as Target | undefined;
   if (!target) return json({ error: "invalid_code" }, 404);
-  if (!target.feed_url) return json({ error: "no_feed" }, 400);
+  if (!target.token && !target.feed_url) return json({ error: "no_feed" }, 400);
 
   const result = await syncOne(supa, target);
   return json(result, "error" in result ? 502 : 200);

@@ -652,3 +652,11 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 #pushLeads { margin: 8px 0 10px; }
 #pushLeads[hidden] { display: none; }
 #pushOpen { text-decoration: none; }
+
+/* 스마트캠퍼스 토큰 연동 */
+.sub-head { margin: 18px 0 4px; font-size: 14px; font-weight: 750; display: flex; align-items: center; gap: 6px; }
+.tag-rec { font-size: 11px; font-weight: 750; padding: 1px 7px; border-radius: 10px; background: var(--hl-yellow); color: var(--hl-ink); }
+.help.fine { font-size: 12px; margin-top: 6px; }
+.steps b { font-weight: 700; color: var(--ink); }
+#feedMore { margin-top: 14px; }
+#feedMore .inline-form { margin-top: 8px; }

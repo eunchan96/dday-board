@@ -73,7 +73,7 @@
     </nav>
 
     <div class="actions">
-      <button class="btn ghost" id="btnLms" hidden title="스마트캠퍼스에서 지금 가져오기">LMS 가져오기</button>
+      <button class="btn ghost" id="btnLms" hidden title="스마트캠퍼스에서 지금 가져오기">가져오기</button>
       <button class="btn icon ghost" id="btnSync" title="다른 기기 변경 사항 불러오기" aria-label="새로고침">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5V7h-3.5"/></svg>
       </button>
@@ -203,21 +203,46 @@
 
     <section>
       <h3>스마트캠퍼스 연동</h3>
-      <p class="help">스마트캠퍼스 캘린더 화면 오른쪽 아래의 "캘린더 피드" 주소를 넣으면 과제를 하루 3번(7시, 13시, 21시) 자동으로 가져와요. 주소는 서버에만 저장되고 다시 볼 수 없어요.</p>
       <p class="lms-state" id="lmsState"></p>
+      <div class="row-actions">
+        <span class="msg" id="lmsMsg" role="status"></span>
+        <button class="btn" id="btnLmsNow" hidden>지금 가져오기</button>
+      </div>
+
+      <h4 class="sub-head">액세스 토큰으로 연결 <span class="tag-rec">추천</span></h4>
+      <p class="help">학기 전체 과제와 제출한 파일 이름까지 하루 3번(7시, 13시, 21시) 자동으로 가져와요.</p>
+      <ol class="help steps" id="tokenSteps">
+        <li>스마트캠퍼스 왼쪽 메뉴의 <b>계정 → 설정</b>으로 가요.</li>
+        <li><b>승인된 통합</b> 아래 <b>+ 새 액세스 토큰</b>을 눌러요.</li>
+        <li>목적에 "D-day 보드"라고 적고, 만료일은 학기가 끝나는 날로 정한 뒤 <b>토큰 생성</b>을 눌러요.</li>
+        <li>나온 토큰을 복사해 아래에 붙여 넣어요. 그 창을 닫으면 토큰을 다시 볼 수 없어요.</li>
+      </ol>
       <div class="inline-form">
-        <input type="text" id="feedUrl" placeholder="https://canvas.ssu.ac.kr/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
-        <button class="btn primary" id="btnFeedSave">연동하기</button>
+        <input type="password" id="tokenInput" placeholder="토큰 붙여 넣기 (예: 1234~AbCd…)" autocomplete="off" spellcheck="false">
+        <button class="btn primary" id="btnTokenSave">연결하기</button>
       </div>
       <div class="row-actions">
-        <span class="msg" id="feedMsg" role="status"></span>
-        <button class="btn" id="btnLmsNow" hidden>지금 가져오기</button>
-        <button class="btn danger ghost" id="btnFeedClear" hidden>연동 해제</button>
+        <span class="msg" id="tokenMsg" role="status"></span>
+        <button class="btn danger ghost" id="btnTokenClear" hidden>토큰 해제</button>
       </div>
+      <p class="help fine">토큰은 내 스마트캠퍼스 계정을 대신 쓸 수 있는 열쇠예요. 서버에 암호화해서 보관하고 화면에는 끝 4자리만 보여 줘요. 이 앱은 과제와 제출 기록을 읽기만 해요. 그만 쓸 때는 여기서 해제하고 스마트캠퍼스 설정에서도 토큰을 지워 주세요.</p>
+
+      <details class="more" id="feedMore">
+        <summary>토큰 대신 캘린더 피드로 연결하기</summary>
+        <p class="help">스마트캠퍼스 캘린더 화면 오른쪽 아래의 "캘린더 피드" 주소를 넣으면 최근 30일 과제를 하루 3번 가져와요. 제출 정보는 없어요. 토큰을 연결하면 피드 대신 토큰을 써요.</p>
+        <div class="inline-form">
+          <input type="text" id="feedUrl" placeholder="https://canvas.ssu.ac.kr/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
+          <button class="btn" id="btnFeedSave">연동하기</button>
+        </div>
+        <div class="row-actions">
+          <span class="msg" id="feedMsg" role="status"></span>
+          <button class="btn danger ghost" id="btnFeedClear" hidden>피드 해제</button>
+        </div>
+      </details>
     </section>
 
-    <section>
-      <h3>학기 전체 과제와 제출 파일 가져오기</h3>
+    <section id="bookmarkletSection">
+      <h3>토큰 없이 학기 전체 가져오기</h3>
       <p class="help">캘린더 피드에는 최근 30일 일정만 있고 제출 정보가 없어요. 아래 버튼을 브라우저 북마크바로 끌어다 놓은 뒤, 스마트캠퍼스에 로그인한 화면에서 누르면 수강 과목의 학기 전체 과제, 제출 여부, 제출한 파일 이름을 가져와요.</p>
       <div class="row-actions" style="justify-content:flex-start">
         <a class="btn bookmarklet" id="bookmarklet" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">D-day로 가져오기</a>

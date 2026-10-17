@@ -216,7 +216,7 @@ export async function connect(input) {
 export function disconnect(reason) {
   flushRemovals();
   state.code = null; state.tasks = [];
-  state.lms = { connected: false, syncedAt: null, error: null };
+  state.lms = { connected: false, feed: false, token: false, tokenHint: null, syncedAt: null, error: null };
   storage.del(KEYS.code); storage.del(KEYS.cache);
   emit('board');
   if (reason) emit({ type: 'disconnected', reason });
@@ -244,6 +244,12 @@ export async function lmsSync() {
 
 export async function setFeed(url) {
   state.lms = await api.setFeed(state.code, url);
+  emit('lms');
+  return state.lms;
+}
+
+export async function setToken(token) {
+  state.lms = await api.setToken(state.code, token);
   emit('lms');
   return state.lms;
 }
