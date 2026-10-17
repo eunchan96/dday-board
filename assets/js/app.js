@@ -7,6 +7,7 @@ import {
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
 import { parseQuick } from './quickadd.js';
+import { pushSupport, pushStatus, enablePush, disablePush, setLeads, testPush, LEAD_OPTIONS, DEFAULT_LEADS } from './push.js';
 import { errText } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
@@ -278,6 +279,67 @@ function renderLms() {
   }
 }
 
+/* ───── 마감 알림 ───── */
+const push = { subscribed: false, leads: DEFAULT_LEADS.slice(), busy: false };
+
+function renderPush() {
+  const support = pushSupport();
+  const st = $('#pushState'), msgOpen = $('#pushOpen');
+  const on = support === 'ok' && push.subscribed;
+  st.className = 'lms-state';
+  msgOpen.hidden = support !== 'embedded';
+  $('#btnPushOn').hidden = support !== 'ok' || on;
+  $('#btnPushOff').hidden = !on;
+  $('#btnPushTest').hidden = !on;
+  $('#btnPushOn').disabled = $('#btnPushOff').disabled = $('#btnPushTest').disabled = push.busy;
+  if (support === 'embedded') st.textContent = '노션 안에서는 알림 권한을 받을 수 없어요. 새 창에서 연 다음 켜 주세요.';
+  else if (support === 'ios-install') st.textContent = '아이폰은 Safari 공유 버튼 → "홈 화면에 추가"로 설치한 앱에서 알림을 켤 수 있어요.';
+  else if (support === 'unsupported') st.textContent = '이 브라우저는 알림을 지원하지 않아요.';
+  else if (support === 'denied') { st.classList.add('err'); st.textContent = '이 사이트 알림이 차단돼 있어요. 브라우저 사이트 설정에서 허용한 뒤 다시 열어 주세요.'; }
+  else if (on) { st.classList.add('ok'); st.textContent = `켜짐 · ${leadText(push.leads)}에 알려요`; }
+  else st.textContent = '이 기기에서는 꺼져 있어요.';
+  $('#pushLeads').hidden = support !== 'ok';
+  fill($('#pushLeads'), h('span', { class: 'dur-label' }, '알림 시점'),
+    ...LEAD_OPTIONS.map(([min, label]) => h('button', {
+      type: 'button', 'aria-pressed': push.leads.includes(min) ? 'true' : 'false',
+      disabled: push.busy, onclick: () => toggleLead(min),
+    }, label)));
+}
+
+function leadText(leads) {
+  const names = LEAD_OPTIONS.filter(([m]) => leads.includes(m)).map(([, l]) => l.replace(' 전', ''));
+  return names.length ? `마감 ${names.join(', ')} 전` : '알림 시점을 골라 주세요';
+}
+
+async function pushTask(label, fn, okText) {
+  const msg = $('#pushMsg');
+  push.busy = true; msg.className = 'msg'; msg.textContent = label; renderPush();
+  try { await fn(); msg.className = 'msg ok'; msg.textContent = okText || ''; }
+  catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
+  finally { push.busy = false; renderPush(); }
+}
+
+async function loadPush() {
+  if (!state.code || pushSupport() !== 'ok') { renderPush(); return; }
+  try {
+    const st = await pushStatus(state.code);
+    push.subscribed = !!st.subscribed;
+    if (st.subscribed && Array.isArray(st.leads)) push.leads = st.leads;
+  } catch { /* 다음에 다시 */ }
+  renderPush();
+}
+
+function toggleLead(min) {
+  const next = push.leads.includes(min) ? push.leads.filter(m => m !== min) : [...push.leads, min];
+  if (!next.length) { const m = $('#pushMsg'); m.className = 'msg err'; m.textContent = '알림 시점을 하나 이상 골라 주세요'; return; }
+  push.leads = next.sort((a, b) => b - a);
+  if (!push.subscribed) { renderPush(); return; }
+  pushTask('저장하는 중…', async () => {
+    const r = await setLeads(state.code, push.leads);
+    if (r && Array.isArray(r.leads)) push.leads = r.leads;
+  }, '알림 시점을 바꿨어요');
+}
+
 /* ───── 토스트 ───── */
 let toastTimer = null;
 function toast(text, action, onAction, ms = 5000) {
@@ -467,9 +529,10 @@ function openSettings() {
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
   ['#feedMsg', '#importMsg', '#copyMsg'].forEach(s => { $(s).textContent = ''; });
-  renderLms(); applyTheme(); prepareCanvasSettings();
+  $('#pushMsg').textContent = '';
+  renderLms(); renderPush(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
-  loadLms();
+  loadLms(); loadPush();
 }
 
 async function copyText(text, input, msgEl) {
@@ -697,8 +760,23 @@ function bind() {
   $('#btnExport').addEventListener('click', () => copyText(exportBackup(), $('#importText'), $('#importMsg')));
   armTwice($('#btnDisconnect'), '이 기기 연결 해제', '한 번 더 누르면 해제돼요', () => {
     $('#settings').close();
+    const code = state.code;
+    disablePush(code).catch(() => {});   // 이 기기 알림도 함께 끔
+    push.subscribed = false;
     disconnect();
   });
+
+  // 마감 알림
+  $('#btnPushOn').addEventListener('click', () => pushTask('알림을 켜는 중…', async () => {
+    const r = await enablePush(state.code, push.leads);
+    push.subscribed = true;
+    if (r && Array.isArray(r.leads)) push.leads = r.leads;
+  }, '알림을 켰어요. 테스트 알림으로 확인해 보세요'));
+  $('#btnPushOff').addEventListener('click', () => pushTask('알림을 끄는 중…', async () => {
+    await disablePush(state.code);
+    push.subscribed = false;
+  }, '이 기기 알림을 껐어요'));
+  $('#btnPushTest').addEventListener('click', () => pushTask('보내는 중…', () => testPush(state.code), '보냈어요. 몇 초 안에 알림이 와요'));
 
   // 스마트캠퍼스 전체 가져오기
   $('#bookmarklet').addEventListener('click', e => {
@@ -801,8 +879,48 @@ function bind() {
     else if (e.key === '3') setView('subjects');
   });
 
-  window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
+  window.addEventListener('hashchange', () => { if (!openTaskFromHash()) setView(location.hash.slice(1)); });
+  // 알림을 눌러 이미 열린 창으로 돌아올 때 (서비스 워커가 보냄)
+  navigator.serviceWorker?.addEventListener('message', e => {
+    if (e.data && e.data.type === 'open-task') { pendingTaskId = e.data.id; openTaskFromHash(); }
+  });
 }
+
+/* ───── 알림에서 과제 열기 (#task=<id>) ───── */
+let pendingTaskId = null;
+function openTaskFromHash() {
+  // 앱 바로가기: 새 과제 / 새 시험
+  if ((location.hash === '#new' || location.hash === '#new-exam') && state.code) {
+    const kind = location.hash === '#new' ? 'assignment' : 'exam';
+    history.replaceState(null, '', `#${state.prefs.view}`);
+    setTimeout(() => openPanel(null, null, kind), 0);
+    return true;
+  }
+  const m = location.hash.match(/^#task=(.+)$/);
+  if (m) pendingTaskId = decodeURIComponent(m[1]);
+  if (!pendingTaskId) return !!m;
+  const t = state.tasks.find(x => x.id === pendingTaskId);
+  if (!t) return true;                      // 아직 불러오기 전이면 불러온 뒤 다시 시도
+  pendingTaskId = null;
+  history.replaceState(null, '', `#${state.prefs.view}`);
+  openPanel(t);
+  return true;
+}
+subscribe(what => { if (pendingTaskId && (what === 'tasks' || what === 'board')) setTimeout(openTaskFromHash, 0); });
+
+/* ───── 앱으로 설치 ───── */
+let installEvent = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); installEvent = e;
+  $('#installRow').hidden = false;
+});
+window.addEventListener('appinstalled', () => { installEvent = null; $('#installRow').hidden = true; });
+$('#btnInstall').addEventListener('click', async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice.catch(() => null);
+  installEvent = null; $('#installRow').hidden = true;
+});
 
 /* ───── 시작 ───── */
 bind();
@@ -812,6 +930,7 @@ const hashView = location.hash.slice(1);
 if (['list', 'calendar', 'subjects'].includes(hashView)) state.prefs.view = hashView;
 renderAll();
 if (state.code) { pull(); loadLms(); }
+openTaskFromHash();
 
 setInterval(() => {
   if (!state.code) return;

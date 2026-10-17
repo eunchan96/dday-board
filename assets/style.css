@@ -642,3 +642,13 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 .keys kbd { margin: 0 2px 0 8px; }
 .keys kbd:first-child { margin-left: 0; }
 .pk-dial { height: auto; aspect-ratio: 1; fill: initial; stroke: none; }
+
+/* ───── 앱(PWA) · 알림 ───── */
+.toast { bottom: calc(24px + env(safe-area-inset-bottom)); }
+.app { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+@media (display-mode: standalone) {
+  .app { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+}
+#pushLeads { margin: 8px 0 10px; }
+#pushLeads[hidden] { display: none; }
+#pushOpen { text-decoration: none; }

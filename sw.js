@@ -1,7 +1,7 @@
 // 앱 화면 파일만 캐시해서 오프라인에서도 열리게 한다.
 // 과제 데이터(Supabase 호출)는 캐시하지 않는다. 항상 네트워크 우선.
 
-const CACHE = 'dday-shell-v4';
+const CACHE = 'dday-shell-v5';
 const SHELL = [
   './',
   'index.html',
@@ -14,6 +14,7 @@ const SHELL = [
   'assets/js/canvas.js',
   'assets/js/picker.js',
   'assets/js/quickadd.js',
+  'assets/js/push.js',
   'assets/icons/icon.svg',
   'manifest.webmanifest',
 ];
@@ -42,4 +43,36 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request).then(r => r || caches.match('index.html'))),
   );
+});
+
+// 마감 알림 (push-notify가 보냄)
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || '과제 D-day', {
+    body: d.body || '',
+    tag: d.tag,
+    renotify: !!d.tag,
+    icon: 'assets/icons/icon-192.png',
+    badge: 'assets/icons/badge-96.png',
+    lang: 'ko',
+    data: { url: d.url || './' },
+  }));
+});
+
+// 알림을 누르면 열려 있는 창을 앞으로 가져오고, 없으면 새로 연다
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './', self.location.href);
+  const id = (url.hash.match(/^#task=(.+)$/) || [])[1];
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find(w => new URL(w.url).origin === url.origin);
+    if (win) {
+      await win.focus();
+      if (id) win.postMessage({ type: 'open-task', id: decodeURIComponent(id) });
+      return;
+    }
+    await self.clients.openWindow(url.href);
+  })());
 });

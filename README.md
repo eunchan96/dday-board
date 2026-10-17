@@ -32,6 +32,12 @@
 - 시작 시각 기준 D-day, 시험 중에는 "시험 중", 끝나면 자동으로 지난 일정으로 이동
 - 목록, 캘린더, 과목별 보기에서 과제와 구분해 표시하고, 종류(과제/시험) 필터 제공
 
+**마감 알림**
+- 설정 → 마감 알림에서 기기마다 켜요. 알림 시점은 1일 전 · 3시간 전 · 1시간 전 · 30분 전 중에서 골라요 (기본 1일 전, 3시간 전)
+- 시험은 시작 시각 기준, 완료한 과제는 알리지 않아요. 마감을 바꾸면 바뀐 마감 기준으로 다시 알려요
+- 알림을 누르면 그 과제가 열린 채로 앱이 떠요
+- 노션 임베드 안에서는 권한을 받을 수 없어서 "새 창에서 열기"로 안내해요. 아이폰은 홈 화면에 추가한 앱에서만 켤 수 있어요(iOS 16.4 이상)
+
 **학기**
 - 마감일로 학기를 자동으로 나눕니다: 3월 2일~8월 31일은 1학기, 9월 1일~다음 해 3월 1일은 2학기
 - 상단에서 학기를 고르면 모든 보기와 통계가 그 학기 기준으로 바뀝니다 (기본은 이번 학기)
@@ -43,7 +49,7 @@
 - 스마트캠퍼스(Canvas) 과제 자동 가져오기 (아래 참고)
 - 밝게 / 어둡게 / 시스템 설정 테마
 - 단축키: `N` 새 과제, `E` 새 시험, `/` 검색, `1` `2` `3` 보기 전환, `Esc` 닫기
-- 홈 화면에 추가(PWA), 앱 화면 오프라인 캐시
+- 앱으로 설치(PWA): 홈 화면 · 작업 표시줄 아이콘, 오프라인에서도 마지막으로 불러온 과제 보기, 앱 아이콘 길게 눌러 새 과제 · 새 시험 · 캘린더 바로가기
 - 노션 임베드 같은 좁은 화면에서는 필터가 가로 칩으로 바뀌는 반응형 레이아웃
 - 백업 텍스트 복사와 가져오기
 
@@ -60,9 +66,11 @@ assets/js/util.js       날짜·학기 계산, 과목 색, DOM 헬퍼
 assets/js/canvas.js     스마트캠퍼스 데이터 변환, 북마클릿
 assets/js/picker.js     달력, 시계 다이얼
 assets/js/quickadd.js   한 줄 빠른 입력 해석
-sw.js, manifest.webmanifest   PWA
+assets/js/push.js       마감 알림 켜기 / 끄기
+sw.js, manifest.webmanifest   PWA (캐시, 알림 표시, 바로가기)
 supabase/migrations/    DB 스키마와 함수
 supabase/functions/canvas-sync/   스마트캠퍼스 피드 동기화
+supabase/functions/push-notify/   마감 알림 발송 (10분마다)
 ```
 
 ## 구조
@@ -139,6 +147,9 @@ Supabase 보안 어드바이저는 "로그인 없이 실행 가능한 SECURITY D
 | `dday_import` | `p_code`, `p_tasks` | `int` | 여러 과제 일괄 추가 (이미 있는 id는 건너뜀) |
 | `dday_set_canvas_feed` | `p_code`, `p_url` | `jsonb` | 피드 주소 등록, 빈 값이면 해제 |
 | `dday_canvas_status` | `p_code` | `jsonb` | 연동 여부, 마지막 동기화 시각, 오류 |
+| `dday_push_subscribe` | `p_code`, `p_sub`, `p_leads` | `jsonb` | 이 기기 알림 켜기 또는 알림 시점 변경 (`p_sub`은 `PushSubscription.toJSON()`, `p_leads`는 분 단위) |
+| `dday_push_unsubscribe` | `p_code`, `p_endpoint` | 없음 | 이 기기 알림 끄기 |
+| `dday_push_status` | `p_code`, `p_endpoint` | `jsonb` | 이 기기 알림 상태와 알림 시점 |
 
 `dday_svc_*` 함수는 Edge Function(service_role) 전용이라 외부에서 호출할 수 없습니다.
 
@@ -153,12 +164,14 @@ Edge Function `POST {SUPABASE_URL}/functions/v1/canvas-sync`에 `{ "code": "<보
   "memo": "", "starred": false, "source": "manual", "link": null, "doneAt": null, "createdAt": "…" }
 ```
 
+Edge Function `push-notify`에 `{ "code", "endpoint" }`를 보내면 그 기기로 테스트 알림을 보냅니다. 예약 실행(10분마다)은 `x-cron-secret` 헤더로 인증하고, 알림 시점이 지난 과제마다 가장 가까운 시점 하나만 보낸 뒤 기록합니다. VAPID 개인 키는 Vault(`dday_vapid_private`)에만 있고, 공개 키는 `assets/js/push.js`와 함수에 들어 있습니다.
+
 오류는 `invalid_code`, `too_many_tasks`(보드당 500개 제한), `invalid_import`, `invalid_feed_url`, `no_feed`, `feed_*` 메시지로 돌아옵니다.
 
 ## 직접 띄워 보기
 
 1. Supabase 프로젝트를 만들고 `supabase/migrations/`의 SQL을 순서대로 실행합니다. `canvas_cron` 마이그레이션의 함수 URL은 자기 프로젝트 ref로 바꿉니다.
-2. `supabase/functions/canvas-sync`를 Edge Function으로 배포합니다. 인증은 함수 안에서 보드 코드와 Vault 값으로 하므로 JWT 검증은 끕니다.
+2. `supabase/functions/canvas-sync`와 `push-notify`를 Edge Function으로 배포합니다. 알림을 쓰려면 VAPID 키를 만들어(`npx web-push generate-vapid-keys`) 개인 키는 Vault에 `dday_vapid_private`로 넣고, 공개 키는 `assets/js/push.js`와 함수의 `VAPID_PUBLIC`에 넣습니다. 인증은 함수 안에서 보드 코드와 Vault 값으로 하므로 JWT 검증은 끕니다.
 3. `assets/js/api.js` 상단의 `PROJECT`(Supabase 프로젝트 주소)와 `API_KEY`(publishable key)를 자기 프로젝트 값으로 바꿉니다.
 4. 저장소 전체를 정적 호스팅(Vercel 등)에 올리고, 노션에서 `/embed`로 그 주소를 넣습니다.
 

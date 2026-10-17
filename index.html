@@ -10,6 +10,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="과제 D-day">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css">
 <link rel="stylesheet" href="assets/style.css">
@@ -184,6 +187,20 @@
     </button>
   </header>
   <div class="settings-body">
+    <section id="pushSection">
+      <h3>마감 알림</h3>
+      <p class="help">마감 전에 이 기기로 알림을 보내요. 완료한 과제는 알리지 않고, 폰과 PC는 각각 켜야 해요.</p>
+      <p class="lms-state" id="pushState"></p>
+      <div class="quick-dates" id="pushLeads" role="group" aria-label="알림 받을 시점"></div>
+      <div class="row-actions">
+        <span class="msg" id="pushMsg" role="status"></span>
+        <a class="btn" id="pushOpen" href="./#list" target="_blank" rel="noopener" hidden>새 창에서 열기</a>
+        <button class="btn" id="btnPushTest" hidden>테스트 알림 보내기</button>
+        <button class="btn danger ghost" id="btnPushOff" hidden>알림 끄기</button>
+        <button class="btn primary" id="btnPushOn">알림 켜기</button>
+      </div>
+    </section>
+
     <section>
       <h3>스마트캠퍼스 연동</h3>
       <p class="help">스마트캠퍼스 캘린더 화면 오른쪽 아래의 "캘린더 피드" 주소를 넣으면 과제를 하루 3번(7시, 13시, 21시) 자동으로 가져와요. 주소는 서버에만 저장되고 다시 볼 수 없어요.</p>
@@ -258,6 +275,10 @@
 
     <section>
       <h3>이 기기</h3>
+      <div class="row-actions" id="installRow" hidden>
+        <span class="help" id="installHelp">홈 화면이나 작업 표시줄에서 앱처럼 열 수 있어요.</span>
+        <button class="btn" id="btnInstall">앱으로 설치</button>
+      </div>
       <div class="row-actions">
         <span class="help">연결을 해제해도 서버의 과제는 그대로 남아요.</span>
         <button class="btn danger ghost" id="btnDisconnect">이 기기 연결 해제</button>
