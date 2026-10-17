@@ -15,18 +15,38 @@
 - 과목별 고정 색 칩, 과목명 자동완성
 - 완료 체크, 완료 숨기기, 두 번 눌러야 지워지는 삭제
 - 보드 코드 기반 기기 간 동기화 (30초 주기, 화면 복귀 시, ↻ 버튼)
+- 과제를 눌러 과목, 제목, 마감 수정
+- 스마트캠퍼스(Canvas) 과제 자동 가져오기 (아래 참고)
 - 로컬 저장 버전 위젯에서 쓰던 데이터 가져오기
 
 ## 구조
 
 ```
 브라우저 (노션 임베드 / 모바일 브라우저)
-   │  POST /rest/v1/rpc/dday_*   (공개 publishable key + 보드 코드)
+   │  POST /rest/v1/rpc/dday_*       (publishable key + 보드 코드)
+   │  POST /functions/v1/canvas-sync (보드 코드)
    ▼
 Supabase
-   ├─ public.dday_* 함수 5개      ← 외부에서 호출 가능한 유일한 입구
-   └─ app 스키마 (boards, tasks)  ← API 비노출, 직접 접근 차단
+   ├─ public.dday_* 함수            ← 외부에서 호출 가능한 입구
+   ├─ Edge Function canvas-sync     ← Canvas 피드를 읽어 병합
+   ├─ pg_cron                       ← 하루 3번 canvas-sync 실행
+   └─ app 스키마 (boards, tasks)    ← API 비노출, 직접 접근 차단
 ```
+
+## 스마트캠퍼스(Canvas) 연동
+
+스마트캠퍼스 캘린더 화면의 "캘린더 피드" 주소(`…/feeds/calendars/user_….ics`)를 위젯 설정에 등록하면, `canvas-sync` Edge Function이 피드를 읽어 과제를 보드에 넣습니다.
+
+- 실행 시점: 하루 3번(07:03, 13:03, 21:03 KST) 자동, 위젯의 **LMS** 버튼으로 즉시
+- 피드에서 `UID:event-assignment-*`인 항목만 과제로 봅니다.
+- `SUMMARY`의 `과제명 [과목명 (학수번호)]`를 과제명과 과목으로 나눕니다.
+- 피드에는 마감 날짜만 있고 시각이 없어서, 날짜만 있으면 그날 23:59(KST)로 봅니다.
+- 처음 가져올 때 이미 마감이 지난 과제는 완료 상태로 넣습니다.
+- 사용자가 고친 제목, 과목, 마감은 `*_custom` 플래그로 기억해 이후 동기화가 덮어쓰지 않습니다.
+- 스마트캠퍼스 과제를 지우면 실제로 지우지 않고 숨겨서, 다음 동기화 때 다시 생기지 않게 합니다.
+- 피드에 제출 여부는 없어서 완료 체크는 직접 해야 합니다.
+
+피드 주소는 로그인 없이 일정을 볼 수 있는 개인 주소라서, DB의 잠긴 스키마에만 저장하고 API로 다시 읽어 갈 수 없게 했습니다. 예약 실행 인증값은 Supabase Vault에 둡니다.
 
 ### 왜 노션 HTML 블록이 아니라 외부 호스팅인가
 
@@ -56,24 +76,32 @@ Supabase 보안 어드바이저는 "로그인 없이 실행 가능한 SECURITY D
 | `dday_create_board` | 없음 | `text` | 새 보드를 만들고 코드 반환 |
 | `dday_list` | `p_code` | `jsonb` 배열 | 보드의 과제 목록 (마감 순) |
 | `dday_upsert` | `p_code`, `p_task` | `jsonb` | 과제 추가 또는 수정 |
-| `dday_delete` | `p_code`, `p_id` | 없음 | 과제 삭제 |
+| `dday_delete` | `p_code`, `p_id` | 없음 | 과제 삭제 (스마트캠퍼스 과제는 숨김) |
 | `dday_import` | `p_code`, `p_tasks` | `int` | 여러 과제 일괄 추가 (이미 있는 id는 건너뜀) |
+| `dday_set_canvas_feed` | `p_code`, `p_url` | `jsonb` | 피드 주소 등록, 빈 값이면 해제 |
+| `dday_canvas_status` | `p_code` | `jsonb` | 연동 여부, 마지막 동기화 시각, 오류 |
+
+`dday_svc_*` 함수는 Edge Function(service_role) 전용이라 외부에서 호출할 수 없습니다.
+
+Edge Function `POST {SUPABASE_URL}/functions/v1/canvas-sync`에 `{ "code": "<보드 코드>" }`를 보내면 그 보드를 바로 동기화하고 `{ added, updated, total }`을 돌려줍니다.
 
 과제 형식:
 
 ```json
-{ "id": "lzx1a2b3", "subject": "데이터베이스", "title": "ER 다이어그램", "due": "2026-10-20T14:59:00.000Z", "done": false }
+{ "id": "lzx1a2b3", "subject": "데이터베이스", "title": "ER 다이어그램", "due": "2026-10-20T14:59:00.000Z", "done": false, "source": "manual", "link": null }
 ```
 
-오류는 `invalid_code`, `too_many_tasks`(보드당 500개 제한), `invalid_import` 메시지로 돌아옵니다.
+오류는 `invalid_code`, `too_many_tasks`(보드당 500개 제한), `invalid_import`, `invalid_feed_url`, `no_feed`, `feed_*` 메시지로 돌아옵니다.
 
 ## 직접 띄워 보기
 
-1. Supabase 프로젝트를 만들고 `supabase/migrations/`의 SQL을 실행합니다.
-2. `index.html` 상단의 `API_URL`, `API_KEY`를 자기 프로젝트 값으로 바꿉니다.
+1. Supabase 프로젝트를 만들고 `supabase/migrations/`의 SQL을 순서대로 실행합니다. `canvas_cron` 마이그레이션의 함수 URL은 자기 프로젝트 ref로 바꿉니다.
+2. `supabase/functions/canvas-sync`를 Edge Function으로 배포합니다. 인증은 함수 안에서 보드 코드와 Vault 값으로 하므로 JWT 검증은 끕니다.
+3. `index.html` 상단의 `API_URL`, `API_KEY`, `LMS_SYNC_URL`을 자기 프로젝트 값으로 바꿉니다.
    - `API_URL`: `https://<project-ref>.supabase.co/rest/v1/rpc/`
    - `API_KEY`: 프로젝트의 publishable key
-3. 정적 호스팅(Vercel 등)에 `index.html`을 올리고, 노션에서 `/embed`로 그 주소를 넣습니다.
+   - `LMS_SYNC_URL`: `https://<project-ref>.supabase.co/functions/v1/canvas-sync`
+4. 정적 호스팅(Vercel 등)에 `index.html`을 올리고, 노션에서 `/embed`로 그 주소를 넣습니다.
 
 빌드 과정이 없어서 `index.html`을 브라우저로 바로 열어도 동작합니다.
 
@@ -86,5 +114,4 @@ Supabase 보안 어드바이저는 "로그인 없이 실행 가능한 SECURITY D
 
 생각 중인 것:
 
-- 스마트캠퍼스 캘린더(iCal) 구독 주소를 읽어 과제를 자동으로 등록
 - `boards.owner_id`를 이용한 로그인 계정 연결
