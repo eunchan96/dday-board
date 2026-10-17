@@ -98,12 +98,12 @@ function emptyState(ctx, title, text, withButton = true) {
 export function renderList(root, tasks, ctx) {
   root.replaceChildren();
   if (!ctx.total) {
-    root.append(emptyState(ctx, '아직 과제가 없어요',
-      '새 과제를 적거나, 설정에서 스마트캠퍼스를 연동하면 과제가 자동으로 들어와요.'));
+    root.append(emptyState(ctx, '아직 등록된 일정이 없어요',
+      '위 입력칸에 "데이터베이스 과제 금요일까지"처럼 적어 보세요. 설정에서 스마트캠퍼스를 연동하면 과제가 알아서 들어와요.'));
     return;
   }
   if (!tasks.length) {
-    root.append(emptyState(ctx, '조건에 맞는 과제가 없어요', '검색어나 필터를 바꿔 보세요.', false));
+    root.append(emptyState(ctx, '찾는 일정이 없어요', '검색어를 지우거나 다른 과목을 골라 보세요.', false));
     return;
   }
 
@@ -117,8 +117,11 @@ export function renderList(root, tasks, ctx) {
     list.sort(isDone ? (a, b) => byDue(b, a) : byDue);
     const open = !isDone || ctx.showDone;
 
+    const dayHint = g.key === 'today' ? fmtDate(ctx.now, false)
+      : g.key === 'tomorrow' ? fmtDate(addDays(ctx.now, 1), false) : null;
     const head = h('div', { class: `group-head g-${g.key}` },
       h('h3', null, g.name),
+      dayHint ? h('span', { class: 'day-hint' }, dayHint) : null,
       h('span', { class: 'count' }, `${list.length}개`),
       isDone ? h('button', {
         class: 'btn ghost', type: 'button', 'aria-expanded': open ? 'true' : 'false',
@@ -178,7 +181,10 @@ export function renderCalendar(root, tasks, ctx) {
       const lv = dday(t, ctx.now).level;
       const label = isExam(t) ? `${timeRange(t).split('–')[0]} ${t.title}` : t.title;
       const tip = [t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
-      cell.append(h('span', { class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''}`, title: tip },
+      cell.append(h('span', {
+        class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''}`, title: tip,
+        onclick: e => { e.stopPropagation(); ctx.onOpen(t); },
+      },
         h('i', { style: { background: subjectColor(t.subject) } }),
         h('span', null, label)));
     });

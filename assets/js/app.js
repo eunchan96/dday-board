@@ -5,6 +5,8 @@ import {
   createBoard, connect, disconnect, loadLms, lmsSync, setFeed, importBackup, exportBackup, canvasImport,
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
+import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
+import { parseQuick } from './quickadd.js';
 import { errText } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
@@ -64,7 +66,7 @@ function renderSemester() {
     : (parseSemesterKey(state.prefs.semester) && state.prefs.semester !== cur ? state.prefs.semester : 'current');
   sel.replaceChildren(
     ...sorted.map(k => h('option', { value: k === cur ? 'current' : k },
-      k === cur ? `${semesterLabel(parseSemesterKey(k))} (이번 학기)` : semesterLabel(parseSemesterKey(k)))),
+      k === cur ? `${semesterLabel(parseSemesterKey(k))} · 지금` : semesterLabel(parseSemesterKey(k)))),
     h('option', { value: 'all' }, '전체 학기'),
   );
   sel.value = value;
@@ -210,7 +212,11 @@ const ctx = () => ({
   showDone: ui.showDone,
   calMonth: ui.calMonth,
   selectedDay: ui.selectedDay,
-  onToggle: id => toggleDone(id),
+  onToggle: id => {
+    const t = state.tasks.find(x => x.id === id);
+    toggleDone(id);
+    if (t && t.done) toast(`"${t.title}" ${isExam(t) ? '응시 완료로 표시했어요' : '완료했어요'}`, '되돌리기', () => toggleDone(id));
+  },
   onStar: id => toggleStar(id),
   onOpen: t => openPanel(t),
   onNew: (d, kind) => openPanel(null, d, kind || 'assignment'),
@@ -252,7 +258,7 @@ function renderStatus() {
   if (state.inflight > 0) { el.classList.add('busy'); el.textContent = '저장하고 불러오는 중…'; }
   else if (state.syncError) { el.classList.add('err'); el.textContent = `${state.syncError} · 눌러서 다시 시도`; }
   else if (notice) { el.classList.add('ok'); el.textContent = notice; }
-  else if (state.lastSync) { el.classList.add('ok'); el.textContent = `모든 기기와 동기화됨 · ${fmtClock(state.lastSync)}`; }
+  else if (state.lastSync) { el.classList.add('ok'); el.textContent = `저장됨 · ${fmtClock(state.lastSync)}`; }
   else el.textContent = '불러오는 중…';
 }
 
@@ -286,20 +292,37 @@ function hideToast() { $('#toast').hidden = true; }
 
 /* ───── 과제 상세 패널 ───── */
 let lastFocus = null;
-function quickDates() {
-  const today = startOfDay(new Date());
-  const fri = addDays(startOfWeek(today), 4);
-  const opts = [
-    ['오늘', today], ['내일', addDays(today, 1)],
-    [fri > today ? '이번 주 금요일' : '다음 주 금요일', fri > today ? fri : addDays(fri, 7)],
-    ['다음 주 월요일', addDays(startOfWeek(today), 7)],
-    ['1주 뒤', addDays(today, 7)],
-  ];
-  $('#quickDates').replaceChildren(...opts.map(([label, d]) =>
-    h('button', { type: 'button', onclick: () => { $('#fDate').value = toDateInput(d); } }, label)));
-}
 
 const EXAM_NAMES = ['중간고사', '기말고사', '퀴즈', '실기시험'];
+
+// 시험: 시작 시각을 바꾸면 끝나는 시각을 같은 길이만큼 따라 옮긴다 (직접 고친 뒤에는 그대로)
+const addMinutes = (hhmm, min) => {
+  const [h0, m0] = hhmm.split(':').map(Number);
+  const t = Math.min(23 * 60 + 59, h0 * 60 + m0 + min);
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
+const minutesBetween = (a, b) => {
+  const [ah, am] = a.split(':').map(Number), [bh, bm] = b.split(':').map(Number);
+  return bh * 60 + bm - (ah * 60 + am);
+};
+function autoEnd(min) {
+  ui.settingEnd = true;
+  setField('fEnd', addMinutes($('#fTime').value || '10:30', min));
+  ui.settingEnd = false;
+  ui.endAuto = true;
+  ui.examLength = min;
+}
+function renderDurations() {
+  const start = $('#fTime').value || '10:30';
+  const cur = $('#fEnd').value ? minutesBetween(start, $('#fEnd').value) : null;
+  const opts = [[50, '50분'], [60, '1시간'], [75, '1시간 15분'], [90, '1시간 30분'], [120, '2시간']];
+  $('#durations').replaceChildren(
+    h('span', { class: 'dur-label' }, '시험 시간'),
+    ...opts.map(([min, label]) => h('button', {
+      type: 'button', 'aria-pressed': cur === min ? 'true' : 'false',
+      onclick: () => { autoEnd(min); renderDurations(); },
+    }, label)));
+}
 
 // 과제 / 시험 템플릿 전환
 function setKind(kind, { isNew }) {
@@ -307,7 +330,7 @@ function setKind(kind, { isNew }) {
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);
   $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
-  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 자세히' : '과제 자세히');
+  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 수정' : '과제 수정');
   $('#fTitleLabel').textContent = exam ? '시험 이름' : '과제명';
   $('#fTitle').placeholder = exam ? '예: 중간고사' : '예: HW3 정규화 연습문제';
   $('#fDateLabel').textContent = exam ? '시험 날짜' : '마감 날짜';
@@ -316,11 +339,14 @@ function setKind(kind, { isNew }) {
   $('#fMemoLabel').textContent = exam ? '시험 범위와 메모' : '메모';
   $('#fMemo').placeholder = exam ? '시험 범위, 준비물(학생증, 계산기), 공부할 것 등을 적어 두세요' : '제출 방법, 참고 자료, 할 일 등을 적어 두세요';
   // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
+  setTimePresets('fTime', exam ? ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'] : ['09:00', '12:00', '18:00', '23:59']);
   if (isNew) {
     const t = $('#fTime').value;
-    if (exam && (t === '23:59' || !t)) $('#fTime').value = '10:30';
-    if (!exam && t === '10:30') $('#fTime').value = '23:59';
+    if (exam && (t === '23:59' || !t)) setField('fTime', '10:30');
+    if (!exam && t === '10:30') setField('fTime', '23:59');
   }
+  if (exam && !$('#fEnd').value) autoEnd(60);
+  renderDurations();
 }
 
 function openPanel(task, presetDay, kind) {
@@ -334,12 +360,14 @@ function openPanel(task, presetDay, kind) {
   const due = task ? new Date(task.due) : (presetDay ? new Date(presetDay) : addDays(startOfDay(new Date()), 7));
   $('#fDate').value = toDateInput(due);
   $('#fTime').value = task ? toTimeInput(due) : '23:59';
+  ui.endAuto = !(task && task.endAt);
   $('#fStar').checked = !!(task && task.starred);
   $('#fDone').checked = !!(task && task.done);
   $('#fDoneRow').hidden = !task;
   $('#fMemo').value = task ? task.memo || '' : '';
   $('#fLocation').value = task ? task.location || '' : '';
   $('#fEnd').value = task && task.endAt ? toTimeInput(new Date(task.endAt)) : '';
+  refreshPickLabels();
   setKind(task ? (isExam(task) ? 'exam' : 'assignment') : (kind || 'assignment'), { isNew: !task });
   $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
   $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
@@ -374,14 +402,13 @@ function openPanel(task, presetDay, kind) {
   if (task && task.done && task.doneAt) meta.push(`완료한 날 ${fmtDate(new Date(task.doneAt), false)}`);
   $('#panelMeta').textContent = meta.join(' · ');
 
-  quickDates();
   $('#scrim').hidden = false;
   $('#panel').hidden = false;
-  (task ? $('#panelSave') : $('#fTitle')).focus();
-  if (!task) $('#fTitle').focus();
+  if (task) $('#panel').focus(); else $('#fTitle').focus();
 }
 
 function closePanel() {
+  closePicker(false);
   $('#panel').hidden = true;
   $('#scrim').hidden = true;
   ui.editingId = null;
@@ -393,7 +420,7 @@ function savePanel() {
   const msg = $('#panelMsg');
   msg.className = 'msg err';
   if (!title) { msg.textContent = '과제명을 적어 주세요'; $('#fTitle').focus(); return; }
-  if (!$('#fDate').value) { msg.textContent = '마감 날짜를 골라 주세요'; $('#fDate').focus(); return; }
+  if (!$('#fDate').value) { msg.textContent = '날짜를 골라 주세요'; $('#fDateBtn').focus(); return; }
   const due = new Date(`${$('#fDate').value}T${$('#fTime').value || '23:59'}`);
   if (isNaN(due)) { msg.textContent = '마감 날짜를 다시 확인해 주세요'; return; }
   const isNew = !ui.editingId;
@@ -401,7 +428,7 @@ function savePanel() {
   let endAt = null;
   if (exam && $('#fEnd').value) {
     const end = new Date(`${$('#fDate').value}T${$('#fEnd').value}`);
-    if (end <= due) { msg.textContent = '끝나는 시각은 시작 시각보다 늦어야 해요'; $('#fEnd').focus(); return; }
+    if (end <= due) { msg.textContent = '끝나는 시각이 시작보다 빨라요'; $('#fEndBtn').focus(); return; }
     endAt = end.toISOString();
   }
   const fields = {
@@ -628,7 +655,7 @@ function bind() {
   $('#scrim').addEventListener('click', closePanel);
   $('#panelSave').addEventListener('click', savePanel);
   $('#panelDelete').addEventListener('click', deleteFromPanel);
-  ['#fTitle', '#fSubject', '#fDate', '#fTime'].forEach(s =>
+  ['#fTitle', '#fSubject', '#fLocation'].forEach(s =>
     $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); savePanel(); } }));
 
   // 설정
@@ -695,7 +722,69 @@ function bind() {
   });
   $('#importCancel').addEventListener('click', () => { pendingImport = null; $('#importDialog').close(); });
   $('#importConfirm').addEventListener('click', confirmImport);
-  listenForCanvasData(data => handleCanvasPayload(data));
+  let importWait = null;
+  listenForCanvasData(data => { clearTimeout(importWait); handleCanvasPayload(data); }, st => {
+    if (st.kind === 'progress') toast(`스마트캠퍼스: ${st.text}`, null, null, 20000);
+    else {
+      clearTimeout(importWait);
+      toast(`스마트캠퍼스에서 읽지 못했어요 (${st.text}). 로그인한 스마트캠퍼스 화면에서 다시 눌러 주세요`, null, null, 12000);
+    }
+  });
+  // 북마클릿으로 열린 창: 기다리는 동안 안내
+  if (location.hash === '#import' && window.opener) {
+    toast('스마트캠퍼스에서 과제를 불러오는 중이에요…', null, null, 30000);
+    importWait = setTimeout(() => toast('스마트캠퍼스 창에서 아직 아무것도 받지 못했어요. 그 창에 오류 안내가 떴는지 확인해 주세요', null, null, 15000), 30000);
+  }
+
+  // 시간 선택 연동
+  $('#fTime').addEventListener('change', () => {
+    if (ui.kind === 'exam' && (ui.endAuto || !$('#fEnd').value)) autoEnd(ui.examLength || 60);
+    renderDurations();
+  });
+  $('#fEnd').addEventListener('change', () => {
+    if (!ui.settingEnd) ui.endAuto = false;
+    renderDurations();
+  });
+
+  // 빠른 입력
+  const qa = $('#qaInput');
+  const subjectNames = () => [...new Set(state.tasks.map(t => t.subject).filter(Boolean))];
+  const qaParse = () => parseQuick(qa.value, new Date(), subjectNames());
+  const qaPreview = () => {
+    const box = $('#qaPreview');
+    if (!qa.value.trim()) { box.replaceChildren(); return; }
+    const r = qaParse();
+    const when = r.date ? `${fmtDate(r.date, false)} ${timeLabel(r.time)}${r.endTime ? `~${timeLabel(r.endTime).replace(/^오[전후] /, '')}` : ''}` : '날짜는 다음 화면에서 골라요';
+    fill(box,
+      h('span', { class: `qa-kind ${r.kind}` }, r.kind === 'exam' ? '시험' : '과제'),
+      r.subject ? h('b', null, r.subject) : null,
+      h('span', null, r.title),
+      h('span', { class: 'qa-when' }, when),
+      h('span', { class: 'qa-hint' }, 'Enter로 추가'));
+  };
+  qa.addEventListener('input', qaPreview);
+  qa.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { qa.value = ''; qaPreview(); qa.blur(); return; }
+    if (e.key !== 'Enter' || e.isComposing || !qa.value.trim()) return;
+    e.preventDefault();
+    const r = qaParse();
+    qa.value = ''; qaPreview();
+    if (!r.date) {
+      openPanel(null, null, r.kind);
+      $('#fTitle').value = r.title; $('#fSubject').value = r.subject;
+      setField('fTime', r.time);
+      if (r.endTime) autoEnd(60);
+      setTimeout(() => $('#fDateBtn').click(), 80);   // 패널이 열린 뒤 달력 띄우기
+      return;
+    }
+    const due = new Date(`${toDateInput(r.date)}T${r.time}`);
+    const t = saveTask({
+      kind: r.kind, title: r.title, subject: r.subject, due: due.toISOString(),
+      endAt: r.endTime ? new Date(`${toDateInput(r.date)}T${r.endTime}`).toISOString() : null,
+      location: '', starred: false, memo: '',
+    });
+    toast(`"${r.title}" ${r.kind === 'exam' ? '시험을' : '과제를'} ${fmtDate(due, false)}에 추가했어요`, '수정', () => openPanel(state.tasks.find(x => x.id === t.id)));
+  });
 
   // 단축키
   document.addEventListener('keydown', e => {
@@ -717,6 +806,7 @@ function bind() {
 
 /* ───── 시작 ───── */
 bind();
+initPickers();
 applyTheme();
 const hashView = location.hash.slice(1);
 if (['list', 'calendar', 'subjects'].includes(hashView)) state.prefs.view = hashView;

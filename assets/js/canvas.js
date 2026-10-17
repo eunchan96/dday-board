@@ -118,11 +118,12 @@ if(!/canvas/.test(location.hostname)&&!document.querySelector('#application')){a
 const w=window.open(A,'dday-import');if(!w){alert('팝업이 막혔어요. 이 사이트의 팝업을 허용해 주세요');return}
 const get=async u=>{const r=await fetch(u,{credentials:'same-origin',headers:{Accept:'application/json'}});if(!r.ok)throw new Error(r.status);const t=await r.text();const n=(r.headers.get('Link')||'').match(/<([^>]+)>;\\s*rel="next"/);return{d:JSON.parse(t.replace(/^while\\(1\\);/,'')),n:n&&n[1]}};
 const all=async u=>{let o=[];while(u){const x=await get(u);o=o.concat(x.d);u=x.n}return o};
+const tell=m=>{try{w.postMessage(m,O)}catch(e){}};
 let data;
 try{const courses=await all('/api/v1/courses?enrollment_state=active&enrollment_type=student&per_page=100');
-let assignments=[];for(const c of courses){try{const a=await all('/api/v1/courses/'+c.id+'/assignments?include[]=submission&per_page=100');assignments=assignments.concat(a.map(x=>Object.assign(x,{course_id:c.id})))}catch(e){}}
+let assignments=[],i=0;for(const c of courses){i++;tell({type:'dday-canvas-progress',text:'과목 '+courses.length+'개 중 '+i+'번째를 읽는 중이에요'});try{const a=await all('/api/v1/courses/'+c.id+'/assignments?include[]=submission&per_page=100');assignments=assignments.concat(a.map(x=>Object.assign(x,{course_id:c.id})))}catch(e){}}
 data={type:'dday-canvas',origin:location.origin,courses:courses.map(c=>({id:c.id,name:c.name,course_code:c.course_code})),assignments}}
-catch(e){alert('스마트캠퍼스에서 정보를 읽지 못했어요 ('+e.message+'). 로그인 상태를 확인해 주세요');return}
+catch(e){tell({type:'dday-canvas-error',message:String(e.message||e)});alert('스마트캠퍼스에서 정보를 읽지 못했어요 ('+e.message+'). 로그인 상태를 확인해 주세요');return}
 const send=()=>{try{w.postMessage(data,O)}catch(e){}};
 window.addEventListener('message',e=>{if(e.origin===O&&e.data==='dday-ready')send()});
 send();setTimeout(send,1500);
@@ -131,13 +132,15 @@ send();setTimeout(send,1500);
 }
 
 // 앱 쪽: 북마클릿에서 오는 데이터 받기
-export function listenForCanvasData(onData) {
+export function listenForCanvasData(onData, onStatus = () => {}) {
   window.addEventListener('message', e => {
     let host = '';
     try { host = new URL(e.origin).hostname; } catch { return; }
     if (!/^canvas\.|\.ac\.kr$|instructure\.com$/.test(host)) return;   // Canvas로 보이는 곳에서만
-    if (!e.data || e.data.type !== 'dday-canvas') return;
-    onData(e.data, e.origin);
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'dday-canvas') onData(e.data, e.origin);
+    else if (e.data.type === 'dday-canvas-progress') onStatus({ kind: 'progress', text: String(e.data.text || '') });
+    else if (e.data.type === 'dday-canvas-error') onStatus({ kind: 'error', text: String(e.data.message || '') });
   });
   // 북마클릿에 준비됐다고 알리기 (여러 번 보내도 북마클릿이 중복 처리하지 않도록 앱에서 한 번만 받음)
   if (window.opener) {

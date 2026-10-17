@@ -51,14 +51,10 @@
 <!-- 앱 -->
 <div class="app" id="viewApp" hidden>
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name">과제 D-day</span>
-      <label class="semester">
-        <span class="sr-only">학기</span>
-        <select id="semester"></select>
-      </label>
-    </div>
+    <label class="semester">
+      <span class="sr-only">학기</span>
+      <select id="semester"></select>
+    </label>
 
     <label class="search">
       <span class="sr-only">과제 검색</span>
@@ -90,18 +86,28 @@
 
   <div class="layout">
     <aside class="rail" id="rail" aria-label="필터"></aside>
-    <main class="view" id="view"></main>
+    <main class="view-col">
+      <div class="quickadd" id="quickadd">
+        <label class="quickadd-box">
+          <span class="sr-only">빠르게 추가</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+          <input type="text" id="qaInput" autocomplete="off" enterkeyhint="done"
+                 placeholder="빠르게 추가: 데이터베이스 과제 금요일까지">
+        </label>
+        <p class="quickadd-preview" id="qaPreview" aria-live="polite"></p>
+      </div>
+      <div class="view" id="view"></div>
+    </main>
   </div>
 
   <footer class="statusbar">
     <span class="status" id="status" role="status"></span>
-    <span class="shortcuts">단축키 <kbd>N</kbd> 새 과제 <kbd>E</kbd> 새 시험 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 보기 전환</span>
   </footer>
 </div>
 
 <!-- 과제 상세 -->
 <div class="scrim" id="scrim" hidden></div>
-<aside class="panel" id="panel" hidden aria-labelledby="panelTitle" role="dialog">
+<aside class="panel" id="panel" hidden aria-labelledby="panelTitle" role="dialog" tabindex="-1">
   <header class="panel-head">
     <h2 id="panelTitle">새 과제</h2>
     <button class="btn icon ghost" id="panelClose" aria-label="닫기">
@@ -126,20 +132,23 @@
       <datalist id="subjectList"></datalist>
     </label>
     <div class="field-row" id="timeRow">
-      <label class="field">
+      <div class="field">
         <span id="fDateLabel">마감 날짜</span>
-        <input type="date" id="fDate">
-      </label>
-      <label class="field">
+        <button type="button" class="pick" id="fDateBtn" aria-haspopup="dialog"></button>
+        <input type="hidden" id="fDate">
+      </div>
+      <div class="field">
         <span id="fTimeLabel">시각</span>
-        <input type="time" id="fTime" value="23:59">
-      </label>
-      <label class="field exam-only">
+        <button type="button" class="pick" id="fTimeBtn" aria-haspopup="dialog"></button>
+        <input type="hidden" id="fTime" value="23:59">
+      </div>
+      <div class="field exam-only">
         <span>끝나는 시각</span>
-        <input type="time" id="fEnd">
-      </label>
+        <button type="button" class="pick" id="fEndBtn" aria-haspopup="dialog"></button>
+        <input type="hidden" id="fEnd">
+      </div>
     </div>
-    <div class="quick-dates" id="quickDates" aria-label="빠른 날짜 선택"></div>
+    <div class="quick-dates exam-only" id="durations" aria-label="시험 시간 길이"></div>
     <label class="field exam-only">
       <span>장소</span>
       <input type="text" id="fLocation" maxlength="100" autocomplete="off" placeholder="예: 정보과학관 21203">
@@ -243,6 +252,11 @@
     </section>
 
     <section>
+      <h3>단축키</h3>
+      <p class="help keys"><kbd>N</kbd> 새 과제 <kbd>E</kbd> 새 시험 <kbd>/</kbd> 검색 <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 목록 · 캘린더 · 과목별 <kbd>Esc</kbd> 닫기</p>
+    </section>
+
+    <section>
       <h3>이 기기</h3>
       <div class="row-actions">
         <span class="help">연결을 해제해도 서버의 과제는 그대로 남아요.</span>
@@ -279,6 +293,9 @@
     <button class="btn primary" id="importConfirm">가져오기</button>
   </footer>
 </dialog>
+
+<!-- 날짜·시간 고르기 -->
+<div class="picker" id="picker" role="dialog" aria-modal="false" hidden></div>
 
 <div class="toast" id="toast" role="status" hidden></div>
 
