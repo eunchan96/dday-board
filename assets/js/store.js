@@ -30,7 +30,7 @@ export const state = {
   lastSync: null,
   syncError: null,
   lms: { connected: false, syncedAt: null, error: null },
-  prefs: Object.assign({ view: 'list', hideDone: false, theme: 'system', subject: null, starredOnly: false },
+  prefs: Object.assign({ view: 'list', hideDone: false, theme: 'system', subject: null, starredOnly: false, kind: null },
                        readJSON(KEYS.prefs, {})),
 };
 let localVersion = 0;
@@ -88,15 +88,19 @@ async function push(fn) {
 }
 
 const payload = t => ({
-  id: t.id, subject: t.subject || '', title: t.title, due: t.due,
-  done: !!t.done, memo: t.memo || '', starred: !!t.starred,
+  id: t.id, kind: t.kind === 'exam' ? 'exam' : 'assignment',
+  subject: t.subject || '', title: t.title, due: t.due, endAt: t.endAt || null,
+  location: t.location || '', done: !!t.done, memo: t.memo || '', starred: !!t.starred,
 });
 
 export function saveTask(fields, id) {
   let task = id && state.tasks.find(t => t.id === id);
   if (task) Object.assign(task, fields);
   else {
-    task = Object.assign({ id: newId(), done: false, starred: false, memo: '', source: 'manual', link: null }, fields);
+    task = Object.assign({
+      id: newId(), kind: 'assignment', done: false, starred: false, memo: '', location: '', endAt: null,
+      source: 'manual', link: null,
+    }, fields);
     state.tasks.push(task);
   }
   cache(); emit('tasks');

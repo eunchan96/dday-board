@@ -7,7 +7,7 @@ import {
 import { errText } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
-  startOfWeek, toDateInput, toTimeInput, DAY,
+  startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
 } from './util.js';
 import { renderList, renderCalendar, renderSubjects } from './views.js';
 
@@ -20,6 +20,7 @@ const ui = {
   calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   selectedDay: startOfDay(new Date()),
   editingId: null,
+  kind: 'assignment',
 };
 
 const isEmbedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
@@ -36,12 +37,14 @@ function applyTheme() {
 /* ───── 필터 적용 ───── */
 function visibleTasks() {
   const q = ui.query.trim().toLowerCase();
-  const { subject, hideDone, starredOnly } = state.prefs;
+  const { subject, hideDone, starredOnly, kind } = state.prefs;
   return state.tasks.filter(t => {
     if (hideDone && t.done) return false;
+    if (kind === 'exam' && !isExam(t)) return false;
+    if (kind === 'assignment' && isExam(t)) return false;
     if (starredOnly && !t.starred) return false;
     if (subject != null && (t.subject || '') !== subject) return false;
-    if (q && !`${t.title} ${t.subject || ''} ${t.memo || ''}`.toLowerCase().includes(q)) return false;
+    if (q && !`${t.title} ${t.subject || ''} ${t.memo || ''} ${t.location || ''}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -49,12 +52,15 @@ function visibleTasks() {
 /* ───── 다음 마감 한 줄 ───── */
 function renderNext() {
   const now = new Date();
-  const pending = state.tasks.filter(t => !t.done);
-  const upcoming = pending.filter(t => new Date(t.due) >= now).sort((a, b) => new Date(a.due) - new Date(b.due));
+  const byDue = (a, b) => new Date(a.due) - new Date(b.due);
+  const assignments = state.tasks.filter(t => !isExam(t));
+  const pending = assignments.filter(t => !t.done);
+  const upcoming = pending.filter(t => new Date(t.due) >= now).sort(byDue);
   const over = pending.length - upcoming.length;
   const weekEnd = addDays(startOfWeek(now), 7);
   const thisWeek = upcoming.filter(t => new Date(t.due) < weekEnd).length;
-  const done = state.tasks.length - pending.length;
+  const done = state.tasks.filter(t => groupOf(t, now) === 'done').length;
+  const nextExam = state.tasks.filter(t => isExam(t) && !t.done && groupOf(t, now) !== 'done').sort(byDue)[0];
 
   const line = h('p', { class: 'next-line' });
   const next = upcoming[0];
@@ -66,18 +72,30 @@ function renderNext() {
       next.subject ? h('span', { class: 'muted' }, ` (${next.subject})`) : null,
       `, ${fmtDuration(left)} 남았어요.`,
     );
-  } else if (state.tasks.length) {
-    line.append('다가오는 마감이 없어요.', over ? h('span', { class: 'muted' }, ' 마감이 지난 과제만 남아 있어요.') : null);
+  } else if (assignments.length) {
+    line.append('다가오는 과제 마감이 없어요.', over ? h('span', { class: 'muted' }, ' 마감이 지난 과제만 남아 있어요.') : null);
   } else {
     line.append('과제를 추가하면 가장 가까운 마감을 여기에 알려 드려요.');
   }
 
   const stats = h('div', { class: 'next-stats' },
-    h('span', null, '이번 주 마감 ', h('b', null, thisWeek)),
+    h('span', null, '이번 주 과제 ', h('b', null, thisWeek)),
     h('span', { class: over ? 'warn' : '' }, '마감 지남 ', h('b', null, over)),
     h('span', null, '완료 ', h('b', null, done), ` / ${state.tasks.length}`),
   );
-  $('#next').replaceChildren(line, stats);
+  const parts = [line, stats];
+  if (nextExam) {
+    const d = new Date(nextExam.due);
+    const info = dday(nextExam, now);
+    parts.push(h('p', { class: 'next-exam' },
+      h('span', { class: 'kind-tag' }, '시험'),
+      '다음 시험은 ',
+      h('b', null, [nextExam.subject, nextExam.title].filter(Boolean).join(' ')),
+      `, ${fmtDate(d, false)} ${timeRange(nextExam)}`,
+      nextExam.location ? ` · ${nextExam.location}` : '',
+      ` (${info.label})`));
+  }
+  $('#next').replaceChildren(...parts);
 }
 
 /* ───── 왼쪽 필터 ───── */
@@ -123,6 +141,8 @@ function renderRail() {
     chip('전체', cur === null, () => setPref('subject', null)),
     subjects.map(([name]) => chip(name || '과목 없음', cur === name,
       () => setPref('subject', cur === name ? null : name), subjectColor(name))),
+    chip('과제만', state.prefs.kind === 'assignment', () => setPref('kind', state.prefs.kind === 'assignment' ? null : 'assignment')),
+    chip('시험만', state.prefs.kind === 'exam', () => setPref('kind', state.prefs.kind === 'exam' ? null : 'exam')),
     chip('완료 숨기기', state.prefs.hideDone, () => setPref('hideDone', !state.prefs.hideDone)),
     chip('중요만', state.prefs.starredOnly, () => setPref('starredOnly', !state.prefs.starredOnly)),
   );
@@ -130,6 +150,12 @@ function renderRail() {
   rail.replaceChildren(
     chips,
     h('div', null, h('h3', null, '과목'), list),
+    h('div', { class: 'kind-filter' }, h('h3', null, '종류'),
+      h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': '종류' },
+        [[null, '전체'], ['assignment', '과제'], ['exam', '시험']].map(([k, label]) => h('button', {
+          type: 'button', role: 'radio', 'aria-checked': state.prefs.kind === k ? 'true' : 'false',
+          onclick: () => setPref('kind', k),
+        }, label)))),
     h('div', { class: 'toggles' }, h('h3', null, '보기 옵션'),
       toggle('hideDone', '완료한 과제 숨기기'),
       toggle('starredOnly', '중요한 과제만 보기')),
@@ -148,7 +174,7 @@ const ctx = () => ({
   onToggle: id => toggleDone(id),
   onStar: id => toggleStar(id),
   onOpen: t => openPanel(t),
-  onNew: d => openPanel(null, d),
+  onNew: (d, kind) => openPanel(null, d, kind || 'assignment'),
   onToggleDoneGroup: () => { ui.showDone = !ui.showDone; renderView(); },
   onMonth: dir => {
     if (dir === 0) { const n = new Date(); ui.calMonth = new Date(n.getFullYear(), n.getMonth(), 1); ui.selectedDay = startOfDay(n); }
@@ -234,10 +260,33 @@ function quickDates() {
     h('button', { type: 'button', onclick: () => { $('#fDate').value = toDateInput(d); } }, label)));
 }
 
-function openPanel(task, presetDay) {
+const EXAM_NAMES = ['중간고사', '기말고사', '퀴즈', '실기시험'];
+
+// 과제 / 시험 템플릿 전환
+function setKind(kind, { isNew }) {
+  ui.kind = kind;
+  const exam = kind === 'exam';
+  $('#panel').classList.toggle('is-exam', exam);
+  $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
+  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 자세히' : '과제 자세히');
+  $('#fTitleLabel').textContent = exam ? '시험 이름' : '과제명';
+  $('#fTitle').placeholder = exam ? '예: 중간고사' : '예: HW3 정규화 연습문제';
+  $('#fDateLabel').textContent = exam ? '시험 날짜' : '마감 날짜';
+  $('#fTimeLabel').textContent = exam ? '시작 시각' : '시각';
+  $('#fDoneLabel').textContent = exam ? '응시 완료' : '제출 완료';
+  $('#fMemoLabel').textContent = exam ? '시험 범위와 메모' : '메모';
+  $('#fMemo').placeholder = exam ? '시험 범위, 준비물(학생증, 계산기), 공부할 것 등을 적어 두세요' : '제출 방법, 참고 자료, 할 일 등을 적어 두세요';
+  // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
+  if (isNew) {
+    const t = $('#fTime').value;
+    if (exam && (t === '23:59' || !t)) $('#fTime').value = '10:30';
+    if (!exam && t === '10:30') $('#fTime').value = '23:59';
+  }
+}
+
+function openPanel(task, presetDay, kind) {
   lastFocus = document.activeElement;
   ui.editingId = task ? task.id : null;
-  $('#panelTitle').textContent = task ? '과제 자세히' : '새 과제';
   $('#panelSave').textContent = task ? '저장' : '추가';
   $('#panelDelete').hidden = !task;
   $('#panelMsg').textContent = '';
@@ -250,6 +299,13 @@ function openPanel(task, presetDay) {
   $('#fDone').checked = !!(task && task.done);
   $('#fDoneRow').hidden = !task;
   $('#fMemo').value = task ? task.memo || '' : '';
+  $('#fLocation').value = task ? task.location || '' : '';
+  $('#fEnd').value = task && task.endAt ? toTimeInput(new Date(task.endAt)) : '';
+  setKind(task ? (isExam(task) ? 'exam' : 'assignment') : (kind || 'assignment'), { isNew: !task });
+  $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
+  $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
+    type: 'button', onclick: () => { $('#fTitle').value = n; $('#fTitle').focus(); },
+  }, n)));
 
   const note = $('#panelNote');
   if (task && task.source === 'canvas') {
@@ -286,10 +342,20 @@ function savePanel() {
   const due = new Date(`${$('#fDate').value}T${$('#fTime').value || '23:59'}`);
   if (isNaN(due)) { msg.textContent = '마감 날짜를 다시 확인해 주세요'; return; }
   const isNew = !ui.editingId;
+  const exam = ui.kind === 'exam';
+  let endAt = null;
+  if (exam && $('#fEnd').value) {
+    const end = new Date(`${$('#fDate').value}T${$('#fEnd').value}`);
+    if (end <= due) { msg.textContent = '끝나는 시각은 시작 시각보다 늦어야 해요'; $('#fEnd').focus(); return; }
+    endAt = end.toISOString();
+  }
   const fields = {
+    kind: exam ? 'exam' : 'assignment',
     title: title.slice(0, 200),
     subject: $('#fSubject').value.trim().slice(0, 40),
     due: due.toISOString(),
+    endAt,
+    location: exam ? $('#fLocation').value.trim().slice(0, 100) : '',
     starred: $('#fStar').checked,
     memo: $('#fMemo').value.slice(0, 2000),
   };
@@ -300,14 +366,14 @@ function savePanel() {
   }
   saveTask(fields, ui.editingId);
   closePanel();
-  if (isNew) toast(`"${title}" 과제를 추가했어요`);
+  if (isNew) toast(`"${title}" ${exam ? '시험을' : '과제를'} 추가했어요`);
 }
 
 function deleteFromPanel() {
   const id = ui.editingId;
   const t = removeTask(id);
   closePanel();
-  if (t) toast(`"${t.title}" 과제를 삭제했어요`, '되돌리기', () => undoRemove(id));
+  if (t) toast(`"${t.title}" ${isExam(t) ? '시험을' : '과제를'} 삭제했어요`, '되돌리기', () => undoRemove(id));
 }
 
 /* ───── 설정 ───── */
@@ -414,7 +480,10 @@ function bind() {
   // 상단
   $$('.views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
-  $('#btnNew').addEventListener('click', () => openPanel(null, state.prefs.view === 'calendar' ? ui.selectedDay : null));
+  const presetDay = () => (state.prefs.view === 'calendar' ? ui.selectedDay : null);
+  $('#btnNew').addEventListener('click', () => openPanel(null, presetDay(), 'assignment'));
+  $('#btnNewExam').addEventListener('click', () => openPanel(null, presetDay(), 'exam'));
+  $$('#kindPicker button').forEach(b => b.addEventListener('click', () => setKind(b.dataset.kind, { isNew: !ui.editingId })));
   $('#btnSync').addEventListener('click', () => { pull(); loadLms(); });
   $('#btnLms').addEventListener('click', e => runLmsSync(e.currentTarget));
   $('#btnSettings').addEventListener('click', openSettings);
@@ -478,7 +547,8 @@ function bind() {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
     if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!$('#panel').hidden || $('#settings').open) return;
-    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null); }
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null, null, 'assignment'); }
+    else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); openPanel(null, null, 'exam'); }
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === '1') setView('list');
     else if (e.key === '2') setView('calendar');

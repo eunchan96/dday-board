@@ -324,7 +324,7 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 .cal-dots i { width: 6px; height: 6px; border-radius: 50%; }
 .day-list { margin-top: 22px; }
 .day-list h3 { font-size: 16px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: baseline; gap: 10px; }
-.day-list h3 .btn { margin-left: auto; }
+.day-list h3 .btn:first-of-type { margin-left: auto; }
 
 /* ───── 과목별 보기 ───── */
 .subjects { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
@@ -439,3 +439,29 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ───── 시험 ───── */
+.kind-tag {
+  flex-shrink: 0; font-size: 11px; font-weight: 800; line-height: 18px;
+  padding: 0 6px; border-radius: 4px;
+  color: var(--paper); background: var(--ink);
+}
+.row .title .kind-tag { overflow: visible; }
+.row .meta .place::before { content: '@ '; color: var(--pencil-2); }
+.row.exam .tab { width: 4px; background-image: repeating-linear-gradient(180deg, transparent 0 3px, rgba(255, 255, 255, 0.55) 3px 5px); }
+.cal-pill.exam { background: var(--ink); color: var(--paper); }
+.cal-pill.exam.done { background: var(--sheet-2); color: inherit; }
+.cal-pill.exam.done span { text-decoration: none; color: var(--pencil-2); }
+.kind-picker { margin-bottom: -2px; }
+.kind-picker button { min-width: 72px; }
+.panel:not(.is-exam) .exam-only { display: none; }
+.panel.is-exam .field-row { grid-template-columns: 1fr 1fr; }
+.panel.is-exam .field-row .field:first-child { grid-column: 1 / -1; }
+.next-exam { flex-basis: 100%; font-size: 15px; font-weight: 600; color: var(--pencil); }
+.next-exam b { color: var(--ink); font-weight: 750; }
+.next-exam .kind-tag { margin-right: 6px; vertical-align: 1px; }
+@media (max-width: 640px) {
+  #btnNewExam { display: none; }
+}
+.kind-filter .segmented button { padding: 0 10px; }
+@media (max-width: 960px) { .rail .kind-filter { display: none; } }

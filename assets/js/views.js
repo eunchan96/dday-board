@@ -2,7 +2,7 @@
 
 import {
   h, dday, fmtDate, fmtDuration, groupOf, GROUPS, subjectColor,
-  startOfDay, addDays, sameDay, dayKey, WEEK,
+  startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange,
 } from './util.js';
 
 const ICON_CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
@@ -21,11 +21,16 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const now = ctx.now;
   const info = dday(t, now);
   const due = new Date(t.due);
-  const remain = t.done ? null : info.ms >= 0 ? `${fmtDuration(info.ms)} 남음` : `${fmtDuration(-info.ms)} 지남`;
+  const exam = isExam(t);
+  let remain = null;
+  if (!t.done) {
+    if (exam && info.ms < 0) remain = examOver(t, now) ? null : '지금 시험 중';
+    else remain = info.ms >= 0 ? `${fmtDuration(info.ms)} 남음` : `${fmtDuration(-info.ms)} 지남`;
+  }
 
   const check = h('button', {
     class: 'check', type: 'button',
-    'aria-label': t.done ? `${t.title} 완료 취소` : `${t.title} 완료`,
+    'aria-label': t.done ? `${t.title} 완료 취소` : `${t.title} ${exam ? '응시 완료' : '완료'}`,
     'aria-pressed': t.done ? 'true' : 'false',
     onclick: () => ctx.onToggle(t.id),
   }, svg(ICON_CHECK));
@@ -33,7 +38,8 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const title = h('div', { class: 'title' },
     // 넓은 화면의 목록에서는 오른쪽 별 버튼으로 보이므로 제목 옆 별은 CSS로 숨긴다
     t.starred ? h('span', { class: compact ? 'star-mark' : 'star-mark title-star', 'aria-label': '중요' }, '★') : null,
-    h('span', null, t.title),
+    exam ? h('span', { class: 'kind-tag' }, '시험') : null,
+    h('span', { class: 'title-text' }, t.title),
     t.link ? h('a', {
       class: 'lms-tag', href: t.link, target: '_blank', rel: 'noopener noreferrer',
       title: '스마트캠퍼스에서 열기', onclick: e => e.stopPropagation(),
@@ -42,7 +48,8 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   const meta = h('div', { class: 'meta' },
     !compact && t.subject ? h('span', null, t.subject) : null,
-    h('span', null, fmtDate(due)),
+    exam ? h('span', null, `${fmtDate(due, false)} ${timeRange(t)}`) : h('span', null, fmtDate(due)),
+    exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', null, remain) : null,
     !compact && t.memo ? h('span', { class: 'memo' }, t.memo.split('\n')[0]) : null,
   );
@@ -61,7 +68,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   const badge = h('div', { class: `dday ${info.level}` }, h('span', null, info.label));
 
-  return h('li', { class: `row${t.done ? ' done' : ''}`, dataset: { id: t.id } },
+  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}`, dataset: { id: t.id } },
     check,
     compact ? null : h('i', { class: 'tab', style: { background: subjectColor(t.subject) } }),
     main, star, badge);
@@ -157,9 +164,11 @@ export function renderCalendar(root, tasks, ctx) {
 
     list.slice(0, 3).forEach(t => {
       const lv = dday(t, ctx.now).level;
-      cell.append(h('span', { class: `cal-pill ${lv}`, title: `${t.subject ? t.subject + ' · ' : ''}${t.title}` },
+      const label = isExam(t) ? `${timeRange(t).split('–')[0]} ${t.title}` : t.title;
+      const tip = [t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
+      cell.append(h('span', { class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''}`, title: tip },
         h('i', { style: { background: subjectColor(t.subject) } }),
-        h('span', null, t.title)));
+        h('span', null, label)));
     });
     if (list.length > 3) cell.append(h('span', { class: 'cal-more' }, `+${list.length - 3}개`));
     if (list.length) {
@@ -178,8 +187,9 @@ export function renderCalendar(root, tasks, ctx) {
     const box = h('section', { class: 'day-list' },
       h('h3', null,
         `${sel.getMonth() + 1}월 ${sel.getDate()}일 (${WEEK[sel.getDay()]})`,
-        h('span', { class: 'msg' }, list.length ? `${list.length}개` : '과제 없음'),
-        h('button', { class: 'btn', onclick: () => ctx.onNew(sel) }, '이 날짜에 과제 추가')),
+        h('span', { class: 'msg' }, list.length ? `${list.length}개` : '일정 없음'),
+        h('button', { class: 'btn', onclick: () => ctx.onNew(sel, 'exam') }, '시험 추가'),
+        h('button', { class: 'btn', onclick: () => ctx.onNew(sel, 'assignment') }, '과제 추가')),
     );
     if (list.length) box.append(h('ul', { class: 'rows' }, list.map(t => taskRow(t, ctx))));
     root.append(box);
@@ -206,10 +216,11 @@ export function renderSubjects(root, tasks, ctx) {
 
   const now = ctx.now;
   const cards = [...groups.entries()].map(([name, list]) => {
-    const pending = list.filter(t => !t.done).sort(byDue);
+    const pending = list.filter(t => groupOf(t, now) !== 'done').sort(byDue);
     const done = list.length - pending.length;
     const next = pending.find(t => new Date(t.due) >= now) || pending[0];
-    return { name, list, pending, done, next };
+    const exams = pending.filter(isExam);
+    return { name, list, pending, done, next, exams };
   }).sort((a, b) => {
     // 남은 과제가 있는 과목 먼저, 그 안에서 가까운 마감 순
     if (!!a.next !== !!b.next) return a.next ? -1 : 1;
@@ -222,10 +233,15 @@ export function renderSubjects(root, tasks, ctx) {
     const color = subjectColor(c.name);
     const pct = c.list.length ? Math.round((c.done / c.list.length) * 100) : 0;
     let sub;
-    if (!c.pending.length) sub = `과제 ${c.list.length}개 모두 완료했어요`;
+    if (!c.pending.length) sub = `일정 ${c.list.length}개 모두 끝냈어요`;
     else {
       const info = dday(c.next, now);
-      sub = `남은 과제 ${c.pending.length}개 · 가장 가까운 마감 ${info.label}`;
+      const tasksLeft = c.pending.length - c.exams.length;
+      const parts = [];
+      if (tasksLeft) parts.push(`남은 과제 ${tasksLeft}개`);
+      if (c.exams.length) parts.push(`다가오는 시험 ${c.exams.length}개`);
+      parts.push(`가장 가까운 일정 ${info.label}`);
+      sub = parts.join(' · ');
     }
     const shown = c.pending.slice(0, 4);
     const card = h('article', { class: 'subject-card', style: { '--c': color } },
@@ -235,10 +251,10 @@ export function renderSubjects(root, tasks, ctx) {
         class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct),
         'aria-label': `${c.name || '과목 없음'} 완료율 ${pct}%`,
       }, h('i', { style: { width: `${pct}%` } })),
-      h('p', { class: 'sub' }, `완료 ${c.done} / 전체 ${c.list.length}`),
+      h('p', { class: 'sub' }, `끝낸 일정 ${c.done} / 전체 ${c.list.length}`),
       shown.length ? h('ul', { class: 'rows' }, shown.map(t => taskRow(t, ctx, { compact: true }))) : null,
       h('button', { class: 'more', onclick: () => ctx.onShowSubject(c.name) },
-        c.pending.length > shown.length ? `남은 과제 ${c.pending.length - shown.length}개 더 보기` : '이 과목만 목록으로 보기'),
+        c.pending.length > shown.length ? `남은 일정 ${c.pending.length - shown.length}개 더 보기` : '이 과목만 목록으로 보기'),
     );
     wrap.append(card);
   }

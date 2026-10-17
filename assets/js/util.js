@@ -34,11 +34,31 @@ export function fmtDuration(ms) {
   return `${mins}분`;
 }
 
+export const isExam = t => t.kind === 'exam';
+
+// 시험이 끝났는지 (끝나는 시각이 없으면 시작 시각 기준)
+export function examOver(t, now = new Date()) {
+  const end = t.endAt ? new Date(t.endAt) : new Date(t.due);
+  return now >= end;
+}
+
+// "10:30–12:00" 또는 "10:30"
+export function timeRange(t) {
+  const s = new Date(t.due);
+  const start = `${pad(s.getHours())}:${pad(s.getMinutes())}`;
+  if (!t.endAt) return start;
+  const e = new Date(t.endAt);
+  return `${start}–${pad(e.getHours())}:${pad(e.getMinutes())}`;
+}
+
 // D-day 라벨과 긴급도
 export function dday(task, now = new Date()) {
   const due = new Date(task.due);
   const ms = due - now;
-  if (task.done) return { label: '완료', level: 'done', ms };
+  if (task.done) return { label: isExam(task) ? '응시함' : '완료', level: 'done', ms };
+  if (isExam(task) && ms < 0) {
+    return examOver(task, now) ? { label: '끝남', level: 'done', ms } : { label: '시험 중', level: 'urgent', ms };
+  }
   if (ms < 0) return { label: '지남', level: 'over', ms };
   const diff = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
   return {
@@ -62,6 +82,7 @@ export const GROUPS = [
 export function groupOf(task, now = new Date()) {
   if (task.done) return 'done';
   const due = new Date(task.due);
+  if (isExam(task) && due < now) return examOver(task, now) ? 'done' : 'today';   // 지난 시험은 완료 쪽으로
   if (due < now) return 'over';
   const today = startOfDay(now);
   const d = startOfDay(due);
