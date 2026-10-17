@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>과제 D-day 보드</title>
+<style>
+  :root{
+    --card:#ffffff;
+    --line:#ebe9e4;
+    --text:#25262b;
+    --sub:#8b8b90;
+    --soft:#f6f5f2;
+    --accent:#2f6fed;
+    --green:#2f9e5b;
+    --red:#d9443a;    --red-bg:#fdecea;
+    --orange:#d9821a; --orange-bg:#fdf2e2;
+    --gray-bg:#f0efec;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --card:#242528; --line:#35363b; --text:#ececee; --sub:#9b9ba2;
+      --soft:#2c2d31; --gray-bg:#33343a;
+      --red-bg:#3d2624; --orange-bg:#3c3020;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:transparent;
+    font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard','Malgun Gothic',sans-serif;
+    color:var(--text);
+    padding:16px;
+    display:flex; justify-content:center;
+  }
+  .board{
+    width:100%; max-width:480px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px 18px 12px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.06);
+  }
+  [hidden]{ display:none !important; }
+
+  /* 헤더 */
+  .head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .title{ font-size:17px; font-weight:700; letter-spacing:-0.2px; }
+  .summary{ font-size:12px; color:var(--sub); margin-top:3px; }
+  .summary b{ color:var(--text); font-weight:600; }
+  .summary .over{ color:var(--red); }
+  .head-btns{ display:flex; gap:6px; flex-shrink:0; }
+  .btn{
+    border:1px solid var(--line); background:var(--soft); color:var(--text);
+    font:inherit; font-size:12.5px; font-weight:600;
+    padding:6px 11px; border-radius:8px; cursor:pointer;
+    transition:background 150ms, border-color 150ms, opacity 150ms;
+  }
+  .btn:hover{ border-color:var(--sub); }
+  .btn:disabled{ opacity:0.5; cursor:default; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary:hover{ filter:brightness(1.06); }
+  .btn.danger{ color:var(--red); }
+  .btn.icon{ padding:6px 9px; }
+
+  input[type=text], input[type=date], input[type=time], textarea{
+    width:100%; font:inherit; font-size:13px; color:var(--text);
+    background:var(--card); border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; outline:none;
+  }
+  input:focus, textarea:focus{ border-color:var(--accent); }
+
+  /* 입력 폼 */
+  .form{
+    display:none;
+    background:var(--soft); border-radius:12px;
+    padding:12px; margin-bottom:14px;
+    gap:8px; grid-template-columns:1fr 1fr;
+  }
+  .form.open{ display:grid; }
+  .form .full{ grid-column:1 / -1; }
+  .actions{ display:flex; justify-content:flex-end; align-items:center; gap:6px; }
+  .form .actions{ grid-column:1 / -1; }
+  .msg{ font-size:12px; margin-right:auto; }
+  .msg.err{ color:var(--red); }
+  .msg.ok{ color:var(--green); }
+
+  /* 필터 */
+  .filter{ display:flex; justify-content:flex-end; margin-bottom:6px; }
+  .filter label{ font-size:12px; color:var(--sub); display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; }
+
+  /* 목록 */
+  .list{ list-style:none; }
+  .item{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 4px; border-top:1px solid var(--line);
+  }
+  .item:first-child{ border-top:none; }
+  .check{
+    width:18px; height:18px; flex-shrink:0;
+    border:1.6px solid var(--sub); border-radius:5px;
+    background:transparent; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 150ms, border-color 150ms;
+  }
+  .check svg{ width:12px; height:12px; opacity:0; }
+  .item.done .check{ background:var(--accent); border-color:var(--accent); }
+  .item.done .check svg{ opacity:1; }
+
+  .body{ flex:1; min-width:0; }
+  .line1{ display:flex; align-items:center; gap:6px; }
+  .chip{
+    font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .task{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .line2{ font-size:11.5px; color:var(--sub); margin-top:3px; }
+  .item.done .task{ text-decoration:line-through; color:var(--sub); }
+  .item.done .chip{ opacity:0.5; }
+
+  .badge{
+    font-size:12px; font-weight:800; letter-spacing:0.2px;
+    padding:4px 9px; border-radius:8px; white-space:nowrap;
+    background:var(--gray-bg); color:var(--text);
+    font-variant-numeric:tabular-nums;
+  }
+  .badge.soon{ background:var(--orange-bg); color:var(--orange); }
+  .badge.urgent{ background:var(--red-bg); color:var(--red); }
+  .badge.over{ background:var(--red); color:#fff; }
+  .badge.done{ background:transparent; color:var(--sub); font-weight:600; }
+
+  .del{
+    border:none; background:none; color:var(--sub); cursor:pointer;
+    font:inherit; font-size:12px; padding:4px 6px; border-radius:6px;
+    opacity:0.5; transition:opacity 150ms, background 150ms;
+    white-space:nowrap;
+  }
+  .item:hover .del{ opacity:1; }
+  .del.confirm{ opacity:1; color:#fff; background:var(--red); }
+
+  .empty{ text-align:center; color:var(--sub); font-size:13px; padding:26px 0 20px; }
+
+  /* 연결 화면 */
+  .connect{ padding:6px 0 4px; }
+  .connect h2{ font-size:15px; font-weight:700; margin-bottom:6px; }
+  .connect p{ font-size:12.5px; color:var(--sub); line-height:1.6; margin-bottom:14px; }
+  .connect .box{ background:var(--soft); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .connect .box-title{ font-size:12px; font-weight:700; margin-bottom:8px; }
+  .connect .row{ display:flex; gap:6px; }
+  .connect .row input{ font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.5px; text-transform:uppercase; }
+
+  /* 패널 (설정 / 코드 안내) */
+  .panel{ margin-top:12px; background:var(--soft); border-radius:12px; padding:12px; }
+  .panel p{ font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.55; }
+  .panel p b{ color:var(--text); }
+  .panel .section{ padding-top:10px; margin-top:10px; border-top:1px solid var(--line); }
+  .panel .section:first-child{ padding-top:0; margin-top:0; border-top:none; }
+  .codebox{
+    display:flex; gap:6px; align-items:center; margin-bottom:6px;
+  }
+  .codebox input{
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; font-weight:700;
+    letter-spacing:1px; text-align:center;
+  }
+  .panel textarea{
+    height:90px; resize:vertical;
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px;
+  }
+  .panel .actions{ margin-top:8px; }
+
+  .foot{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    margin-top:10px; padding-top:8px; border-top:1px solid var(--line);
+    font-size:11px; color:var(--sub);
+  }
+  .foot button{ border:none; background:none; color:var(--sub); font:inherit; cursor:pointer; text-decoration:underline; }
+  .status{ display:flex; align-items:center; gap:5px; }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--sub); }
+  .status.ok .dot{ background:var(--green); }
+  .status.busy .dot{ background:var(--orange); }
+  .status.err{ color:var(--red); cursor:pointer; }
+  .status.err .dot{ background:var(--red); }
+</style>
+</head>
+<body>
+
+<div class="board">
+
+  <!-- ───── 연결 화면 (코드 없을 때) ───── -->
+  <div id="viewConnect" hidden>
+    <div class="connect">
+      <h2>과제 D-day 보드 연결</h2>
+      <p>과제는 서버에 저장되고, 같은 <b>보드 코드</b>를 입력한 기기끼리 자동으로 동기화돼요.</p>
+
+      <div class="box">
+        <div class="box-title">처음 쓰는 거라면</div>
+        <div class="actions" style="justify-content:flex-start">
+          <button class="btn primary" id="btnCreate">새 보드 만들기</button>
+          <span class="msg" id="createMsg" style="margin-left:6px"></span>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="box-title">다른 기기에서 이미 만들었다면</div>
+        <div class="row">
+          <input type="text" id="inCode" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false">
+          <button class="btn primary" id="btnConnect">연결</button>
+        </div>
+        <div class="msg" id="connectMsg" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───── 보드 화면 ───── -->
+  <div id="viewBoard" hidden>
+    <div class="head">
+      <div>
+        <div class="title">과제 D-day</div>
+        <div class="summary" id="summary"></div>
+      </div>
+      <div class="head-btns">
+        <button class="btn icon" id="btnSync" title="지금 동기화" aria-label="지금 동기화">↻</button>
+        <button class="btn primary" id="btnAdd">+ 추가</button>
+      </div>
+    </div>
+
+    <!-- 노션 HTML 블록은 form 제출이 막혀 있어서 form 태그 대신 div + 버튼 클릭으로 처리 -->
+    <div class="form" id="form">
+      <input type="text" class="full" id="inSubject" placeholder="과목 (예: 데이터베이스)" list="subjects" autocomplete="off">
+      <datalist id="subjects"></datalist>
+      <input type="text" class="full" id="inTitle" placeholder="과제명" autocomplete="off">
+      <input type="date" id="inDate">
+      <input type="time" id="inTime" value="23:59">
+      <div class="actions">
+        <span class="msg err" id="formMsg"></span>
+        <button type="button" class="btn" id="btnCancel">취소</button>
+        <button type="button" class="btn primary" id="btnSave">저장</button>
+      </div>
+    </div>
+
+    <div class="filter">
+      <label><input type="checkbox" id="hideDone"> 완료 숨기기</label>
+    </div>
+
+    <ul class="list" id="list"></ul>
+
+    <!-- 새 보드 만든 직후 코드 안내 -->
+    <div class="panel" id="panelNewCode" hidden>
+      <p><b>보드가 만들어졌어요.</b> 다른 기기(폰 노션 앱 등)에서 이 위젯을 열고 아래 코드를 입력하면 같은 과제가 보여요. 코드는 비밀번호 역할을 하니 다른 사람에게 공유하지 마세요.</p>
+      <div class="codebox">
+        <input type="text" id="newCodeText" readonly>
+        <button class="btn" id="btnCopyNew">복사</button>
+      </div>
+      <div class="actions"><span class="msg" id="copyNewMsg"></span><button class="btn" id="btnCloseNew">확인</button></div>
+    </div>
+
+    <!-- 설정 -->
+    <div class="panel" id="panelSettings" hidden>
+      <div class="section">
+        <p><b>보드 코드</b> · 다른 기기에서 이 코드를 입력하면 연결돼요.</p>
+        <div class="codebox">
+          <input type="text" id="codeText" readonly>
+          <button class="btn" id="btnShowCode">보기</button>
+          <button class="btn" id="btnCopyCode">복사</button>
+        </div>
+        <div class="msg" id="copyMsg"></div>
+      </div>
+      <div class="section">
+        <p><b>이전 위젯 데이터 가져오기</b> · 예전 위젯의 "백업 / 불러오기"에서 복사한 텍스트를 붙여 넣으세요. 이미 있는 과제는 건너뛰어요.</p>
+        <textarea id="importText" spellcheck="false" placeholder='[{"id":"...","title":"...","due":"..."}]'></textarea>
+        <div class="actions">
+          <span class="msg" id="importMsg"></span>
+          <button class="btn primary" id="btnImport">가져오기</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="actions">
+          <span class="msg" style="color:var(--sub)">연결을 해제해도 서버 데이터는 남아 있어요.</span>
+          <button class="btn danger" id="btnDisconnect">이 기기 연결 해제</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="status" id="status"><span class="dot"></span><span id="statusText"></span></span>
+      <button id="btnSettings">설정</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ───── 서버 설정 (공개 키: 테이블 직접 접근은 막혀 있고 코드 기반 함수만 호출 가능) ───── */
+  const API_URL = 'https://azwiggxcvmeppkfvdbln.supabase.co/rest/v1/rpc/';
+  const API_KEY = 'sb_publishable_d5_83pjNlpVx5h0VWvF7Jg_5vresbV-';
+
+  const CODE_KEY   = 'ddayboard.code';
+  const CACHE_KEY  = 'ddayboard.cache';
+  const LEGACY_KEY = 'ddayboard.v1';       // 이전 로컬 저장 버전
+  const PREF_KEY   = 'ddayboard.hideDone';
+  const DAY = 86400000;
+  const SYNC_INTERVAL = 30000;
+
+  /* ───── localStorage 래퍼 ───── */
+  const store = {
+    get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+    set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
+    del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  };
+
+  /* ───── 서버 호출 ───── */
+  async function rpc(name, body){
+    let res;
+    try{
+      res = await fetch(API_URL + name, {
+        method:'POST',
+        headers:{ 'apikey':API_KEY, 'Content-Type':'application/json' },
+        body: JSON.stringify(body || {})
+      });
+    }catch(e){
+      throw new Error('network');
+    }
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok){
+      const msg = (data && data.message) || ('http_' + res.status);
+      throw new Error(msg);
+    }
+    return data;
+  }
+  function errText(e){
+    switch(e.message){
+      case 'network':        return '서버에 연결할 수 없어요';
+      case 'invalid_code':   return '코드가 올바르지 않아요';
+      case 'too_many_tasks': return '과제는 최대 500개까지 저장돼요';
+      default:               return '오류가 났어요 (' + e.message + ')';
+    }
+  }
+
+  /* ───── 상태 ───── */
+  let code = store.get(CODE_KEY);
+  let tasks = [];
+  try{ tasks = JSON.parse(store.get(CACHE_KEY) || '[]'); }catch(e){ tasks = []; }
+  let inflight = 0;
+  let localVersion = 0;      // 이 기기에서 바뀔 때마다 증가 → 그 사이 받아온 목록은 버림
+  let lastSync = null;
+  let syncError = null;
+
+  /* ───── DOM ───── */
+  const $ = id => document.getElementById(id);
+  const viewConnect = $('viewConnect'), viewBoard = $('viewBoard');
+  const listEl = $('list'), summaryEl = $('summary');
+  const form = $('form'), inSubject = $('inSubject'), inTitle = $('inTitle');
+  const inDate = $('inDate'), inTime = $('inTime');
+  const hideDone = $('hideDone');
+  const statusEl = $('status'), statusText = $('statusText');
+
+  hideDone.checked = store.get(PREF_KEY) === '1';
+
+  /* ───── 유틸 ───── */
+  const WEEK = ['일','월','화','수','목','금','토'];
+  const pad = n => String(n).padStart(2,'0');
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  function fmtDate(d){
+    return `${d.getMonth()+1}/${d.getDate()} (${WEEK[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function fmtClock(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtDuration(ms){
+    const totalMin = Math.floor(ms / 60000);
+    const days = Math.floor(totalMin / 1440);
+    const hours = Math.floor((totalMin % 1440) / 60);
+    const mins = totalMin % 60;
+    if (days > 0) return `${days}일 ${hours}시간`;
+    if (hours > 0) return `${hours}시간 ${mins}분`;
+    return `${mins}분`;
+  }
+
+  const PALETTE = [
+    ['#2f6fed','rgba(47,111,237,0.12)'], ['#c2410c','rgba(194,65,12,0.12)'],
+    ['#0f8a6a','rgba(15,138,106,0.12)'], ['#8b3fd9','rgba(139,63,217,0.12)'],
+    ['#b8860b','rgba(184,134,11,0.14)'], ['#d6336c','rgba(214,51,108,0.12)'],
+    ['#0e7490','rgba(14,116,144,0.12)'], ['#57534e','rgba(87,83,78,0.12)']
+  ];
+  function subjectColor(name){
+    let h = 0;
+    for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  function ddayInfo(task, now){
+    const due = new Date(task.due);
+    const ms = due - now;
+    if (task.done) return { label:'완료', level:'done', detail: fmtDate(due) };
+    if (ms < 0) return { label:'지남', level:'over', detail: `${fmtDate(due)} · ${fmtDuration(-ms)} 지남` };
+    const dayDiff = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
+    const label = dayDiff === 0 ? 'D-DAY' : `D-${dayDiff}`;
+    const level = ms <= DAY ? 'urgent' : dayDiff <= 3 ? 'soon' : 'normal';
+    return { label, level, detail: `${fmtDate(due)} · ${fmtDuration(ms)} 남음` };
+  }
+
+  // 예전 로컬 데이터 형식("2026-10-20T23:59")을 서버 형식(ISO, UTC)으로
+  function toServerTasks(list){
+    return (Array.isArray(list) ? list : [])
+      .filter(t => t && t.title && t.due && !isNaN(new Date(t.due)))
+      .map(t => ({
+        id: String(t.id || newId()).slice(0, 40),
+        subject: String(t.subject || '').slice(0, 40),
+        title: String(t.title).slice(0, 200),
+        due: new Date(t.due).toISOString(),
+        done: !!t.done
+      }));
+  }
+
+  /* ───── 화면 전환 ───── */
+  function showView(){
+    viewConnect.hidden = !!code;
+    viewBoard.hidden = !code;
+    if (code){ $('codeText').value = maskCode(code); }
+  }
+  function maskCode(c){ return c.slice(0, 5) + '-•••••-•••••-' + c.slice(-5); }
+
+  /* ───── 렌더 ───── */
+  function render(){
+    const now = new Date();
+    const pending = tasks.filter(t => !t.done);
+    const over = pending.filter(t => new Date(t.due) < now).length;
+    const week = pending.filter(t => { const ms = new Date(t.due) - now; return ms >= 0 && ms <= 7*DAY; }).length;
+
+    const parts = [`남은 과제 <b>${pending.length}</b>`, `7일 이내 <b>${week}</b>`];
+    if (over) parts.push(`<span class="over">마감 지남 <b class="over">${over}</b></span>`);
+    summaryEl.innerHTML = parts.join(' · ');
+
+    const sorted = [...tasks].sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return a.done ? new Date(b.due) - new Date(a.due) : new Date(a.due) - new Date(b.due);
+    });
+    const visible = hideDone.checked ? sorted.filter(t => !t.done) : sorted;
+
+    listEl.innerHTML = '';
+    if (!visible.length){
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = tasks.length ? '남은 과제가 없어요 🎉' : '+ 추가를 눌러 과제를 등록해 보세요';
+      listEl.appendChild(li);
+    }
+
+    for (const t of visible){
+      const info = ddayInfo(t, now);
+      const li = document.createElement('li');
+      li.className = 'item' + (t.done ? ' done' : '');
+      li.dataset.id = t.id;
+
+      const check = document.createElement('button');
+      check.className = 'check';
+      check.dataset.action = 'toggle';
+      check.setAttribute('aria-label', t.done ? '완료 취소' : '완료');
+      check.innerHTML = '<svg viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5 6.5 5 9 9.5 3.5"/></svg>';
+
+      const body = document.createElement('div');
+      body.className = 'body';
+      const line1 = document.createElement('div');
+      line1.className = 'line1';
+      if (t.subject){
+        const [fg, bg] = subjectColor(t.subject);
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.style.color = fg; chip.style.background = bg;
+        chip.textContent = t.subject;
+        line1.appendChild(chip);
+      }
+      const title = document.createElement('span');
+      title.className = 'task';
+      title.textContent = t.title;
+      title.title = t.title;
+      line1.appendChild(title);
+      const line2 = document.createElement('div');
+      line2.className = 'line2';
+      line2.textContent = info.detail;
+      body.append(line1, line2);
+
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + info.level;
+      badge.textContent = info.label;
+
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.dataset.action = 'delete';
+      del.textContent = '삭제';
+
+      li.append(check, body, badge, del);
+      listEl.appendChild(li);
+    }
+
+    const subjects = [...new Set(tasks.map(t => t.subject).filter(Boolean))];
+    $('subjects').innerHTML = '';
+    for (const s of subjects){
+      const opt = document.createElement('option');
+      opt.value = s;
+      $('subjects').appendChild(opt);
+    }
+  }
+
+  function renderStatus(){
+    statusEl.className = 'status';
+    if (inflight > 0){ statusEl.classList.add('busy'); statusText.textContent = '동기화 중…'; }
+    else if (syncError){ statusEl.classList.add('err'); statusText.textContent = syncError + ' · 눌러서 다시 시도'; }
+    else if (lastSync){ statusEl.classList.add('ok'); statusText.textContent = `동기화됨 · ${fmtClock(lastSync)}`; }
+    else { statusText.textContent = '불러오는 중…'; }
+  }
+
+  function cache(){ store.set(CACHE_KEY, JSON.stringify(tasks)); }
+
+  /* ───── 동기화 ───── */
+  async function pull(){
+    if (!code || inflight > 0) return;
+    inflight++; renderStatus();
+    const startedAt = localVersion;
+    try{
+      const data = await rpc('dday_list', { p_code: code });
+      if (startedAt !== localVersion) return;   // 받아오는 사이 이 기기에서 수정됨
+      tasks = Array.isArray(data) ? data : [];
+      cache();
+      syncError = null;
+      lastSync = new Date();
+      if (!pendingDelete) render();
+    }catch(e){
+      if (e.message === 'invalid_code'){ disconnect('이 기기에 저장된 코드가 더 이상 유효하지 않아요'); return; }
+      syncError = errText(e);
+    }finally{
+      inflight = Math.max(0, inflight - 1);
+      renderStatus();
+    }
+  }
+
+  // 화면을 먼저 바꾸고(낙관적 업데이트) 서버에 반영, 실패하면 서버 상태로 되돌림
+  async function push(name, body){
+    localVersion++;
+    inflight++; renderStatus();
+    try{
+      await rpc(name, Object.assign({ p_code: code }, body));
+      syncError = null;
+      lastSync = new Date();
+    }catch(e){
+      syncError = errText(e);
+    }finally{
+      inflight = Math.max(0, inflight - 1);
+      renderStatus();
+      if (syncError) pull();
+    }
+  }
+
+  async function migrateLegacy(){
+    let legacy = [];
+    try{ legacy = JSON.parse(store.get(LEGACY_KEY) || '[]'); }catch(e){}
+    const list = toServerTasks(legacy);
+    if (!list.length) return 0;
+    const n = await rpc('dday_import', { p_code: code, p_tasks: list });
+    store.del(LEGACY_KEY);
+    return n;
+  }
+
+  /* ───── 연결 / 해제 ───── */
+  $('btnCreate').addEventListener('click', async () => {
+    const btn = $('btnCreate'), msg = $('createMsg');
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = '만드는 중…';
+    try{
+      code = await rpc('dday_create_board');
+      store.set(CODE_KEY, code);
+      await migrateLegacy().catch(() => 0);
+      tasks = [];
+      showView(); render(); await pull();
+      $('newCodeText').value = code;
+      $('panelNewCode').hidden = false;
+    }catch(e){
+      msg.className = 'msg err'; msg.textContent = errText(e);
+    }finally{
+      btn.disabled = false;
+      if (code) msg.textContent = '';
+    }
+  });
+
+  async function connectWith(input){
+    const msg = $('connectMsg'), btn = $('btnConnect');
+    const c = input.trim().toUpperCase();
+    if (c.replace(/[^A-Z0-9]/g, '').length < 20){
+      msg.className = 'msg err'; msg.textContent = '코드 20자를 모두 입력해 주세요'; return;
+    }
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = '확인 중…';
+    try{
+      const data = await rpc('dday_list', { p_code: c });
+      code = c;
+      store.set(CODE_KEY, code);
+      tasks = Array.isArray(data) ? data : [];
+      const n = await migrateLegacy().catch(() => 0);
+      if (n) tasks = await rpc('dday_list', { p_code: code });
+      cache();
+      lastSync = new Date(); syncError = null;
+      msg.textContent = ''; $('inCode').value = '';
+      showView(); render(); renderStatus();
+    }catch(e){
+      msg.className = 'msg err'; msg.textContent = errText(e);
+    }finally{
+      btn.disabled = false;
+    }
+  }
+  $('btnConnect').addEventListener('click', () => connectWith($('inCode').value));
+  $('inCode').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); connectWith($('inCode').value); } });
+
+  let disconnectArmed = null;
+  function disconnect(reason){
+    code = null; tasks = [];
+    store.del(CODE_KEY); store.del(CACHE_KEY);
+    $('panelSettings').hidden = true;
+    $('panelNewCode').hidden = true;
+    showView();
+    if (reason){ const m = $('connectMsg'); m.className = 'msg err'; m.textContent = reason; }
+  }
+  $('btnDisconnect').addEventListener('click', () => {
+    const btn = $('btnDisconnect');
+    if (disconnectArmed){
+      clearTimeout(disconnectArmed); disconnectArmed = null;
+      btn.textContent = '이 기기 연결 해제';
+      disconnect();
+      return;
+    }
+    btn.textContent = '정말 해제할까요?';
+    disconnectArmed = setTimeout(() => { disconnectArmed = null; btn.textContent = '이 기기 연결 해제'; }, 3000);
+  });
+
+  /* ───── 코드 보기 / 복사 ───── */
+  async function copyText(text, input, msgEl){
+    let ok = false;
+    try{ await navigator.clipboard.writeText(text); ok = true; }catch(e){}
+    if (!ok){
+      // 노션 블록에서 클립보드 접근이 막히면 선택만 해 두고 직접 복사하게 안내
+      input.value = text; input.focus(); input.select();
+      try{ ok = document.execCommand('copy'); }catch(e){}
+    }
+    msgEl.className = ok ? 'msg ok' : 'msg';
+    msgEl.textContent = ok ? '복사했어요' : '선택해 뒀어요. Ctrl/⌘+C로 복사하세요';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+  }
+  let codeShown = false;
+  $('btnShowCode').addEventListener('click', () => {
+    codeShown = !codeShown;
+    $('codeText').value = codeShown ? code : maskCode(code);
+    $('btnShowCode').textContent = codeShown ? '숨기기' : '보기';
+  });
+  $('btnCopyCode').addEventListener('click', () => copyText(code, $('codeText'), $('copyMsg')));
+  $('btnCopyNew').addEventListener('click', () => copyText(code, $('newCodeText'), $('copyNewMsg')));
+  $('btnCloseNew').addEventListener('click', () => { $('panelNewCode').hidden = true; });
+
+  $('btnSettings').addEventListener('click', () => {
+    const p = $('panelSettings');
+    p.hidden = !p.hidden;
+    codeShown = false;
+    $('codeText').value = maskCode(code);
+    $('btnShowCode').textContent = '보기';
+    $('importMsg').textContent = '';
+  });
+
+  /* ───── 이전 백업 가져오기 ───── */
+  $('btnImport').addEventListener('click', async () => {
+    const msg = $('importMsg'), btn = $('btnImport');
+    let list;
+    try{ list = toServerTasks(JSON.parse($('importText').value)); }
+    catch(e){ msg.className = 'msg err'; msg.textContent = '형식이 올바르지 않아요'; return; }
+    if (!list.length){ msg.className = 'msg err'; msg.textContent = '가져올 과제가 없어요'; return; }
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = '가져오는 중…';
+    try{
+      const n = await rpc('dday_import', { p_code: code, p_tasks: list });
+      msg.className = 'msg ok'; msg.textContent = `${n}개 가져왔어요`;
+      $('importText').value = '';
+      await pull();
+    }catch(e){
+      msg.className = 'msg err'; msg.textContent = errText(e);
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
+  /* ───── 입력 폼 ───── */
+  function openForm(){
+    form.classList.add('open');
+    if (!inDate.value){
+      const d = new Date(Date.now() + 7*DAY);
+      inDate.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    inSubject.focus();
+  }
+  function closeForm(){
+    form.classList.remove('open');
+    inSubject.value = ''; inTitle.value = ''; inDate.value = ''; inTime.value = '23:59';
+    $('formMsg').textContent = '';
+  }
+  $('btnAdd').addEventListener('click', () => form.classList.contains('open') ? closeForm() : openForm());
+  $('btnCancel').addEventListener('click', closeForm);
+  $('btnSave').addEventListener('click', saveTask);
+  [inSubject, inTitle, inDate, inTime].forEach(el =>
+    el.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveTask(); } })
+  );
+
+  function saveTask(){
+    const title = inTitle.value.trim();
+    const msg = $('formMsg');
+    if (!title){ msg.textContent = '과제명을 입력해 주세요'; inTitle.focus(); return; }
+    if (!inDate.value){ msg.textContent = '마감 날짜를 골라 주세요'; inDate.focus(); return; }
+    const task = {
+      id: newId(),
+      subject: inSubject.value.trim().slice(0, 40),
+      title: title.slice(0, 200),
+      due: new Date(`${inDate.value}T${inTime.value || '23:59'}`).toISOString(),
+      done: false
+    };
+    tasks.push(task);
+    cache(); closeForm(); render();
+    push('dday_upsert', { p_task: task });
+  }
+
+  /* ───── 목록 조작 ───── */
+  let pendingDelete = null;
+  listEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const id = btn.closest('.item').dataset.id;
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    if (btn.dataset.action === 'toggle'){
+      task.done = !task.done;
+      cache(); render();
+      push('dday_upsert', { p_task: task });
+    }
+    if (btn.dataset.action === 'delete'){
+      if (pendingDelete && pendingDelete.id === id){
+        clearTimeout(pendingDelete.timer);
+        pendingDelete = null;
+        tasks = tasks.filter(t => t.id !== id);
+        cache(); render();
+        push('dday_delete', { p_id: id });
+      } else {
+        if (pendingDelete) clearTimeout(pendingDelete.timer);
+        btn.classList.add('confirm');
+        btn.textContent = '삭제?';
+        pendingDelete = { id, timer: setTimeout(() => { pendingDelete = null; render(); }, 2500) };
+      }
+    }
+  });
+
+  hideDone.addEventListener('change', () => {
+    store.set(PREF_KEY, hideDone.checked ? '1' : '0');
+    render();
+  });
+
+  $('btnSync').addEventListener('click', pull);
+  statusEl.addEventListener('click', () => { if (syncError) pull(); });
+
+  /* ───── 시작 ───── */
+  showView();
+  if (code){
+    render(); renderStatus();
+    pull();
+  }
+  // 다른 기기 변경 사항 반영: 주기적으로, 그리고 화면으로 돌아올 때
+  setInterval(() => {
+    if (!code) return;
+    if (!form.classList.contains('open')) pull();
+    else if (!pendingDelete) render();
+  }, SYNC_INTERVAL);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+  window.addEventListener('focus', pull);
+})();
+</script>
+</body>
+</html>
