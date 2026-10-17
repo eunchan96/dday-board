@@ -56,7 +56,7 @@ export function errText(e) {
     case 'no_feed': return '스마트캠퍼스 피드가 등록되지 않았어요';
     case 'feed_invalid': return '피드 내용을 읽을 수 없어요. 주소를 다시 복사해 주세요';
     case 'feed_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';
-    case 'invalid_token': return '토큰 모양이 아니에요. 숫자~영문 형태의 토큰 전체를 붙여 넣어 주세요';
+    case 'invalid_token': return '토큰을 읽지 못했어요. 스마트캠퍼스에 나온 토큰 전체를 다시 복사해 붙여 넣어 주세요';
     case 'token_invalid': return '토큰이 만료됐거나 지워졌어요. 스마트캠퍼스에서 새 토큰을 만들어 넣어 주세요';
     case 'api_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';
     case 'api_unexpected': return '스마트캠퍼스가 예상과 다른 응답을 보냈어요. 잠시 후 다시 시도해 주세요';

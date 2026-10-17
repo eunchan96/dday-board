@@ -16,7 +16,8 @@ declare
   v_token text := nullif(regexp_replace(coalesce(p_token, ''), '\s', '', 'g'), '');
   v_secret uuid;
 begin
-  if v_token is not null and v_token !~ '^[0-9]+~[A-Za-z0-9]{20,200}$' then
+  -- 형식은 학교마다 달라서 길이와 문자만 확인하고, 진짜인지는 첫 동기화(401 여부)로 판단한다
+  if v_token is not null and v_token !~ '^[A-Za-z0-9~_.+/=-]{20,400}$' then
     raise exception 'invalid_token' using errcode = 'P0001';
   end if;
   select canvas_token_secret into v_secret from app.boards where id = v_board;
