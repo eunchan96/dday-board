@@ -2,968 +2,232 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>과제 D-day 보드</title>
-<style>
-  :root{
-    --card:#ffffff;
-    --line:#ebe9e4;
-    --text:#25262b;
-    --sub:#8b8b90;
-    --soft:#f6f5f2;
-    --accent:#2f6fed;
-    --green:#2f9e5b;
-    --red:#d9443a;    --red-bg:#fdecea;
-    --orange:#d9821a; --orange-bg:#fdf2e2;
-    --gray-bg:#f0efec;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --card:#242528; --line:#35363b; --text:#ececee; --sub:#9b9ba2;
-      --soft:#2c2d31; --gray-bg:#33343a;
-      --red-bg:#3d2624; --orange-bg:#3c3020;
-    }
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    background:transparent;
-    font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard','Malgun Gothic',sans-serif;
-    color:var(--text);
-    padding:16px;
-    display:flex; justify-content:center;
-  }
-  .board{
-    width:100%; max-width:480px;
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:16px;
-    padding:18px 18px 12px;
-    box-shadow:0 6px 20px rgba(0,0,0,0.06);
-  }
-  [hidden]{ display:none !important; }
-
-  /* 헤더 */
-  .head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
-  .title{ font-size:17px; font-weight:700; letter-spacing:-0.2px; }
-  .summary{ font-size:12px; color:var(--sub); margin-top:3px; }
-  .summary b{ color:var(--text); font-weight:600; }
-  .summary .over{ color:var(--red); }
-  .head-btns{ display:flex; gap:6px; flex-shrink:0; }
-  .btn{
-    border:1px solid var(--line); background:var(--soft); color:var(--text);
-    font:inherit; font-size:12.5px; font-weight:600;
-    padding:6px 11px; border-radius:8px; cursor:pointer;
-    transition:background 150ms, border-color 150ms, opacity 150ms;
-  }
-  .btn:hover{ border-color:var(--sub); }
-  .btn:disabled{ opacity:0.5; cursor:default; }
-  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
-  .btn.primary:hover{ filter:brightness(1.06); }
-  .btn.danger{ color:var(--red); }
-  .btn.icon{ padding:6px 9px; }
-
-  input[type=text], input[type=date], input[type=time], textarea{
-    width:100%; font:inherit; font-size:13px; color:var(--text);
-    background:var(--card); border:1px solid var(--line);
-    border-radius:8px; padding:8px 10px; outline:none;
-  }
-  input:focus, textarea:focus{ border-color:var(--accent); }
-
-  /* 입력 폼 */
-  .form{
-    display:none;
-    background:var(--soft); border-radius:12px;
-    padding:12px; margin-bottom:14px;
-    gap:8px; grid-template-columns:1fr 1fr;
-  }
-  .form.open{ display:grid; }
-  .form .full{ grid-column:1 / -1; }
-  .actions{ display:flex; justify-content:flex-end; align-items:center; gap:6px; }
-  .form .actions{ grid-column:1 / -1; }
-  .msg{ font-size:12px; margin-right:auto; }
-  .msg.err{ color:var(--red); }
-  .msg.ok{ color:var(--green); }
-
-  /* 필터 */
-  .filter{ display:flex; justify-content:flex-end; margin-bottom:6px; }
-  .filter label{ font-size:12px; color:var(--sub); display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; }
-
-  /* 목록 */
-  .list{ list-style:none; }
-  .item{
-    display:flex; align-items:center; gap:10px;
-    padding:11px 4px; border-top:1px solid var(--line);
-  }
-  .item:first-child{ border-top:none; }
-  .check{
-    width:18px; height:18px; flex-shrink:0;
-    border:1.6px solid var(--sub); border-radius:5px;
-    background:transparent; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-    transition:background 150ms, border-color 150ms;
-  }
-  .check svg{ width:12px; height:12px; opacity:0; }
-  .item.done .check{ background:var(--accent); border-color:var(--accent); }
-  .item.done .check svg{ opacity:1; }
-
-  .body{ flex:1; min-width:0; }
-  .line1{ display:flex; align-items:center; gap:6px; }
-  .chip{
-    font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px;
-    white-space:nowrap; flex-shrink:0;
-  }
-  .task{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .line2{ font-size:11.5px; color:var(--sub); margin-top:3px; }
-  .item.done .task{ text-decoration:line-through; color:var(--sub); }
-  .item.done .chip{ opacity:0.5; }
-
-  .badge{
-    font-size:12px; font-weight:800; letter-spacing:0.2px;
-    padding:4px 9px; border-radius:8px; white-space:nowrap;
-    background:var(--gray-bg); color:var(--text);
-    font-variant-numeric:tabular-nums;
-  }
-  .badge.soon{ background:var(--orange-bg); color:var(--orange); }
-  .badge.urgent{ background:var(--red-bg); color:var(--red); }
-  .badge.over{ background:var(--red); color:#fff; }
-  .badge.done{ background:transparent; color:var(--sub); font-weight:600; }
-
-  .del{
-    border:none; background:none; color:var(--sub); cursor:pointer;
-    font:inherit; font-size:12px; padding:4px 6px; border-radius:6px;
-    opacity:0.5; transition:opacity 150ms, background 150ms;
-    white-space:nowrap;
-  }
-  .item:hover .del{ opacity:1; }
-  .del.confirm{ opacity:1; color:#fff; background:var(--red); }
-
-  .empty{ text-align:center; color:var(--sub); font-size:13px; padding:26px 0 20px; }
-
-  /* 과제 수정 / LMS */
-  .body{ cursor:pointer; }
-  .body:hover .task{ text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
-  .item.done .body:hover .task{ text-decoration:line-through; }
-  .ext{
-    font-size:10px; font-weight:700; color:var(--sub); text-decoration:none;
-    border:1px solid var(--line); border-radius:5px; padding:1px 5px; flex-shrink:0;
-  }
-  .ext:hover{ color:var(--accent); border-color:var(--accent); }
-  .form-note{ font-size:11.5px; color:var(--sub); line-height:1.5; }
-  .form-note a{ color:var(--accent); }
-  #feedUrl{ font-size:12px; font-weight:400; letter-spacing:0; text-align:left; }
-  .status.note{ color:var(--green); }
-  .status.note .dot{ background:var(--green); }
-
-  /* 연결 화면 */
-  .connect{ padding:6px 0 4px; }
-  .connect h2{ font-size:15px; font-weight:700; margin-bottom:6px; }
-  .connect p{ font-size:12.5px; color:var(--sub); line-height:1.6; margin-bottom:14px; }
-  .connect .box{ background:var(--soft); border-radius:12px; padding:12px; margin-bottom:10px; }
-  .connect .box-title{ font-size:12px; font-weight:700; margin-bottom:8px; }
-  .connect .row{ display:flex; gap:6px; }
-  .connect .row input{ font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.5px; text-transform:uppercase; }
-
-  /* 패널 (설정 / 코드 안내) */
-  .panel{ margin-top:12px; background:var(--soft); border-radius:12px; padding:12px; }
-  .panel p{ font-size:12px; color:var(--sub); margin-bottom:8px; line-height:1.55; }
-  .panel p b{ color:var(--text); }
-  .panel .section{ padding-top:10px; margin-top:10px; border-top:1px solid var(--line); }
-  .panel .section:first-child{ padding-top:0; margin-top:0; border-top:none; }
-  .codebox{
-    display:flex; gap:6px; align-items:center; margin-bottom:6px;
-  }
-  .codebox input{
-    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; font-weight:700;
-    letter-spacing:1px; text-align:center;
-  }
-  .panel textarea{
-    height:90px; resize:vertical;
-    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px;
-  }
-  .panel .actions{ margin-top:8px; }
-
-  .foot{
-    display:flex; justify-content:space-between; align-items:center; gap:8px;
-    margin-top:10px; padding-top:8px; border-top:1px solid var(--line);
-    font-size:11px; color:var(--sub);
-  }
-  .foot button{ border:none; background:none; color:var(--sub); font:inherit; cursor:pointer; text-decoration:underline; }
-  .status{ display:flex; align-items:center; gap:5px; }
-  .dot{ width:6px; height:6px; border-radius:50%; background:var(--sub); }
-  .status.ok .dot{ background:var(--green); }
-  .status.busy .dot{ background:var(--orange); }
-  .status.err{ color:var(--red); cursor:pointer; }
-  .status.err .dot{ background:var(--red); }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>과제 D-day</title>
+<meta name="description" content="스마트캠퍼스 과제를 마감 순으로 모아 보는 과제 플래너">
+<meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141F" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+  // 테마를 먼저 적용해 깜빡임 방지
+  try {
+    const p = JSON.parse(localStorage.getItem('ddayboard.prefs') || '{}');
+    if (p.theme === 'light' || p.theme === 'dark') document.documentElement.dataset.theme = p.theme;
+  } catch (e) {}
+</script>
 </head>
 <body>
 
-<div class="board">
+<!-- 연결 화면 -->
+<main class="connect" id="viewConnect" hidden>
+  <div class="connect-sheet">
+    <h1 class="connect-title">과제 D-day</h1>
+    <p class="connect-lead">스마트캠퍼스 과제와 직접 적은 과제를 마감 순으로 한곳에 모아 봐요. 보드 코드 하나로 PC, 폰, 노션 어디서든 같은 보드가 열려요.</p>
 
-  <!-- ───── 연결 화면 (코드 없을 때) ───── -->
-  <div id="viewConnect" hidden>
-    <div class="connect">
-      <h2>과제 D-day 보드 연결</h2>
-      <p>과제는 서버에 저장되고, 같은 <b>보드 코드</b>를 입력한 기기끼리 자동으로 동기화돼요.</p>
+    <section class="connect-block">
+      <h2>처음 써요</h2>
+      <p>새 보드를 만들면 보드 코드가 나와요. 다른 기기에서 그 코드를 입력하면 같은 과제가 보여요.</p>
+      <button class="btn primary" id="btnCreate">새 보드 만들기</button>
+      <p class="msg" id="createMsg" role="status"></p>
+    </section>
 
-      <div class="box">
-        <div class="box-title">처음 쓰는 거라면</div>
-        <div class="actions" style="justify-content:flex-start">
-          <button class="btn primary" id="btnCreate">새 보드 만들기</button>
-          <span class="msg" id="createMsg" style="margin-left:6px"></span>
-        </div>
-      </div>
+    <section class="connect-block">
+      <h2>이미 보드가 있어요</h2>
+      <label class="field">
+        <span>보드 코드</span>
+        <input type="text" id="inCode" class="code-input" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false" autocapitalize="characters">
+      </label>
+      <button class="btn" id="btnConnect">보드 열기</button>
+      <p class="msg" id="connectMsg" role="status"></p>
+    </section>
+  </div>
+</main>
 
-      <div class="box">
-        <div class="box-title">다른 기기에서 이미 만들었다면</div>
-        <div class="row">
-          <input type="text" id="inCode" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false">
-          <button class="btn primary" id="btnConnect">연결</button>
-        </div>
-        <div class="msg" id="connectMsg" style="margin-top:6px"></div>
-      </div>
+<!-- 앱 -->
+<div class="app" id="viewApp" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">과제 D-day</span>
     </div>
+
+    <label class="search">
+      <span class="sr-only">과제 검색</span>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
+      <input type="search" id="search" placeholder="과제, 과목, 메모 검색" autocomplete="off">
+      <kbd class="hint">/</kbd>
+    </label>
+
+    <nav class="views" role="tablist" aria-label="보기 방식">
+      <button role="tab" data-view="list" id="tabList">목록</button>
+      <button role="tab" data-view="calendar" id="tabCalendar">캘린더</button>
+      <button role="tab" data-view="subjects" id="tabSubjects">과목별</button>
+    </nav>
+
+    <div class="actions">
+      <button class="btn ghost" id="btnLms" hidden title="스마트캠퍼스에서 지금 가져오기">LMS 가져오기</button>
+      <button class="btn icon ghost" id="btnSync" title="다른 기기 변경 사항 불러오기" aria-label="새로고침">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5V7h-3.5"/></svg>
+      </button>
+      <button class="btn icon ghost" id="btnSettings" title="설정" aria-label="설정">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>
+      </button>
+      <button class="btn primary" id="btnNew">새 과제</button>
+    </div>
+  </header>
+
+  <section class="next" id="next" aria-live="polite"></section>
+
+  <div class="layout">
+    <aside class="rail" id="rail" aria-label="필터"></aside>
+    <main class="view" id="view"></main>
   </div>
 
-  <!-- ───── 보드 화면 ───── -->
-  <div id="viewBoard" hidden>
-    <div class="head">
-      <div>
-        <div class="title">과제 D-day</div>
-        <div class="summary" id="summary"></div>
-      </div>
-      <div class="head-btns">
-        <button class="btn icon" id="btnLms" title="스마트캠퍼스에서 가져오기" hidden>LMS</button>
-        <button class="btn icon" id="btnSync" title="지금 동기화" aria-label="지금 동기화">↻</button>
-        <button class="btn primary" id="btnAdd">+ 추가</button>
-      </div>
-    </div>
-
-    <!-- 노션 HTML 블록은 form 제출이 막혀 있어서 form 태그 대신 div + 버튼 클릭으로 처리 -->
-    <div class="form" id="form">
-      <div class="full form-note" id="formNote" hidden></div>
-      <input type="text" class="full" id="inSubject" placeholder="과목 (예: 데이터베이스)" list="subjects" autocomplete="off">
-      <datalist id="subjects"></datalist>
-      <input type="text" class="full" id="inTitle" placeholder="과제명" autocomplete="off">
-      <input type="date" id="inDate">
-      <input type="time" id="inTime" value="23:59">
-      <div class="actions">
-        <span class="msg err" id="formMsg"></span>
-        <button type="button" class="btn" id="btnCancel">취소</button>
-        <button type="button" class="btn primary" id="btnSave">저장</button>
-      </div>
-    </div>
-
-    <div class="filter">
-      <label><input type="checkbox" id="hideDone"> 완료 숨기기</label>
-    </div>
-
-    <ul class="list" id="list"></ul>
-
-    <!-- 새 보드 만든 직후 코드 안내 -->
-    <div class="panel" id="panelNewCode" hidden>
-      <p><b>보드가 만들어졌어요.</b> 다른 기기(폰 노션 앱 등)에서 이 위젯을 열고 아래 코드를 입력하면 같은 과제가 보여요. 코드는 비밀번호 역할을 하니 다른 사람에게 공유하지 마세요.</p>
-      <div class="codebox">
-        <input type="text" id="newCodeText" readonly>
-        <button class="btn" id="btnCopyNew">복사</button>
-      </div>
-      <div class="actions"><span class="msg" id="copyNewMsg"></span><button class="btn" id="btnCloseNew">확인</button></div>
-    </div>
-
-    <!-- 설정 -->
-    <div class="panel" id="panelSettings" hidden>
-      <div class="section">
-        <p><b>보드 코드</b> · 다른 기기에서 이 코드를 입력하면 연결돼요.</p>
-        <div class="codebox">
-          <input type="text" id="codeText" readonly>
-          <button class="btn" id="btnShowCode">보기</button>
-          <button class="btn" id="btnCopyCode">복사</button>
-        </div>
-        <div class="msg" id="copyMsg"></div>
-      </div>
-      <div class="section">
-        <p><b>스마트캠퍼스 연동</b> · 캘린더 화면 오른쪽 아래 "캘린더 피드" 주소를 넣으면 과제를 하루 3번(07시·13시·21시) 자동으로 가져와요. 주소는 서버에만 저장되고 다시 볼 수 없어요.</p>
-        <p id="lmsState"></p>
-        <div class="codebox">
-          <input type="text" id="feedUrl" placeholder="https://canvas.ssu.ac.kr/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
-          <button class="btn primary" id="btnFeedSave">저장</button>
-        </div>
-        <div class="actions">
-          <span class="msg" id="feedMsg"></span>
-          <button class="btn" id="btnLmsNow" hidden>지금 가져오기</button>
-          <button class="btn danger" id="btnFeedClear" hidden>연동 해제</button>
-        </div>
-      </div>
-      <div class="section">
-        <p><b>이전 위젯 데이터 가져오기</b> · 예전 위젯의 "백업 / 불러오기"에서 복사한 텍스트를 붙여 넣으세요. 이미 있는 과제는 건너뛰어요.</p>
-        <textarea id="importText" spellcheck="false" placeholder='[{"id":"...","title":"...","due":"..."}]'></textarea>
-        <div class="actions">
-          <span class="msg" id="importMsg"></span>
-          <button class="btn primary" id="btnImport">가져오기</button>
-        </div>
-      </div>
-      <div class="section">
-        <div class="actions">
-          <span class="msg" style="color:var(--sub)">연결을 해제해도 서버 데이터는 남아 있어요.</span>
-          <button class="btn danger" id="btnDisconnect">이 기기 연결 해제</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="foot">
-      <span class="status" id="status"><span class="dot"></span><span id="statusText"></span></span>
-      <button id="btnSettings">설정</button>
-    </div>
-  </div>
+  <footer class="statusbar">
+    <span class="status" id="status" role="status"></span>
+    <span class="shortcuts">단축키 <kbd>N</kbd> 새 과제 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 보기 전환</span>
+  </footer>
 </div>
 
-<script>
-(function(){
-  /* ───── 서버 설정 (공개 키: 테이블 직접 접근은 막혀 있고 코드 기반 함수만 호출 가능) ───── */
-  const API_URL = 'https://azwiggxcvmeppkfvdbln.supabase.co/rest/v1/rpc/';
-  const API_KEY = 'sb_publishable_d5_83pjNlpVx5h0VWvF7Jg_5vresbV-';
-  const LMS_SYNC_URL = 'https://azwiggxcvmeppkfvdbln.supabase.co/functions/v1/canvas-sync';
+<!-- 과제 상세 -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" hidden aria-labelledby="panelTitle" role="dialog">
+  <header class="panel-head">
+    <h2 id="panelTitle">새 과제</h2>
+    <button class="btn icon ghost" id="panelClose" aria-label="닫기">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </header>
+  <div class="panel-body">
+    <p class="panel-note" id="panelNote" hidden></p>
+    <label class="field">
+      <span>과제명</span>
+      <input type="text" id="fTitle" maxlength="200" autocomplete="off" placeholder="예: HW3 정규화 연습문제">
+    </label>
+    <label class="field">
+      <span>과목</span>
+      <input type="text" id="fSubject" maxlength="40" list="subjectList" autocomplete="off" placeholder="예: 데이터베이스">
+      <datalist id="subjectList"></datalist>
+    </label>
+    <div class="field-row">
+      <label class="field">
+        <span>마감 날짜</span>
+        <input type="date" id="fDate">
+      </label>
+      <label class="field">
+        <span>시각</span>
+        <input type="time" id="fTime" value="23:59">
+      </label>
+    </div>
+    <div class="quick-dates" id="quickDates" aria-label="빠른 날짜 선택"></div>
+    <label class="check-row">
+      <input type="checkbox" id="fStar">
+      <span>중요한 과제로 표시</span>
+    </label>
+    <label class="check-row" id="fDoneRow">
+      <input type="checkbox" id="fDone">
+      <span>제출 완료</span>
+    </label>
+    <label class="field">
+      <span>메모</span>
+      <textarea id="fMemo" rows="5" maxlength="2000" placeholder="제출 방법, 참고 자료, 할 일 등을 적어 두세요"></textarea>
+    </label>
+    <p class="panel-meta" id="panelMeta"></p>
+  </div>
+  <footer class="panel-foot">
+    <button class="btn danger ghost" id="panelDelete" hidden>삭제</button>
+    <span class="msg" id="panelMsg" role="status"></span>
+    <button class="btn" id="panelCancel">취소</button>
+    <button class="btn primary" id="panelSave">저장</button>
+  </footer>
+</aside>
 
-  const CODE_KEY   = 'ddayboard.code';
-  const CACHE_KEY  = 'ddayboard.cache';
-  const LEGACY_KEY = 'ddayboard.v1';       // 이전 로컬 저장 버전
-  const PREF_KEY   = 'ddayboard.hideDone';
-  const DAY = 86400000;
-  const SYNC_INTERVAL = 30000;
+<!-- 설정 -->
+<dialog class="settings" id="settings" aria-labelledby="settingsTitle">
+  <header class="panel-head">
+    <h2 id="settingsTitle">설정</h2>
+    <button class="btn icon ghost" id="settingsClose" aria-label="닫기">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </header>
+  <div class="settings-body">
+    <section>
+      <h3>스마트캠퍼스 연동</h3>
+      <p class="help">스마트캠퍼스 캘린더 화면 오른쪽 아래의 "캘린더 피드" 주소를 넣으면 과제를 하루 3번(7시, 13시, 21시) 자동으로 가져와요. 주소는 서버에만 저장되고 다시 볼 수 없어요.</p>
+      <p class="lms-state" id="lmsState"></p>
+      <div class="inline-form">
+        <input type="text" id="feedUrl" placeholder="https://canvas.ssu.ac.kr/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
+        <button class="btn primary" id="btnFeedSave">연동하기</button>
+      </div>
+      <div class="row-actions">
+        <span class="msg" id="feedMsg" role="status"></span>
+        <button class="btn" id="btnLmsNow" hidden>지금 가져오기</button>
+        <button class="btn danger ghost" id="btnFeedClear" hidden>연동 해제</button>
+      </div>
+    </section>
 
-  /* ───── localStorage 래퍼 ───── */
-  const store = {
-    get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
-    set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
-    del(k){ try{ localStorage.removeItem(k); }catch(e){} }
-  };
+    <section>
+      <h3>보드 코드</h3>
+      <p class="help">다른 기기에서 이 코드를 입력하면 같은 보드가 열려요. 비밀번호처럼 다뤄 주세요.</p>
+      <div class="inline-form">
+        <input type="text" id="codeText" class="code-input" readonly>
+        <button class="btn" id="btnShowCode">보기</button>
+        <button class="btn" id="btnCopyCode">복사</button>
+      </div>
+      <p class="msg" id="copyMsg" role="status"></p>
+    </section>
 
-  /* ───── 서버 호출 ───── */
-  async function rpc(name, body){
-    let res;
-    try{
-      res = await fetch(API_URL + name, {
-        method:'POST',
-        headers:{ 'apikey':API_KEY, 'Content-Type':'application/json' },
-        body: JSON.stringify(body || {})
-      });
-    }catch(e){
-      throw new Error('network');
-    }
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!res.ok){
-      const msg = (data && data.message) || ('http_' + res.status);
-      throw new Error(msg);
-    }
-    return data;
-  }
-  function errText(e){
-    switch(e.message){
-      case 'network':        return '서버에 연결할 수 없어요';
-      case 'invalid_code':   return '코드가 올바르지 않아요';
-      case 'too_many_tasks': return '과제는 최대 500개까지 저장돼요';
-      case 'invalid_feed_url': return '캘린더 피드 주소 형식이 아니에요 (…/feeds/calendars/….ics)';
-      case 'no_feed':        return '스마트캠퍼스 피드가 등록되지 않았어요';
-      case 'feed_invalid':   return '피드 내용을 읽을 수 없어요. 주소를 다시 확인해 주세요';
-      case 'feed_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요';
-      default:
-        if (/^feed_http_(401|403|404)$/.test(e.message)) return '피드 주소가 더 이상 유효하지 않아요. 새로 복사해 주세요';
-        if (/^feed_http_/.test(e.message)) return '스마트캠퍼스 응답 오류 (' + e.message.slice(10) + ')';
-        return '오류가 났어요 (' + e.message + ')';
-    }
-  }
+    <section>
+      <h3>화면</h3>
+      <div class="segmented" id="themePicker" role="radiogroup" aria-label="테마">
+        <button role="radio" data-theme="system">시스템 설정</button>
+        <button role="radio" data-theme="light">밝게</button>
+        <button role="radio" data-theme="dark">어둡게</button>
+      </div>
+    </section>
 
-  /* ───── 상태 ───── */
-  let code = store.get(CODE_KEY);
-  let tasks = [];
-  try{ tasks = JSON.parse(store.get(CACHE_KEY) || '[]'); }catch(e){ tasks = []; }
-  let inflight = 0;
-  let localVersion = 0;      // 이 기기에서 바뀔 때마다 증가 → 그 사이 받아온 목록은 버림
-  let lastSync = null;
-  let syncError = null;
-  let notice = null, noticeTimer = null;      // 잠깐 보여 줄 안내 (예: LMS 가져오기 결과)
-  let lms = { connected:false, syncedAt:null, error:null };
-  let editingId = null;                       // 수정 중인 과제 id (없으면 새 과제)
+    <section>
+      <h3>백업과 가져오기</h3>
+      <p class="help">이전 위젯의 "백업 / 불러오기" 텍스트를 붙여 넣으면 과제를 옮겨 와요. 이미 있는 과제는 건너뛰어요.</p>
+      <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
+      <div class="row-actions">
+        <span class="msg" id="importMsg" role="status"></span>
+        <button class="btn" id="btnExport">현재 과제 백업 복사</button>
+        <button class="btn primary" id="btnImport">가져오기</button>
+      </div>
+    </section>
 
-  /* ───── DOM ───── */
-  const $ = id => document.getElementById(id);
-  const viewConnect = $('viewConnect'), viewBoard = $('viewBoard');
-  const listEl = $('list'), summaryEl = $('summary');
-  const form = $('form'), inSubject = $('inSubject'), inTitle = $('inTitle');
-  const inDate = $('inDate'), inTime = $('inTime');
-  const hideDone = $('hideDone');
-  const statusEl = $('status'), statusText = $('statusText');
+    <section>
+      <h3>이 기기</h3>
+      <div class="row-actions">
+        <span class="help">연결을 해제해도 서버의 과제는 그대로 남아요.</span>
+        <button class="btn danger ghost" id="btnDisconnect">이 기기 연결 해제</button>
+      </div>
+    </section>
+  </div>
+</dialog>
 
-  hideDone.checked = store.get(PREF_KEY) === '1';
+<!-- 새 보드 코드 안내 -->
+<dialog class="settings small" id="newCodeDialog" aria-labelledby="newCodeTitle">
+  <header class="panel-head"><h2 id="newCodeTitle">보드를 만들었어요</h2></header>
+  <div class="settings-body">
+    <p class="help">다른 기기에서 아래 코드를 입력하면 같은 보드가 열려요. 코드를 잃어버리면 찾을 수 없으니 안전한 곳에 적어 두세요.</p>
+    <div class="inline-form">
+      <input type="text" id="newCodeText" class="code-input" readonly>
+      <button class="btn" id="btnCopyNew">복사</button>
+    </div>
+    <p class="msg" id="copyNewMsg" role="status"></p>
+  </div>
+  <footer class="panel-foot"><button class="btn primary" id="btnNewCodeOk">확인</button></footer>
+</dialog>
 
-  /* ───── 유틸 ───── */
-  const WEEK = ['일','월','화','수','목','금','토'];
-  const pad = n => String(n).padStart(2,'0');
-  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+<div class="toast" id="toast" role="status" hidden></div>
 
-  function fmtDate(d){
-    return `${d.getMonth()+1}/${d.getDate()} (${WEEK[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-  function fmtClock(d){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-  function fmtDuration(ms){
-    const totalMin = Math.floor(ms / 60000);
-    const days = Math.floor(totalMin / 1440);
-    const hours = Math.floor((totalMin % 1440) / 60);
-    const mins = totalMin % 60;
-    if (days > 0) return `${days}일 ${hours}시간`;
-    if (hours > 0) return `${hours}시간 ${mins}분`;
-    return `${mins}분`;
-  }
-
-  const PALETTE = [
-    ['#2f6fed','rgba(47,111,237,0.12)'], ['#c2410c','rgba(194,65,12,0.12)'],
-    ['#0f8a6a','rgba(15,138,106,0.12)'], ['#8b3fd9','rgba(139,63,217,0.12)'],
-    ['#b8860b','rgba(184,134,11,0.14)'], ['#d6336c','rgba(214,51,108,0.12)'],
-    ['#0e7490','rgba(14,116,144,0.12)'], ['#57534e','rgba(87,83,78,0.12)']
-  ];
-  function subjectColor(name){
-    let h = 0;
-    for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
-    return PALETTE[h % PALETTE.length];
-  }
-
-  function ddayInfo(task, now){
-    const due = new Date(task.due);
-    const ms = due - now;
-    if (task.done) return { label:'완료', level:'done', detail: fmtDate(due) };
-    if (ms < 0) return { label:'지남', level:'over', detail: `${fmtDate(due)} · ${fmtDuration(-ms)} 지남` };
-    const dayDiff = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
-    const label = dayDiff === 0 ? 'D-DAY' : `D-${dayDiff}`;
-    const level = ms <= DAY ? 'urgent' : dayDiff <= 3 ? 'soon' : 'normal';
-    return { label, level, detail: `${fmtDate(due)} · ${fmtDuration(ms)} 남음` };
-  }
-
-  // 예전 로컬 데이터 형식("2026-10-20T23:59")을 서버 형식(ISO, UTC)으로
-  function toServerTasks(list){
-    return (Array.isArray(list) ? list : [])
-      .filter(t => t && t.title && t.due && !isNaN(new Date(t.due)))
-      .map(t => ({
-        id: String(t.id || newId()).slice(0, 40),
-        subject: String(t.subject || '').slice(0, 40),
-        title: String(t.title).slice(0, 200),
-        due: new Date(t.due).toISOString(),
-        done: !!t.done
-      }));
-  }
-
-  /* ───── 화면 전환 ───── */
-  function showView(){
-    viewConnect.hidden = !!code;
-    viewBoard.hidden = !code;
-    if (code){ $('codeText').value = maskCode(code); }
-  }
-  function maskCode(c){ return c.slice(0, 5) + '-•••••-•••••-' + c.slice(-5); }
-
-  /* ───── 렌더 ───── */
-  function render(){
-    const now = new Date();
-    const pending = tasks.filter(t => !t.done);
-    const over = pending.filter(t => new Date(t.due) < now).length;
-    const week = pending.filter(t => { const ms = new Date(t.due) - now; return ms >= 0 && ms <= 7*DAY; }).length;
-
-    const parts = [`남은 과제 <b>${pending.length}</b>`, `7일 이내 <b>${week}</b>`];
-    if (over) parts.push(`<span class="over">마감 지남 <b class="over">${over}</b></span>`);
-    summaryEl.innerHTML = parts.join(' · ');
-
-    const sorted = [...tasks].sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      return a.done ? new Date(b.due) - new Date(a.due) : new Date(a.due) - new Date(b.due);
-    });
-    const visible = hideDone.checked ? sorted.filter(t => !t.done) : sorted;
-
-    listEl.innerHTML = '';
-    if (!visible.length){
-      const li = document.createElement('li');
-      li.className = 'empty';
-      li.textContent = tasks.length ? '남은 과제가 없어요 🎉' : '+ 추가를 눌러 과제를 등록해 보세요';
-      listEl.appendChild(li);
-    }
-
-    for (const t of visible){
-      const info = ddayInfo(t, now);
-      const li = document.createElement('li');
-      li.className = 'item' + (t.done ? ' done' : '');
-      li.dataset.id = t.id;
-
-      const check = document.createElement('button');
-      check.className = 'check';
-      check.dataset.action = 'toggle';
-      check.setAttribute('aria-label', t.done ? '완료 취소' : '완료');
-      check.innerHTML = '<svg viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5 6.5 5 9 9.5 3.5"/></svg>';
-
-      const body = document.createElement('div');
-      body.className = 'body';
-      const line1 = document.createElement('div');
-      line1.className = 'line1';
-      if (t.subject){
-        const [fg, bg] = subjectColor(t.subject);
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.style.color = fg; chip.style.background = bg;
-        chip.textContent = t.subject;
-        line1.appendChild(chip);
-      }
-      const title = document.createElement('span');
-      title.className = 'task';
-      title.textContent = t.title;
-      title.title = '눌러서 수정 · ' + t.title;
-      line1.appendChild(title);
-      if (t.link){
-        const a = document.createElement('a');
-        a.className = 'ext';
-        a.href = t.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
-        a.textContent = 'LMS';
-        a.title = '스마트캠퍼스에서 열기';
-        line1.appendChild(a);
-      }
-      const line2 = document.createElement('div');
-      line2.className = 'line2';
-      line2.textContent = info.detail;
-      body.dataset.action = 'edit';
-      body.append(line1, line2);
-
-      const badge = document.createElement('span');
-      badge.className = 'badge ' + info.level;
-      badge.textContent = info.label;
-
-      const del = document.createElement('button');
-      del.className = 'del';
-      del.dataset.action = 'delete';
-      del.textContent = '삭제';
-
-      li.append(check, body, badge, del);
-      listEl.appendChild(li);
-    }
-
-    const subjects = [...new Set(tasks.map(t => t.subject).filter(Boolean))];
-    $('subjects').innerHTML = '';
-    for (const s of subjects){
-      const opt = document.createElement('option');
-      opt.value = s;
-      $('subjects').appendChild(opt);
-    }
-  }
-
-  function renderStatus(){
-    statusEl.className = 'status';
-    if (inflight > 0){ statusEl.classList.add('busy'); statusText.textContent = '동기화 중…'; }
-    else if (notice){ statusEl.classList.add('note'); statusText.textContent = notice; }
-    else if (syncError){ statusEl.classList.add('err'); statusText.textContent = syncError + ' · 눌러서 다시 시도'; }
-    else if (lastSync){ statusEl.classList.add('ok'); statusText.textContent = `동기화됨 · ${fmtClock(lastSync)}`; }
-    else { statusText.textContent = '불러오는 중…'; }
-  }
-
-  function cache(){ store.set(CACHE_KEY, JSON.stringify(tasks)); }
-
-  function showNotice(text){
-    notice = text;
-    clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(() => { notice = null; renderStatus(); }, 5000);
-    renderStatus();
-  }
-
-  /* ───── 스마트캠퍼스(LMS) 연동 ───── */
-  function renderLms(){
-    $('btnLms').hidden = !lms.connected;
-    $('btnLmsNow').hidden = !lms.connected;
-    $('btnFeedClear').hidden = !lms.connected;
-    $('btnFeedSave').textContent = lms.connected ? '주소 변경' : '저장';
-    const st = $('lmsState');
-    if (!lms.connected){ st.textContent = '아직 연동되지 않았어요.'; st.style.color = ''; return; }
-    if (lms.error){ st.textContent = '⚠ ' + errText(new Error(lms.error)); st.style.color = 'var(--red)'; return; }
-    st.style.color = 'var(--green)';
-    st.textContent = lms.syncedAt
-      ? `연동됨 · 마지막으로 가져온 시각 ${fmtDate(new Date(lms.syncedAt))}`
-      : '연동됨 · 아직 가져오기 전이에요';
-  }
-
-  async function loadLms(){
-    if (!code) return;
-    try{ lms = await rpc('dday_canvas_status', { p_code: code }); renderLms(); }catch(e){}
-  }
-
-  async function lmsSync(){
-    if (!code) return;
-    const btns = [$('btnLms'), $('btnLmsNow')];
-    btns.forEach(b => b.disabled = true);
-    inflight++; renderStatus();
-    let result = null, err = null;
-    try{
-      const res = await fetch(LMS_SYNC_URL, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'apikey':API_KEY },
-        body: JSON.stringify({ code })
-      });
-      result = await res.json().catch(() => ({}));
-      if (!res.ok || result.error) err = new Error(result.error || ('http_' + res.status));
-    }catch(e){ err = new Error('network'); }
-    finally{
-      inflight = Math.max(0, inflight - 1);
-      btns.forEach(b => b.disabled = false);
-    }
-    if (err){ syncError = errText(err); renderStatus(); }
-    else{
-      syncError = null;
-      const parts = [];
-      if (result.added) parts.push(`새 과제 ${result.added}개`);
-      if (result.updated) parts.push(`변경 ${result.updated}개`);
-      showNotice(parts.length ? `스마트캠퍼스: ${parts.join(' · ')}` : '스마트캠퍼스: 새로운 과제 없음');
-      await pull();
-    }
-    await loadLms();
-  }
-
-  $('btnLms').addEventListener('click', lmsSync);
-  $('btnLmsNow').addEventListener('click', lmsSync);
-
-  async function setFeed(url){
-    const msg = $('feedMsg');
-    msg.className = 'msg'; msg.textContent = '저장 중…';
-    try{
-      lms = await rpc('dday_set_canvas_feed', { p_code: code, p_url: url });
-      $('feedUrl').value = '';
-      renderLms();
-      msg.textContent = '';
-      if (lms.connected) await lmsSync();
-    }catch(e){
-      msg.className = 'msg err'; msg.textContent = errText(e);
-    }
-  }
-  $('btnFeedSave').addEventListener('click', () => {
-    const url = $('feedUrl').value.trim();
-    if (!url){ const m = $('feedMsg'); m.className = 'msg err'; m.textContent = '피드 주소를 붙여 넣어 주세요'; return; }
-    setFeed(url);
-  });
-  let feedClearArmed = null;
-  $('btnFeedClear').addEventListener('click', () => {
-    const btn = $('btnFeedClear');
-    if (feedClearArmed){
-      clearTimeout(feedClearArmed); feedClearArmed = null;
-      btn.textContent = '연동 해제';
-      setFeed(null);
-      return;
-    }
-    btn.textContent = '정말 해제할까요?';
-    feedClearArmed = setTimeout(() => { feedClearArmed = null; btn.textContent = '연동 해제'; }, 3000);
-  });
-
-  /* ───── 동기화 ───── */
-  async function pull(){
-    if (!code || inflight > 0) return;
-    inflight++; renderStatus();
-    const startedAt = localVersion;
-    try{
-      const data = await rpc('dday_list', { p_code: code });
-      if (startedAt !== localVersion) return;   // 받아오는 사이 이 기기에서 수정됨
-      tasks = Array.isArray(data) ? data : [];
-      cache();
-      syncError = null;
-      lastSync = new Date();
-      if (!pendingDelete) render();
-    }catch(e){
-      if (e.message === 'invalid_code'){ disconnect('이 기기에 저장된 코드가 더 이상 유효하지 않아요'); return; }
-      syncError = errText(e);
-    }finally{
-      inflight = Math.max(0, inflight - 1);
-      renderStatus();
-    }
-  }
-
-  // 화면을 먼저 바꾸고(낙관적 업데이트) 서버에 반영, 실패하면 서버 상태로 되돌림
-  async function push(name, body){
-    localVersion++;
-    inflight++; renderStatus();
-    try{
-      await rpc(name, Object.assign({ p_code: code }, body));
-      syncError = null;
-      lastSync = new Date();
-    }catch(e){
-      syncError = errText(e);
-    }finally{
-      inflight = Math.max(0, inflight - 1);
-      renderStatus();
-      if (syncError) pull();
-    }
-  }
-
-  async function migrateLegacy(){
-    let legacy = [];
-    try{ legacy = JSON.parse(store.get(LEGACY_KEY) || '[]'); }catch(e){}
-    const list = toServerTasks(legacy);
-    if (!list.length) return 0;
-    const n = await rpc('dday_import', { p_code: code, p_tasks: list });
-    store.del(LEGACY_KEY);
-    return n;
-  }
-
-  /* ───── 연결 / 해제 ───── */
-  $('btnCreate').addEventListener('click', async () => {
-    const btn = $('btnCreate'), msg = $('createMsg');
-    btn.disabled = true; msg.className = 'msg'; msg.textContent = '만드는 중…';
-    try{
-      code = await rpc('dday_create_board');
-      store.set(CODE_KEY, code);
-      await migrateLegacy().catch(() => 0);
-      tasks = [];
-      showView(); render(); await pull();
-      $('newCodeText').value = code;
-      $('panelNewCode').hidden = false;
-    }catch(e){
-      msg.className = 'msg err'; msg.textContent = errText(e);
-    }finally{
-      btn.disabled = false;
-      if (code) msg.textContent = '';
-    }
-  });
-
-  async function connectWith(input){
-    const msg = $('connectMsg'), btn = $('btnConnect');
-    const c = input.trim().toUpperCase();
-    if (c.replace(/[^A-Z0-9]/g, '').length < 20){
-      msg.className = 'msg err'; msg.textContent = '코드 20자를 모두 입력해 주세요'; return;
-    }
-    btn.disabled = true; msg.className = 'msg'; msg.textContent = '확인 중…';
-    try{
-      const data = await rpc('dday_list', { p_code: c });
-      code = c;
-      store.set(CODE_KEY, code);
-      tasks = Array.isArray(data) ? data : [];
-      const n = await migrateLegacy().catch(() => 0);
-      if (n) tasks = await rpc('dday_list', { p_code: code });
-      cache();
-      lastSync = new Date(); syncError = null;
-      msg.textContent = ''; $('inCode').value = '';
-      showView(); render(); renderStatus();
-      loadLms();
-    }catch(e){
-      msg.className = 'msg err'; msg.textContent = errText(e);
-    }finally{
-      btn.disabled = false;
-    }
-  }
-  $('btnConnect').addEventListener('click', () => connectWith($('inCode').value));
-  $('inCode').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); connectWith($('inCode').value); } });
-
-  let disconnectArmed = null;
-  function disconnect(reason){
-    code = null; tasks = [];
-    lms = { connected:false, syncedAt:null, error:null }; renderLms();
-    closeForm();
-    store.del(CODE_KEY); store.del(CACHE_KEY);
-    $('panelSettings').hidden = true;
-    $('panelNewCode').hidden = true;
-    showView();
-    if (reason){ const m = $('connectMsg'); m.className = 'msg err'; m.textContent = reason; }
-  }
-  $('btnDisconnect').addEventListener('click', () => {
-    const btn = $('btnDisconnect');
-    if (disconnectArmed){
-      clearTimeout(disconnectArmed); disconnectArmed = null;
-      btn.textContent = '이 기기 연결 해제';
-      disconnect();
-      return;
-    }
-    btn.textContent = '정말 해제할까요?';
-    disconnectArmed = setTimeout(() => { disconnectArmed = null; btn.textContent = '이 기기 연결 해제'; }, 3000);
-  });
-
-  /* ───── 코드 보기 / 복사 ───── */
-  async function copyText(text, input, msgEl){
-    let ok = false;
-    try{ await navigator.clipboard.writeText(text); ok = true; }catch(e){}
-    if (!ok){
-      // 노션 블록에서 클립보드 접근이 막히면 선택만 해 두고 직접 복사하게 안내
-      input.value = text; input.focus(); input.select();
-      try{ ok = document.execCommand('copy'); }catch(e){}
-    }
-    msgEl.className = ok ? 'msg ok' : 'msg';
-    msgEl.textContent = ok ? '복사했어요' : '선택해 뒀어요. Ctrl/⌘+C로 복사하세요';
-    setTimeout(() => { msgEl.textContent = ''; }, 3000);
-  }
-  let codeShown = false;
-  $('btnShowCode').addEventListener('click', () => {
-    codeShown = !codeShown;
-    $('codeText').value = codeShown ? code : maskCode(code);
-    $('btnShowCode').textContent = codeShown ? '숨기기' : '보기';
-  });
-  $('btnCopyCode').addEventListener('click', () => copyText(code, $('codeText'), $('copyMsg')));
-  $('btnCopyNew').addEventListener('click', () => copyText(code, $('newCodeText'), $('copyNewMsg')));
-  $('btnCloseNew').addEventListener('click', () => { $('panelNewCode').hidden = true; });
-
-  $('btnSettings').addEventListener('click', () => {
-    const p = $('panelSettings');
-    p.hidden = !p.hidden;
-    codeShown = false;
-    $('codeText').value = maskCode(code);
-    $('btnShowCode').textContent = '보기';
-    $('importMsg').textContent = '';
-    $('feedMsg').textContent = '';
-    if (!p.hidden) loadLms();
-  });
-
-  /* ───── 이전 백업 가져오기 ───── */
-  $('btnImport').addEventListener('click', async () => {
-    const msg = $('importMsg'), btn = $('btnImport');
-    let list;
-    try{ list = toServerTasks(JSON.parse($('importText').value)); }
-    catch(e){ msg.className = 'msg err'; msg.textContent = '형식이 올바르지 않아요'; return; }
-    if (!list.length){ msg.className = 'msg err'; msg.textContent = '가져올 과제가 없어요'; return; }
-    btn.disabled = true; msg.className = 'msg'; msg.textContent = '가져오는 중…';
-    try{
-      const n = await rpc('dday_import', { p_code: code, p_tasks: list });
-      msg.className = 'msg ok'; msg.textContent = `${n}개 가져왔어요`;
-      $('importText').value = '';
-      await pull();
-    }catch(e){
-      msg.className = 'msg err'; msg.textContent = errText(e);
-    }finally{
-      btn.disabled = false;
-    }
-  });
-
-  /* ───── 입력 폼 ───── */
-  const toDateInput = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const toTimeInput = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-  function openForm(task){
-    editingId = task ? task.id : null;
-    form.classList.add('open');
-    const note = $('formNote');
-    if (task){
-      inSubject.value = task.subject || '';
-      inTitle.value = task.title;
-      const d = new Date(task.due);
-      inDate.value = toDateInput(d);
-      inTime.value = toTimeInput(d);
-      $('btnSave').textContent = '수정';
-      $('btnAdd').textContent = '닫기';
-      if (task.source === 'canvas'){
-        note.hidden = false;
-        note.innerHTML = '';
-        note.append('스마트캠퍼스에서 가져온 과제예요. 직접 고친 칸은 이후 동기화에서도 그대로 유지돼요.');
-        if (task.link){
-          const a = document.createElement('a');
-          a.href = task.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
-          a.textContent = ' LMS에서 열기 ↗';
-          note.append(a);
-        }
-      } else note.hidden = true;
-      inTitle.focus();
-    } else {
-      note.hidden = true;
-      $('btnSave').textContent = '저장';
-      $('btnAdd').textContent = '닫기';
-      if (!inDate.value) inDate.value = toDateInput(new Date(Date.now() + 7*DAY));
-      inSubject.focus();
-    }
-  }
-  function closeForm(){
-    editingId = null;
-    form.classList.remove('open');
-    inSubject.value = ''; inTitle.value = ''; inDate.value = ''; inTime.value = '23:59';
-    $('formMsg').textContent = '';
-    $('formNote').hidden = true;
-    $('btnSave').textContent = '저장';
-    $('btnAdd').textContent = '+ 추가';
-  }
-  $('btnAdd').addEventListener('click', () => form.classList.contains('open') ? closeForm() : openForm());
-  $('btnCancel').addEventListener('click', closeForm);
-  $('btnSave').addEventListener('click', saveTask);
-  [inSubject, inTitle, inDate, inTime].forEach(el =>
-    el.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); saveTask(); } })
-  );
-
-  function saveTask(){
-    const title = inTitle.value.trim();
-    const msg = $('formMsg');
-    if (!title){ msg.textContent = '과제명을 입력해 주세요'; inTitle.focus(); return; }
-    if (!inDate.value){ msg.textContent = '마감 날짜를 골라 주세요'; inDate.focus(); return; }
-    const fields = {
-      subject: inSubject.value.trim().slice(0, 40),
-      title: title.slice(0, 200),
-      due: new Date(`${inDate.value}T${inTime.value || '23:59'}`).toISOString()
-    };
-    let task;
-    const existing = editingId && tasks.find(t => t.id === editingId);
-    if (existing){
-      Object.assign(existing, fields);
-      task = existing;
-    } else {
-      task = Object.assign({ id: newId(), done: false, source: 'manual' }, fields);
-      tasks.push(task);
-    }
-    cache(); closeForm(); render();
-    push('dday_upsert', { p_task: { id: task.id, subject: task.subject, title: task.title, due: task.due, done: !!task.done } });
-  }
-
-  /* ───── 목록 조작 ───── */
-  let pendingDelete = null;
-  listEl.addEventListener('click', e => {
-    if (e.target.closest('a')) return;            // LMS 링크는 그대로 열기
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const id = btn.closest('.item').dataset.id;
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-
-    if (btn.dataset.action === 'edit'){
-      openForm(task);
-      form.scrollIntoView({ block:'nearest', behavior:'smooth' });
-      return;
-    }
-
-    if (btn.dataset.action === 'toggle'){
-      task.done = !task.done;
-      cache(); render();
-      push('dday_upsert', { p_task: task });
-    }
-    if (btn.dataset.action === 'delete'){
-      if (pendingDelete && pendingDelete.id === id){
-        clearTimeout(pendingDelete.timer);
-        pendingDelete = null;
-        tasks = tasks.filter(t => t.id !== id);
-        cache(); render();
-        push('dday_delete', { p_id: id });
-      } else {
-        if (pendingDelete) clearTimeout(pendingDelete.timer);
-        btn.classList.add('confirm');
-        btn.textContent = '삭제?';
-        pendingDelete = { id, timer: setTimeout(() => { pendingDelete = null; render(); }, 2500) };
-      }
-    }
-  });
-
-  hideDone.addEventListener('change', () => {
-    store.set(PREF_KEY, hideDone.checked ? '1' : '0');
-    render();
-  });
-
-  $('btnSync').addEventListener('click', pull);
-  statusEl.addEventListener('click', () => { if (syncError) pull(); });
-
-  /* ───── 시작 ───── */
-  showView();
-  if (code){
-    render(); renderStatus();
-    pull();
-    loadLms();
-  }
-  // 다른 기기 변경 사항 반영: 주기적으로, 그리고 화면으로 돌아올 때
-  setInterval(() => {
-    if (!code) return;
-    if (!form.classList.contains('open')) pull();
-    else if (!pendingDelete) render();
-  }, SYNC_INTERVAL);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
-  window.addEventListener('focus', pull);
-})();
-</script>
+<script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

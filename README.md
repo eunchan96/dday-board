@@ -1,23 +1,51 @@
-# 과제 D-day 보드
+# 과제 D-day
 
-노션 페이지에 임베드해서 쓰는 과제 마감 관리 위젯입니다. 마감 임박 순으로 정렬하고 D-day와 남은 시간을 보여 주며, 같은 보드 코드를 입력한 기기끼리 과제가 동기화됩니다.
+스마트캠퍼스 과제와 직접 적은 과제를 마감 순으로 모아 보는 과제 플래너입니다. 단독 웹으로도, 노션 페이지에 임베드해서도 씁니다. 같은 보드 코드를 입력한 기기끼리 과제가 동기화됩니다.
 
-- 위젯: https://dday-board-pink.vercel.app
-- 프론트엔드: HTML / CSS / Vanilla JS (빌드 없음, 파일 하나)
-- 백엔드: Supabase (PostgreSQL + RPC 함수)
-- 배포: Vercel 정적 호스팅
+- 서비스: https://dday-board-pink.vercel.app
+- 프론트엔드: HTML / CSS / Vanilla JS ES 모듈 (빌드 없음)
+- 백엔드: Supabase (PostgreSQL, RPC 함수, Edge Function, pg_cron)
+- 배포: Vercel (GitHub `main` push 시 자동 배포)
 
 ## 기능
 
-- 과목, 과제명, 마감 일시로 과제 등록 (기본 마감 시각 23:59)
-- 마감 임박 순 정렬, D-day 배지
-  - 24시간 이내 빨강, 3일 이내 주황, 마감 지남은 꽉 찬 빨강
-- 과목별 고정 색 칩, 과목명 자동완성
-- 완료 체크, 완료 숨기기, 두 번 눌러야 지워지는 삭제
-- 보드 코드 기반 기기 간 동기화 (30초 주기, 화면 복귀 시, ↻ 버튼)
-- 과제를 눌러 과목, 제목, 마감 수정
+**보기**
+- 목록: 마감 지남 / 오늘 / 내일 / 이번 주 / 다음 주 / 그 이후 / 완료로 묶어서 표시
+- 캘린더: 월 단위, 날짜를 누르면 그날 과제와 "이 날짜에 과제 추가"
+- 과목별: 과목마다 남은 과제, 가장 가까운 마감, 완료율
+- 상단에 "다음 마감은 ○○, 남은 시간" 한 줄과 이번 주 마감·마감 지남·완료 수
+
+**과제**
+- 과제명, 과목, 마감 일시, 메모, 중요 표시, 제출 완료
+- 빠른 날짜 선택(오늘, 내일, 금요일, 다음 주 월요일, 1주 뒤)
+- 삭제 후 5초 동안 되돌리기
+- D-day 배지: 3일 이내는 노란 형광펜, 24시간 이내는 분홍 형광펜, 마감 지남은 빨간 물결 밑줄
+
+**찾기**
+- 과제명·과목·메모 검색, 과목 필터, 완료 숨기기, 중요한 과제만 보기
+
+**그 밖에**
 - 스마트캠퍼스(Canvas) 과제 자동 가져오기 (아래 참고)
-- 로컬 저장 버전 위젯에서 쓰던 데이터 가져오기
+- 밝게 / 어둡게 / 시스템 설정 테마
+- 단축키: `N` 새 과제, `/` 검색, `1` `2` `3` 보기 전환, `Esc` 닫기
+- 홈 화면에 추가(PWA), 앱 화면 오프라인 캐시
+- 노션 임베드 같은 좁은 화면에서는 필터가 가로 칩으로 바뀌는 반응형 레이아웃
+- 백업 텍스트 복사와 가져오기
+
+## 파일 구성
+
+```
+index.html              화면 뼈대 (연결 화면, 앱, 상세 패널, 설정)
+assets/style.css        디자인 토큰과 스타일 (모눈종이 + 형광펜 콘셉트)
+assets/js/app.js        시작, 화면 그리기, 이벤트, 단축키
+assets/js/views.js      목록 / 캘린더 / 과목별 보기
+assets/js/store.js      상태, 낙관적 업데이트, 동기화, 되돌리기 삭제
+assets/js/api.js        Supabase RPC와 Edge Function 호출, 오류 문구
+assets/js/util.js       날짜 계산, 과목 색, DOM 헬퍼
+sw.js, manifest.webmanifest   PWA
+supabase/migrations/    DB 스키마와 함수
+supabase/functions/canvas-sync/   스마트캠퍼스 피드 동기화
+```
 
 ## 구조
 
@@ -83,12 +111,15 @@ Supabase 보안 어드바이저는 "로그인 없이 실행 가능한 SECURITY D
 
 `dday_svc_*` 함수는 Edge Function(service_role) 전용이라 외부에서 호출할 수 없습니다.
 
+`dday_upsert`의 `memo`, `starred`는 보내지 않으면 기존 값을 유지합니다.
+
 Edge Function `POST {SUPABASE_URL}/functions/v1/canvas-sync`에 `{ "code": "<보드 코드>" }`를 보내면 그 보드를 바로 동기화하고 `{ added, updated, total }`을 돌려줍니다.
 
 과제 형식:
 
 ```json
-{ "id": "lzx1a2b3", "subject": "데이터베이스", "title": "ER 다이어그램", "due": "2026-10-20T14:59:00.000Z", "done": false, "source": "manual", "link": null }
+{ "id": "lzx1a2b3", "subject": "데이터베이스", "title": "ER 다이어그램", "due": "2026-10-20T14:59:00.000Z", "done": false,
+  "memo": "", "starred": false, "source": "manual", "link": null, "doneAt": null, "createdAt": "…" }
 ```
 
 오류는 `invalid_code`, `too_many_tasks`(보드당 500개 제한), `invalid_import`, `invalid_feed_url`, `no_feed`, `feed_*` 메시지로 돌아옵니다.
@@ -97,13 +128,10 @@ Edge Function `POST {SUPABASE_URL}/functions/v1/canvas-sync`에 `{ "code": "<보
 
 1. Supabase 프로젝트를 만들고 `supabase/migrations/`의 SQL을 순서대로 실행합니다. `canvas_cron` 마이그레이션의 함수 URL은 자기 프로젝트 ref로 바꿉니다.
 2. `supabase/functions/canvas-sync`를 Edge Function으로 배포합니다. 인증은 함수 안에서 보드 코드와 Vault 값으로 하므로 JWT 검증은 끕니다.
-3. `index.html` 상단의 `API_URL`, `API_KEY`, `LMS_SYNC_URL`을 자기 프로젝트 값으로 바꿉니다.
-   - `API_URL`: `https://<project-ref>.supabase.co/rest/v1/rpc/`
-   - `API_KEY`: 프로젝트의 publishable key
-   - `LMS_SYNC_URL`: `https://<project-ref>.supabase.co/functions/v1/canvas-sync`
-4. 정적 호스팅(Vercel 등)에 `index.html`을 올리고, 노션에서 `/embed`로 그 주소를 넣습니다.
+3. `assets/js/api.js` 상단의 `PROJECT`(Supabase 프로젝트 주소)와 `API_KEY`(publishable key)를 자기 프로젝트 값으로 바꿉니다.
+4. 저장소 전체를 정적 호스팅(Vercel 등)에 올리고, 노션에서 `/embed`로 그 주소를 넣습니다.
 
-빌드 과정이 없어서 `index.html`을 브라우저로 바로 열어도 동작합니다.
+빌드 과정은 없지만 ES 모듈을 쓰기 때문에 로컬에서는 `python3 -m http.server`처럼 간단한 서버로 열어야 합니다.
 
 ## 한계와 다음 단계
 
