@@ -14,9 +14,9 @@ export type CanvasItem = {
   link: string | null;
 };
 
-// 날짜만 있는 마감은 그날 23:59(한국 시간)으로 본다.
+// 날짜만 있는 마감은 그날 23:59:59(한국 시간)으로 본다.
 const DEFAULT_OFFSET = "+09:00";
-const DATE_ONLY_TIME = "23:59:00";
+const DATE_ONLY_TIME = "23:59:59";  // 스마트캠퍼스 과제 마감(due_at)과 같은 값
 
 type Prop = { name: string; params: Record<string, string>; value: string };
 
