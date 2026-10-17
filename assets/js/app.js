@@ -2,16 +2,23 @@
 
 import {
   state, subscribe, setPref, pull, saveTask, toggleDone, toggleStar, removeTask, undoRemove,
-  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, importBackup, exportBackup,
+  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, importBackup, exportBackup, canvasImport,
 } from './store.js';
+import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { errText } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
+  semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize,
 } from './util.js';
 import { renderList, renderCalendar, renderSubjects } from './views.js';
 
 const SYNC_INTERVAL = 30000;
+
+// null/false를 걸러서 붙이기 (DOM의 append는 null을 "null" 글자로 넣는다)
+const clean = kids => kids.flat().filter(k => k != null && k !== false);
+const add = (el, ...kids) => el.append(...clean(kids));
+const fill = (el, ...kids) => el.replaceChildren(...clean(kids));
 
 /* ───── 화면 상태 (기기에만) ───── */
 const ui = {
@@ -34,11 +41,40 @@ function applyTheme() {
   $$('#themePicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.theme === t ? 'true' : 'false'));
 }
 
+/* ───── 학기 ───── */
+const currentSemesterKey = () => semesterKey(semesterOf(new Date()));
+function activeSemesterKey() {
+  const p = state.prefs.semester;
+  if (p === 'all') return null;
+  return parseSemesterKey(p) ? p : currentSemesterKey();
+}
+// 학기만 적용한 과제 (통계, 과목 수, 다음 마감에 사용)
+function scopedTasks() {
+  const key = activeSemesterKey();
+  return key ? state.tasks.filter(t => taskSemesterKey(t) === key) : state.tasks;
+}
+
+function renderSemester() {
+  const sel = $('#semester');
+  const cur = currentSemesterKey();
+  const keys = new Set(state.tasks.map(taskSemesterKey));
+  keys.add(cur);
+  const sorted = [...keys].sort().reverse();
+  const value = state.prefs.semester === 'all' ? 'all'
+    : (parseSemesterKey(state.prefs.semester) && state.prefs.semester !== cur ? state.prefs.semester : 'current');
+  sel.replaceChildren(
+    ...sorted.map(k => h('option', { value: k === cur ? 'current' : k },
+      k === cur ? `${semesterLabel(parseSemesterKey(k))} (이번 학기)` : semesterLabel(parseSemesterKey(k)))),
+    h('option', { value: 'all' }, '전체 학기'),
+  );
+  sel.value = value;
+}
+
 /* ───── 필터 적용 ───── */
 function visibleTasks() {
   const q = ui.query.trim().toLowerCase();
   const { subject, hideDone, starredOnly, kind } = state.prefs;
-  return state.tasks.filter(t => {
+  return scopedTasks().filter(t => {
     if (hideDone && t.done) return false;
     if (kind === 'exam' && !isExam(t)) return false;
     if (kind === 'assignment' && isExam(t)) return false;
@@ -53,35 +89,38 @@ function visibleTasks() {
 function renderNext() {
   const now = new Date();
   const byDue = (a, b) => new Date(a.due) - new Date(b.due);
-  const assignments = state.tasks.filter(t => !isExam(t));
+  const scoped = scopedTasks();
+  const assignments = scoped.filter(t => !isExam(t));
   const pending = assignments.filter(t => !t.done);
   const upcoming = pending.filter(t => new Date(t.due) >= now).sort(byDue);
   const over = pending.length - upcoming.length;
   const weekEnd = addDays(startOfWeek(now), 7);
   const thisWeek = upcoming.filter(t => new Date(t.due) < weekEnd).length;
-  const done = state.tasks.filter(t => groupOf(t, now) === 'done').length;
-  const nextExam = state.tasks.filter(t => isExam(t) && !t.done && groupOf(t, now) !== 'done').sort(byDue)[0];
+  const done = scoped.filter(t => groupOf(t, now) === 'done').length;
+  const nextExam = scoped.filter(t => isExam(t) && !t.done && groupOf(t, now) !== 'done').sort(byDue)[0];
 
   const line = h('p', { class: 'next-line' });
   const next = upcoming[0];
   if (next) {
     const left = new Date(next.due) - now;
-    line.append(
+    add(line, 
       '다음 마감은 ',
       h('button', { type: 'button', onclick: () => openPanel(next) }, next.title),
       next.subject ? h('span', { class: 'muted' }, ` (${next.subject})`) : null,
       `, ${fmtDuration(left)} 남았어요.`,
     );
   } else if (assignments.length) {
-    line.append('다가오는 과제 마감이 없어요.', over ? h('span', { class: 'muted' }, ' 마감이 지난 과제만 남아 있어요.') : null);
+    add(line, '다가오는 과제 마감이 없어요.', over ? h('span', { class: 'muted' }, ' 마감이 지난 과제만 남아 있어요.') : null);
+  } else if (state.tasks.length && !scoped.length) {
+    add(line, `${state.prefs.semester === 'all' ? '' : semesterLabel(parseSemesterKey(activeSemesterKey())) + '에는 '}일정이 없어요.`);
   } else {
-    line.append('과제를 추가하면 가장 가까운 마감을 여기에 알려 드려요.');
+    add(line, '과제를 추가하면 가장 가까운 마감을 여기에 알려 드려요.');
   }
 
   const stats = h('div', { class: 'next-stats' },
     h('span', null, '이번 주 과제 ', h('b', null, thisWeek)),
     h('span', { class: over ? 'warn' : '' }, '마감 지남 ', h('b', null, over)),
-    h('span', null, '완료 ', h('b', null, done), ` / ${state.tasks.length}`),
+    h('span', null, '끝낸 일정 ', h('b', null, done), ` / ${scoped.length}`),
   );
   const parts = [line, stats];
   if (nextExam) {
@@ -95,13 +134,13 @@ function renderNext() {
       nextExam.location ? ` · ${nextExam.location}` : '',
       ` (${info.label})`));
   }
-  $('#next').replaceChildren(...parts);
+  fill($('#next'), parts);
 }
 
 /* ───── 왼쪽 필터 ───── */
 function subjectsWithCounts() {
   const map = new Map();
-  for (const t of state.tasks) {
+  for (const t of scopedTasks()) {
     const k = t.subject || '';
     const v = map.get(k) || { total: 0, pending: 0 };
     v.total++; if (!t.done) v.pending++;
@@ -114,7 +153,7 @@ function renderRail() {
   const rail = $('#rail');
   const cur = state.prefs.subject;
   const subjects = subjectsWithCounts();
-  const pendingAll = state.tasks.filter(t => !t.done).length;
+  const pendingAll = scopedTasks().filter(t => !t.done).length;
 
   const item = (label, value, count, color) => h('li', null,
     h('button', {
@@ -167,7 +206,7 @@ function renderRail() {
 /* ───── 본문 ───── */
 const ctx = () => ({
   now: new Date(),
-  total: state.tasks.length,
+  total: scopedTasks().length,
   showDone: ui.showDone,
   calMonth: ui.calMonth,
   selectedDay: ui.selectedDay,
@@ -310,9 +349,25 @@ function openPanel(task, presetDay, kind) {
   const note = $('#panelNote');
   if (task && task.source === 'canvas') {
     note.hidden = false;
-    note.replaceChildren('스마트캠퍼스에서 가져온 과제예요. 직접 고친 과제명, 과목, 마감은 이후 자동 가져오기에서도 그대로 유지돼요. ',
+    fill(note, '스마트캠퍼스에서 가져온 과제예요. 직접 고친 과제명, 과목, 마감은 이후 자동 가져오기에서도 그대로 유지돼요. ',
       task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '스마트캠퍼스에서 열기') : null);
   } else note.hidden = true;
+
+  // 스마트캠퍼스에 제출한 기록
+  const sub = $('#panelSubmission');
+  if (task && (task.submittedAt || task.submission)) {
+    const files = task.submission?.files || [];
+    sub.hidden = false;
+    fill(sub, 
+      h('h3', null, '스마트캠퍼스 제출 기록'),
+      h('p', null, task.submittedAt ? `${fmtDate(new Date(task.submittedAt))}에 제출했어요` : '제출했어요'),
+      files.length ? h('ul', null, files.map(f => h('li', null,
+        h('span', { class: 'fname' }, f.name), f.size != null ? h('span', { class: 'fsize' }, fmtSize(f.size)) : null))) : null,
+      task.submission?.url ? h('p', null, '제출한 링크: ', h('a', { href: task.submission.url, target: '_blank', rel: 'noopener noreferrer' }, task.submission.url)) : null,
+      !files.length && task.submission?.type === 'online_text_entry' ? h('p', { class: 'muted' }, '글로 직접 입력해 제출했어요') : null,
+      task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '스마트캠퍼스에서 제출물 보기') : null,
+    );
+  } else sub.hidden = true;
 
   const meta = [];
   if (task && task.createdAt) meta.push(`만든 날 ${fmtDate(new Date(task.createdAt), false)}`);
@@ -385,7 +440,7 @@ function openSettings() {
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
   ['#feedMsg', '#importMsg', '#copyMsg'].forEach(s => { $(s).textContent = ''; });
-  renderLms(); applyTheme();
+  renderLms(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
   loadLms();
 }
@@ -425,6 +480,72 @@ async function runLmsSync(button) {
   }
 }
 
+/* ───── 스마트캠퍼스 전체 가져오기 ───── */
+let pendingImport = null;   // 보드 연결 전에 받은 데이터
+
+function prepareCanvasSettings() {
+  $('#bookmarklet').href = bookmarkletSource(location.href.split('#')[0]);
+  const r = semesterRange(semesterOf(new Date()));
+  const d = x => toDateInput(x);
+  $('#plannerUrl').textContent =
+    `https://canvas.ssu.ac.kr/api/v1/planner/items?start_date=${d(r.start)}&end_date=${d(r.end)}&per_page=100`;
+}
+
+function showImport(items) {
+  if (!state.code) {
+    pendingImport = items;
+    const m = $('#connectMsg'); m.className = 'msg';
+    m.textContent = `스마트캠퍼스 과제 ${items.length}개를 받았어요. 보드를 열면 바로 가져올게요.`;
+    return;
+  }
+  pendingImport = items;
+  const s = summarize(items, new Set(state.tasks.map(t => t.id)));
+  const parts = [`과제 ${s.total}개를 찾았어요`];
+  parts.push(s.fresh ? `새로 추가될 과제 ${s.fresh}개` : '모두 이미 있는 과제예요');
+  if (s.submitted) parts.push(`제출한 과제 ${s.submitted}개는 완료로 표시해요`);
+  if (s.files) parts.push(`제출 파일 ${s.files}개의 이름도 함께 저장해요`);
+  $('#importSummary').textContent = parts.join('. ') + '.';
+  const now = new Date();
+  $('#importPreview').replaceChildren(...items.slice().sort((a, b) => new Date(b.due) - new Date(a.due)).slice(0, 12).map(it =>
+    h('li', null,
+      h('span', { class: 'ip-title' }, it.title),
+      h('span', { class: 'ip-meta' },
+        [it.subject, fmtDate(new Date(it.due), false),
+         'submitted' in it ? (it.submitted ? '제출함' : (new Date(it.due) < now ? '안 냄' : '아직 안 냄')) : null,
+         it.submission?.files?.length ? it.submission.files.map(f => f.name).join(', ') : null,
+        ].filter(Boolean).join(' · ')))));
+  if (items.length > 12) $('#importPreview').append(h('li', { class: 'ip-more' }, `외 ${items.length - 12}개`));
+  $('#importDialogMsg').textContent = '';
+  if (!$('#importDialog').open) $('#importDialog').showModal();
+}
+
+async function confirmImport() {
+  const btn = $('#importConfirm'), msg = $('#importDialogMsg');
+  btn.disabled = true; msg.className = 'msg'; msg.textContent = '가져오는 중…';
+  try {
+    const r = await canvasImport(pendingImport);
+    pendingImport = null;
+    $('#importDialog').close();
+    const parts = [];
+    if (r.added) parts.push(`새 과제 ${r.added}개`);
+    if (r.updated) parts.push(`업데이트 ${r.updated}개`);
+    toast(parts.length ? `스마트캠퍼스에서 ${parts.join(', ')}를 반영했어요` : '이미 모두 반영되어 있어요');
+    if (location.hash === '#import') history.replaceState(null, '', `#${state.prefs.view}`);
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = errText(e);
+  } finally { btn.disabled = false; }
+}
+
+function handleCanvasPayload(data) {
+  try {
+    const items = parseCanvasData(data);
+    if (!items.length) { toast('가져올 과제가 없어요. 수강 중인 과목이 있는지 확인해 주세요'); return; }
+    showImport(items);
+  } catch (e) {
+    toast(errText(e));
+  }
+}
+
 /* ───── 전체 그리기 ───── */
 function showScreens() {
   $('#viewConnect').hidden = !!state.code;
@@ -435,7 +556,7 @@ function renderAll() {
   showScreens();
   if (!state.code) return;
   setSubjects(state.tasks.map(t => t.subject));
-  renderNext(); renderRail(); renderView(); renderStatus(); renderLms();
+  renderSemester(); renderNext(); renderRail(); renderView(); renderStatus(); renderLms();
 }
 
 subscribe(what => {
@@ -443,8 +564,9 @@ subscribe(what => {
     const m = $('#connectMsg'); m.className = 'msg err'; m.textContent = what.reason; return;
   }
   if (what === 'status') { renderStatus(); return; }
+  if (what === 'board' && state.code && pendingImport) setTimeout(() => showImport(pendingImport), 0);
   if (what === 'lms') { renderLms(); return; }
-  if (what === 'prefs') { applyTheme(); renderRail(); renderView(); return; }
+  if (what === 'prefs') { applyTheme(); renderSemester(); renderNext(); renderRail(); renderView(); return; }
   renderAll();
 });
 
@@ -478,6 +600,17 @@ function bind() {
   $('#btnNewCodeOk').addEventListener('click', () => $('#newCodeDialog').close());
 
   // 상단
+  $('#semester').addEventListener('change', e => {
+    const v = e.target.value;
+    setPref('subject', null);
+    setPref('semester', v);
+    // 캘린더를 그 학기의 첫 달로 (이번 학기면 이번 달)
+    const s = v === 'current' || v === 'all' ? null : parseSemesterKey(v);
+    const base = s ? semesterRange(s).start : new Date();
+    ui.calMonth = new Date(base.getFullYear(), base.getMonth(), 1);
+    ui.selectedDay = s ? null : startOfDay(new Date());
+    renderView();
+  });
   $$('.views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
   const presetDay = () => (state.prefs.view === 'calendar' ? ui.selectedDay : null);
@@ -539,6 +672,30 @@ function bind() {
     $('#settings').close();
     disconnect();
   });
+
+  // 스마트캠퍼스 전체 가져오기
+  $('#bookmarklet').addEventListener('click', e => {
+    e.preventDefault();
+    toast('이 버튼은 북마크바로 끌어다 놓은 뒤, 스마트캠퍼스 화면에서 눌러 주세요');
+  });
+  $('#canvasFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    const msg = $('#canvasFileMsg');
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const items = parseCanvasData(await file.text());
+      msg.className = 'msg'; msg.textContent = '';
+      $('#settings').close();
+      showImport(items);
+    } catch (err) {
+      msg.className = 'msg err';
+      msg.textContent = '스마트캠퍼스에서 저장한 파일이 아니에요. 안내한 주소를 열어 저장했는지 확인해 주세요';
+    }
+  });
+  $('#importCancel').addEventListener('click', () => { pendingImport = null; $('#importDialog').close(); });
+  $('#importConfirm').addEventListener('click', confirmImport);
+  listenForCanvasData(data => handleCanvasPayload(data));
 
   // 단축키
   document.addEventListener('keydown', e => {

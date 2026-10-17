@@ -54,6 +54,10 @@
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">과제 D-day</span>
+      <label class="semester">
+        <span class="sr-only">학기</span>
+        <select id="semester"></select>
+      </label>
     </div>
 
     <label class="search">
@@ -110,6 +114,7 @@
       <button type="button" role="radio" data-kind="exam">시험</button>
     </div>
     <p class="panel-note" id="panelNote" hidden></p>
+    <div class="submission" id="panelSubmission" hidden></div>
     <label class="field">
       <span id="fTitleLabel">과제명</span>
       <input type="text" id="fTitle" maxlength="200" autocomplete="off" placeholder="예: HW3 정규화 연습문제">
@@ -186,6 +191,27 @@
     </section>
 
     <section>
+      <h3>학기 전체 과제와 제출 파일 가져오기</h3>
+      <p class="help">캘린더 피드에는 최근 30일 일정만 있고 제출 정보가 없어요. 아래 버튼을 브라우저 북마크바로 끌어다 놓은 뒤, 스마트캠퍼스에 로그인한 화면에서 누르면 수강 과목의 학기 전체 과제, 제출 여부, 제출한 파일 이름을 가져와요.</p>
+      <div class="row-actions" style="justify-content:flex-start">
+        <a class="btn bookmarklet" id="bookmarklet" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">D-day로 가져오기</a>
+        <span class="help">← 북마크바로 끌어다 놓기</span>
+      </div>
+      <details class="more">
+        <summary>북마크바를 쓸 수 없다면 (파일로 가져오기)</summary>
+        <ol class="help steps">
+          <li>스마트캠퍼스에 로그인한 브라우저에서 아래 주소를 열어요.</li>
+          <li><code id="plannerUrl"></code></li>
+          <li>나온 화면을 Ctrl+S(⌘+S)로 저장하고, 그 파일을 올려 주세요. 이 방법으로는 제출 여부까지만 가져와요.</li>
+        </ol>
+        <div class="row-actions">
+          <span class="msg" id="canvasFileMsg" role="status"></span>
+          <label class="btn">파일 올리기<input type="file" id="canvasFile" hidden></label>
+        </div>
+      </details>
+    </section>
+
+    <section>
       <h3>보드 코드</h3>
       <p class="help">다른 기기에서 이 코드를 입력하면 같은 보드가 열려요. 비밀번호처럼 다뤄 주세요.</p>
       <div class="inline-form">
@@ -238,6 +264,20 @@
     <p class="msg" id="copyNewMsg" role="status"></p>
   </div>
   <footer class="panel-foot"><button class="btn primary" id="btnNewCodeOk">확인</button></footer>
+</dialog>
+
+<!-- 스마트캠퍼스 가져오기 확인 -->
+<dialog class="settings small" id="importDialog" aria-labelledby="importTitle">
+  <header class="panel-head"><h2 id="importTitle">스마트캠퍼스에서 가져오기</h2></header>
+  <div class="settings-body">
+    <p class="help" id="importSummary"></p>
+    <ul class="import-preview" id="importPreview"></ul>
+  </div>
+  <footer class="panel-foot">
+    <span class="msg" id="importDialogMsg" role="status"></span>
+    <button class="btn" id="importCancel">취소</button>
+    <button class="btn primary" id="importConfirm">가져오기</button>
+  </footer>
 </dialog>
 
 <div class="toast" id="toast" role="status" hidden></div>

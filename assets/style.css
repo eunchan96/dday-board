@@ -465,3 +465,42 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 }
 .kind-filter .segmented button { padding: 0 10px; }
 @media (max-width: 960px) { .rail .kind-filter { display: none; } }
+
+/* ───── 학기 선택 ───── */
+.semester select {
+  height: 30px; margin-left: 4px; padding: 0 26px 0 10px;
+  font: 650 13px var(--font); color: var(--pencil);
+  background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%239AA1B5' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 12px;
+  border: 1px solid var(--rule); border-radius: 6px; appearance: none; cursor: pointer;
+}
+.semester select:hover { color: var(--ink); border-color: var(--pencil-2); }
+@media (max-width: 640px) { .semester select { max-width: 150px; } }
+
+/* ───── 스마트캠퍼스 전체 가져오기 ───── */
+.bookmarklet { border-style: dashed; border-color: var(--pen); color: var(--pen); cursor: grab; text-decoration: none; }
+.more summary { cursor: pointer; font-size: 13px; font-weight: 650; color: var(--pencil); }
+.more[open] summary { margin-bottom: 8px; }
+.steps { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.steps code { display: block; padding: 6px 8px; font-size: 11.5px; word-break: break-all; background: var(--sheet-2); border-radius: 4px; user-select: all; }
+.import-preview { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--rule); max-height: 46vh; overflow-y: auto; }
+.import-preview li { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.ip-title { font-weight: 650; font-size: 14px; }
+.ip-meta { font-size: 12.5px; color: var(--pencil); }
+.ip-more { color: var(--pencil); font-size: 13px; }
+
+/* ───── 제출 기록 ───── */
+.row .meta .sub-files { color: var(--green); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.submission { border: 1px solid var(--rule); border-left: 4px solid var(--green); border-radius: var(--radius-s); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.submission h3 { font-size: 13px; font-weight: 750; color: var(--green); }
+.submission ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.submission li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 8px; background: var(--sheet-2); border-radius: 4px; }
+.submission .fname { font-weight: 600; overflow-wrap: anywhere; }
+.submission .fsize { color: var(--pencil); font-size: 12px; flex-shrink: 0; }
+.submission a { color: var(--pen); font-weight: 650; font-size: 13px; }
+.submission .muted { color: var(--pencil); }
+.brand-name { white-space: nowrap; }
+.brand { min-width: 0; }
+@media (max-width: 640px) {
+  .brand-name { display: none; }
+  .semester select { max-width: 170px; }
+}

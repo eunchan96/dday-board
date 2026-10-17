@@ -16,6 +16,17 @@ function svg(markup) {
 
 const byDue = (a, b) => new Date(a.due) - new Date(b.due);
 
+// "제출: 보고서.pdf 외 1개" 또는 "제출함"
+function submissionLine(t) {
+  const files = t.submission?.files || [];
+  if (files.length) {
+    const more = files.length > 1 ? ` 외 ${files.length - 1}개` : '';
+    return h('span', { class: 'sub-files', title: files.map(f => f.name).join('\n') }, `제출: ${files[0].name}${more}`);
+  }
+  if (t.submittedAt) return h('span', { class: 'sub-files' }, '제출함');
+  return null;
+}
+
 /* ───── 과제 한 줄 ───── */
 export function taskRow(t, ctx, { compact = false } = {}) {
   const now = ctx.now;
@@ -51,6 +62,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     exam ? h('span', null, `${fmtDate(due, false)} ${timeRange(t)}`) : h('span', null, fmtDate(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', null, remain) : null,
+    !compact ? submissionLine(t) : null,
     !compact && t.memo ? h('span', { class: 'memo' }, t.memo.split('\n')[0]) : null,
   );
 

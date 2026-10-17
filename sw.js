@@ -1,7 +1,7 @@
 // 앱 화면 파일만 캐시해서 오프라인에서도 열리게 한다.
 // 과제 데이터(Supabase 호출)는 캐시하지 않는다. 항상 네트워크 우선.
 
-const CACHE = 'dday-shell-v2';
+const CACHE = 'dday-shell-v3';
 const SHELL = [
   './',
   'index.html',
@@ -11,6 +11,7 @@ const SHELL = [
   'assets/js/store.js',
   'assets/js/util.js',
   'assets/js/views.js',
+  'assets/js/canvas.js',
   'assets/icons/icon.svg',
   'manifest.webmanifest',
 ];

@@ -36,6 +36,7 @@ export const api = {
   lmsStatus: code => rpc('dday_canvas_status', { p_code: code }),
   setFeed: (code, url) => rpc('dday_set_canvas_feed', { p_code: code, p_url: url }),
   lmsSync: code => post(LMS_SYNC_URL, { code }),
+  canvasImport: (code, items) => rpc('dday_canvas_import', { p_code: code, p_items: items }),
 };
 
 export function errText(e) {

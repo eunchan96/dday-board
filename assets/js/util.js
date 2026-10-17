@@ -36,6 +36,36 @@ export function fmtDuration(ms) {
 
 export const isExam = t => t.kind === 'exam';
 
+/* ───── 학기 ─────
+   1학기: 3월 2일 ~ 8월 31일 (여름방학 포함)
+   2학기: 9월 1일 ~ 다음 해 3월 1일 (겨울방학 포함) */
+export function semesterOf(date) {
+  const d = new Date(date);
+  const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+  if (m >= 9) return { year: y, term: 2 };
+  if (m < 3 || (m === 3 && day < 2)) return { year: y - 1, term: 2 };
+  return { year: y, term: 1 };
+}
+export const semesterKey = s => `${s.year}-${s.term}`;
+export const semesterLabel = s => `${s.year}년 ${s.term}학기`;
+export function parseSemesterKey(key) {
+  const m = /^(\d{4})-([12])$/.exec(key || '');
+  return m ? { year: +m[1], term: +m[2] } : null;
+}
+export function semesterRange(s) {
+  return s.term === 1
+    ? { start: new Date(s.year, 2, 2), end: new Date(s.year, 8, 1) }
+    : { start: new Date(s.year, 8, 1), end: new Date(s.year + 1, 2, 2) };
+}
+export const taskSemesterKey = t => semesterKey(semesterOf(t.due));
+
+export function fmtSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
 // 시험이 끝났는지 (끝나는 시각이 없으면 시작 시각 기준)
 export function examOver(t, now = new Date()) {
   const end = t.endAt ? new Date(t.endAt) : new Date(t.due);

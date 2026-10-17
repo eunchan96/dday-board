@@ -30,7 +30,7 @@ export const state = {
   lastSync: null,
   syncError: null,
   lms: { connected: false, syncedAt: null, error: null },
-  prefs: Object.assign({ view: 'list', hideDone: false, theme: 'system', subject: null, starredOnly: false, kind: null },
+  prefs: Object.assign({ view: 'list', hideDone: false, theme: 'system', subject: null, starredOnly: false, kind: null, semester: 'current' },
                        readJSON(KEYS.prefs, {})),
 };
 let localVersion = 0;
@@ -246,6 +246,13 @@ export async function setFeed(url) {
   state.lms = await api.setFeed(state.code, url);
   emit('lms');
   return state.lms;
+}
+
+export async function canvasImport(items) {
+  const r = await api.canvasImport(state.code, items);
+  await pull();
+  await loadLms();
+  return r;
 }
 
 export function exportBackup() {
