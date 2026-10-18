@@ -1,7 +1,7 @@
 // 앱 화면 파일만 캐시해서 오프라인에서도 열리게 한다.
 // 과제 데이터(Supabase 호출)는 캐시하지 않는다. 항상 네트워크 우선.
 
-const CACHE = 'dday-shell-v14';
+const CACHE = 'dday-shell-v15';
 const SHELL = [
   './',
   'index.html',
@@ -14,6 +14,7 @@ const SHELL = [
   'assets/js/canvas.js',
   'assets/js/picker.js',
   'assets/js/push.js',
+  'assets/js/study.js',
   'assets/icons/icon.svg',
   'manifest.webmanifest',
 ];
@@ -70,6 +71,7 @@ self.addEventListener('notificationclick', e => {
     if (win) {
       await win.focus();
       if (id) win.postMessage({ type: 'open-task', id: decodeURIComponent(id) });
+      else if (url.hash === '#study') win.postMessage({ type: 'open-view', view: 'study' });
       return;
     }
     await self.clients.openWindow(url.href);

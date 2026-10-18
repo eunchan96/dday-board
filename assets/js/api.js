@@ -48,6 +48,20 @@ export const api = {
   pushUnsubscribe: (code, endpoint) => rpc('dday_push_unsubscribe', { p_code: code, p_endpoint: endpoint }),
   pushStatus: (code, endpoint) => rpc('dday_push_status', { p_code: code, p_endpoint: endpoint }),
   pushTest: (code, endpoint) => post(PUSH_URL, { code, endpoint }),
+  // 공부 모드
+  study: (code, from) => rpc('dday_study', { p_code: code, p_from: from }),
+  studyAdd: (code, session) => rpc('dday_study_add', { p_code: code, p_session: session }),
+  studyRemove: (code, id, removed = true) => rpc('dday_study_remove', { p_code: code, p_id: id, p_removed: removed }),
+  studyGoal: (code, minutes) => rpc('dday_study_goal', { p_code: code, p_minutes: minutes }),
+  studyPlan: (code, plan) => rpc('dday_study_plan', { p_code: code, p_plan: plan }),
+  studyPlanRemove: (code, id, removed = true) => rpc('dday_study_plan_remove', { p_code: code, p_id: id, p_removed: removed }),
+  studyLive: (code, on) => rpc('dday_study_live', { p_code: code, p_on: on }),
+  studyProfile: (code, nickname) => rpc('dday_study_profile', { p_code: code, p_nickname: nickname }),
+  studyProfileHide: code => rpc('dday_study_profile_hide', { p_code: code }),
+  studyNewCode: code => rpc('dday_study_new_code', { p_code: code }),
+  friends: code => rpc('dday_friends', { p_code: code }),
+  friendAdd: (code, friendCode) => rpc('dday_friend_add', { p_code: code, p_friend_code: friendCode }),
+  friendRemove: (code, friendCode) => rpc('dday_friend_remove', { p_code: code, p_friend_code: friendCode }),
 };
 
 export function errText(e) {
@@ -71,6 +85,16 @@ export function errText(e) {
     case 'push_failed': return '알림 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요';
     case 'too_many_devices': return '보드 하나에 알림 기기는 20대까지 연결돼요';
     case 'invalid_subscription': return '이 브라우저의 알림 정보를 읽지 못했어요';
+    case 'invalid_session': return '공부 기록 시간이 맞지 않아요';
+    case 'too_many_sessions': return '공부 기록이 너무 많아요';
+    case 'invalid_plan': return '계획 내용을 다시 확인해 주세요';
+    case 'too_many_plans': return '공부 계획이 너무 많아요';
+    case 'invalid_goal': return '목표는 10분에서 24시간 사이로 정해 주세요';
+    case 'invalid_nickname': return '닉네임은 1~20자로 적어 주세요';
+    case 'friend_not_found': return '그 친구 코드를 찾지 못했어요. 코드를 다시 확인해 주세요';
+    case 'friend_self': return '내 친구 코드예요';
+    case 'too_many_friends': return '친구는 50명까지 추가할 수 있어요';
+    case 'no_profile': return '먼저 닉네임을 정해 주세요';
   }
   if (/^feed_http_(401|403|404)$/.test(m)) return '피드 주소가 더 이상 유효하지 않아요. 스마트캠퍼스에서 새로 복사해 주세요';
   if (/^api_http_/.test(m)) return `스마트캠퍼스가 오류로 응답했어요 (${m.slice(9)})`;

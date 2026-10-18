@@ -69,9 +69,11 @@
     <nav class="views" role="tablist" aria-label="보기 방식">
       <button role="tab" data-view="list" id="tabList">목록</button>
       <button role="tab" data-view="calendar" id="tabCalendar">캘린더</button>
+      <button role="tab" data-view="study" id="tabStudy">공부</button>
     </nav>
 
     <div class="actions">
+      <button class="timer-chip" id="timerChip" type="button" title="공부 타이머로 가기" hidden></button>
       <button class="btn icon ghost notice-btn" id="btnNotices" title="스마트캠퍼스 공지" aria-label="스마트캠퍼스 공지" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8a4.5 4.5 0 0 1 9 0c0 4 1.8 5.5 1.8 5.5H3.7S5.5 12 5.5 8z"/><path d="M8.3 16a1.8 1.8 0 0 0 3.4 0"/></svg>
         <span class="dot" id="noticeDot" hidden></span>
@@ -97,6 +99,8 @@
     </main>
   </div>
 
+  <div class="study" id="viewStudy" hidden></div>
+
   <footer class="statusbar">
     <span class="status" id="status" role="status"></span>
   </footer>
@@ -112,6 +116,9 @@
       <button type="button" role="radio" data-kind="exam">시험</button>
     </div>
     <div class="panel-tools">
+      <button type="button" class="btn ghost study-start" id="fStudyBtn" title="이걸로 공부 시작" hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="11" r="6"/><path d="M10 8v3l2 1.5M8.5 3h3"/></svg><span>공부 시작</span>
+      </button>
       <button type="button" class="btn icon ghost star-toggle" id="fStarBtn" aria-pressed="false" aria-label="중요 표시" title="중요 표시">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg>
       </button>
@@ -318,7 +325,7 @@
           </div>
         </div>
         <div class="set-row">
-          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd> 목록 · 캘린더 <kbd>Esc</kbd> 닫기</p>
+          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 목록 · 캘린더 · 공부 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
         </div>
       </div>
     </details>

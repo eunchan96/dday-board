@@ -849,3 +849,211 @@ a.notice-title:hover { text-decoration: underline; text-underline-offset: 3px; }
 .cal-pill.exam { background: var(--exam-soft); color: var(--exam); box-shadow: none; font-weight: 650; }
 .cal-pill.exam.done { color: var(--pencil-2); }
 @media (max-width: 640px) { .row { padding-left: 12px; } }
+
+/* ═════ 공부 모드 ═════ */
+/* 상단: 공부 화면에서는 학기 · 검색 · 추가 · 다음 마감을 숨기고 탭을 왼쪽에 */
+.study-mode .semester, .study-mode .search, .study-mode #btnNew,
+.study-mode .next, .study-mode .layout { display: none !important; }
+.study-mode .topbar { grid-template-columns: auto 1fr auto; }
+.study-mode .views { grid-column: 1; grid-row: 1; justify-self: start; }
+.study-mode .views button { flex: none; }
+.study-mode .actions { grid-column: 3; grid-row: 1; }
+
+/* 일정 화면에서 돌고 있는 타이머 */
+.timer-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; max-width: 220px; margin-right: 4px; padding: 0 12px 0 10px;
+  border: 1px solid var(--pen); border-radius: 16px; background: var(--pen-soft); color: var(--pen);
+  font: 700 13px var(--font); cursor: pointer;
+}
+.timer-chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: live-pulse 1.6s ease-in-out infinite; }
+.timer-chip .tc-time { font-variant-numeric: tabular-nums; }
+.timer-chip .tc-label { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-chip.rest { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.timer-chip.paused i { animation: none; opacity: 0.5; }
+@keyframes live-pulse { 50% { opacity: 0.35; } }
+@media (max-width: 640px) { .timer-chip .tc-label { display: none; } }
+
+.study { padding-top: 6px; }
+.study-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 36px;
+  grid-template-areas: "timer side" "plans side" "records side";
+  align-items: start;
+}
+.timer-card { grid-area: timer; }
+.study-side { grid-area: side; display: flex; flex-direction: column; gap: 26px; padding-top: 10px; }
+.s-plans { grid-area: plans; }
+.s-records { grid-area: records; }
+.s-block h3 { font-size: 13px; font-weight: 750; color: var(--pencil); }
+.s-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.s-aside { font-size: 13px; color: var(--pencil); font-variant-numeric: tabular-nums; }
+.s-block .muted { color: var(--pencil); font-size: 14px; }
+.sm-icon { width: 30px; height: 30px; }
+.sm-icon svg { width: 16px; height: 16px; }
+
+/* 타이머: 이 화면의 주인공. 큰 숫자 하나, 과목 색은 왼쪽 굵은 선 */
+.timer-card {
+  --c: var(--pen);
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 22px 0 28px 26px; margin-bottom: 30px;
+  box-shadow: inset 5px 0 0 var(--c);
+  border-bottom: 1px solid var(--rule);
+}
+.timer-modes { align-self: flex-start; }
+.timer-modes button:disabled { cursor: default; }
+.timer-modes button:disabled:not([aria-checked="true"]) { opacity: 0.45; }
+.timer-face { display: flex; flex-direction: column; gap: 6px; }
+.timer-phase { font-size: 14px; font-weight: 650; color: var(--pencil); }
+.timer-card[data-phase="focus"]:not(.paused) .timer-phase { color: var(--c); }
+.timer-card[data-phase="rest"] .timer-phase { color: var(--green); }
+.timer-digits {
+  font-size: clamp(76px, 13vw, 136px); font-weight: 750; line-height: 0.95; letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
+}
+.timer-card.paused .timer-digits { color: var(--pencil-2); }
+.timer-bar { height: 4px; max-width: 520px; margin-top: 10px; background: var(--sheet-2); border-radius: 2px; overflow: hidden; }
+.timer-bar i { display: block; height: 100%; background: var(--c); transition: width 1s linear; }
+.timer-card[data-phase="idle"] .timer-bar, .timer-card[data-phase="idle"] .timer-bar i { opacity: 0.6; }
+.timer-what { display: flex; flex-wrap: wrap; gap: 6px; }
+.timer-what .chip .tab, .timer-now .tab { background: var(--c); }
+.more-chip { color: var(--pencil); border-style: dashed; }
+.chip-sub { font-weight: 600; font-size: 12px; color: var(--pencil); }
+.chip[aria-pressed="true"] .chip-sub { color: inherit; opacity: 0.8; }
+.timer-now { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.timer-now .tab { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.timer-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.big { height: 48px; min-width: 132px; padding: 0 24px; font-size: 16px; border-radius: 10px; }
+.btn.ghost-line { background: transparent; }
+
+/* 오늘 */
+.today-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.today-total { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.goal-select {
+  height: 30px; padding: 0 24px 0 10px; border: 1px solid var(--rule); border-radius: 6px; appearance: none; cursor: pointer;
+  font: 650 13px var(--font); color: var(--pencil);
+  background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%239AA1B5' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 7px center / 11px;
+}
+.goal-bar { height: 8px; margin: 10px 0 14px; background: var(--sheet-2); border-radius: 4px; overflow: hidden; }
+.goal-bar i { display: block; height: 100%; background: var(--pen); border-radius: 4px; }
+.subject-bars { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.subject-bars li { display: grid; grid-template-columns: minmax(0, 7em) 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.sb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.sb-bar { height: 6px; background: var(--sheet-2); border-radius: 3px; overflow: hidden; }
+.sb-bar i { display: block; height: 100%; background: var(--c); border-radius: 3px; }
+.sb-time { color: var(--pencil); font-variant-numeric: tabular-nums; }
+
+/* 이번 주 */
+.week-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 112px; }
+.wb { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.wb-col { position: relative; flex: 1; width: 100%; max-width: 26px; background: var(--sheet-2); border-radius: 5px; overflow: hidden; }
+.wb-col i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--pencil-2); border-radius: 5px 5px 0 0; }
+.wb.today .wb-col i { background: var(--pen); }
+.wb-goal { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--pencil-2); }
+.wb-day { font-size: 12px; color: var(--pencil); }
+.wb.today .wb-day { color: var(--ink); font-weight: 750; }
+.wb.future .wb-col { opacity: 0.5; }
+
+/* 시험까지 */
+.exam-study { list-style: none; display: flex; flex-direction: column; }
+.exam-study li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto 30px; align-items: center; gap: 10px;
+  padding: 8px 0 8px 12px; border-bottom: 1px solid var(--rule); box-shadow: inset 3px 0 0 var(--c); font-size: 14px;
+}
+.es-title { all: unset; cursor: pointer; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.es-title:hover { text-decoration: underline; }
+.es-title:focus-visible { outline: 2px solid var(--pen); }
+.es-dday { font-weight: 750; color: var(--exam); font-variant-numeric: tabular-nums; }
+.es-time { color: var(--pencil); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* 계획 · 기록 */
+.s-plans, .s-records { margin-bottom: 30px; }
+.s-plans h3, .s-records h3 { margin-bottom: 8px; }
+.plan-list, .record-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.plan-list li, .record-list li { border-bottom: 1px solid var(--rule); }
+.plan-list li.empty, .record-list li.empty { padding: 14px 4px; color: var(--pencil); font-size: 14px; }
+.plan { display: flex; align-items: center; gap: 10px; padding: 9px 4px 9px 14px; box-shadow: inset 3px 0 0 var(--c); }
+.plan-check {
+  flex-shrink: 0; width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
+  border: 1.5px solid var(--pencil-2); border-radius: 50%; background: transparent; color: transparent; cursor: pointer;
+}
+.plan-check svg { width: 14px; height: 14px; stroke-width: 2.2; }
+.plan-check:hover { border-color: var(--pen); color: var(--pencil-2); }
+.plan-check[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+.plan-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plan-title { font-weight: 650; }
+.plan.done .plan-title { color: var(--pencil); text-decoration: line-through; text-decoration-color: var(--pencil-2); }
+.plan-meta { display: flex; flex-wrap: wrap; gap: 0 10px; font-size: 12.5px; color: var(--pencil); }
+.plan-past { color: var(--red); font-weight: 650; }
+.plan-prog { font-variant-numeric: tabular-nums; }
+.plan-bar { height: 3px; max-width: 220px; margin-top: 3px; background: var(--sheet-2); border-radius: 2px; overflow: hidden; }
+.plan-bar i { display: block; height: 100%; background: var(--c); }
+.plan-add { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+.plan-add input[type=text] { flex: 1; min-width: 0; }
+.plan-add select, .plan-subject select {
+  height: 40px; max-width: 150px; padding: 0 26px 0 10px; border: 1px solid var(--rule); border-radius: var(--radius-s); appearance: none; cursor: pointer;
+  font: 600 14px var(--font);
+  background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%239AA1B5' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 12px;
+}
+.plan-add input[type=number] { width: 84px; min-height: 40px; padding: 8px 10px; font-size: 15px; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-s); }
+.plan-add .unit { color: var(--pencil); font-size: 14px; }
+.record-list li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto 30px; align-items: center; gap: 12px;
+  padding: 8px 4px 8px 14px; box-shadow: inset 3px 0 0 var(--c); font-size: 14px;
+}
+.rec-time { color: var(--pencil); font-variant-numeric: tabular-nums; font-size: 13px; }
+.rec-what { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-what .chip-sub { margin-left: 6px; }
+.rec-len { font-weight: 700; font-variant-numeric: tabular-nums; }
+.manual { margin-top: 12px; }
+.manual .plan-add { margin-top: 8px; }
+.row-x { opacity: 0.55; }
+li:hover > .row-x, .row-x:focus-visible { opacity: 1; }
+
+/* 친구 */
+.friends-body { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.my-code { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--pencil); }
+.my-code .code { font-size: 15px; color: var(--ink); letter-spacing: 0.08em; }
+.friend-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.friend-list li {
+  display: grid; grid-template-columns: 8px minmax(0, 1fr) 64px auto 30px; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px;
+}
+.friend-list li.me .f-name { font-weight: 750; }
+.f-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rule); }
+.f-dot.live { background: var(--green); animation: live-pulse 1.6s ease-in-out infinite; }
+.f-name { display: flex; flex-direction: column; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-live { font-size: 12px; font-weight: 600; color: var(--green); }
+.f-bar { height: 6px; background: var(--sheet-2); border-radius: 3px; overflow: hidden; }
+.f-bar i { display: block; height: 100%; background: var(--pen); border-radius: 3px; }
+.friend-list li:not(.me) .f-bar i { background: var(--pencil-2); }
+.f-time { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; min-width: 5.5em; }
+.friend-manage .inline-form { margin-bottom: 8px; }
+
+/* 과제 패널: 공부 시작 */
+.study-start { height: 34px; padding: 0 10px; font-size: 13px; }
+.study-start svg { width: 16px; height: 16px; }
+
+@media (max-width: 960px) {
+  .study-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "timer" "plans" "side" "records"; }
+  .study-side { padding-top: 0; margin-bottom: 30px; }
+}
+@media (max-width: 640px) {
+  .timer-card { padding: 14px 0 22px 18px; gap: 14px; margin-bottom: 22px; }
+  .timer-modes { align-self: stretch; }
+  .timer-modes button { flex: 1; padding: 0 6px; }
+  .timer-what { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; }
+  .timer-what::-webkit-scrollbar { display: none; }
+  .timer-controls .btn.big { flex: 1; min-width: 0; }
+  .plan-add { flex-wrap: wrap; }
+  .plan-add input[type=text] { flex-basis: 100%; }
+  .plan-add select, .plan-subject { flex: 1; max-width: none; }
+  .plan-subject select { width: 100%; max-width: none; }
+  .record-list li { grid-template-columns: minmax(0, 1fr) auto 30px; gap: 2px 10px; }
+  .rec-time { grid-column: 1; grid-row: 2; }
+  .rec-what { grid-column: 1; grid-row: 1; }
+  .rec-len { grid-column: 2; grid-row: 1 / span 2; }
+  .record-list .row-x { grid-column: 3; grid-row: 1 / span 2; }
+  .row-x { opacity: 1; }
+  .friend-list li { grid-template-columns: 8px minmax(0, 1fr) 44px auto 30px; gap: 8px; }
+  .study-start span { display: none; }
+  .study-start { width: 36px; padding: 0; }
+}

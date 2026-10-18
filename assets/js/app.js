@@ -14,6 +14,7 @@ import {
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
+import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy } from './study.js';
 
 const SYNC_INTERVAL = 30000;
 
@@ -224,9 +225,20 @@ const ctx = () => ({
   onShowSubject: name => { setPref('subject', name); setView('list'); },
 });
 
+let studyShown = false;
 function renderView() {
   const view = state.prefs.view;
   $$('.views button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view ? 'true' : 'false'));
+  // 공부 모드: 일정 화면 대신 타이머 · 기록
+  const studying = view === 'study' && !isCompact;
+  document.body.classList.toggle('study-mode', studying);
+  $('#viewStudy').hidden = !studying;
+  renderTimerChip();
+  if (studying) {
+    if (!studyShown) { studyShown = true; onShowStudy(); } else renderStudy();
+    return;
+  }
+  studyShown = false;
   const root = $('#view');
   const tasks = visibleTasks();
   if (isCompact) renderCompact(root, tasks);
@@ -252,8 +264,25 @@ function renderCompact(root, tasks) {
       h('a', { href: full, target: '_blank', rel: 'noopener' }, '전체 보기')));
 }
 
+// 일정 화면에서 타이머가 돌고 있으면 상단에 작게
+function renderTimerChip() {
+  const chip = $('#timerChip');
+  const t = timerSummary();
+  const show = !!t && state.prefs.view !== 'study' && !isCompact;
+  chip.hidden = !show;
+  if (!show) return;
+  chip.className = `timer-chip${t.rest ? ' rest' : ''}${t.paused ? ' paused' : ''}`;
+  chip.replaceChildren(h('i'), h('span', { class: 'tc-time' }, t.text), t.label ? h('span', { class: 'tc-label' }, t.label) : null);
+  chip.title = t.rest ? '쉬는 시간 · 공부 화면으로' : t.paused ? '멈춤 · 공부 화면으로' : '공부 중 · 공부 화면으로';
+}
+function onTimer() {
+  renderTimerChip();
+  const t = timerSummary();
+  document.title = t && !t.paused ? `${t.text} ${t.rest ? '휴식' : '집중'} · S-DAY` : 'S-DAY';
+}
+
 function setView(v) {
-  if (!['list', 'calendar'].includes(v)) v = 'list';
+  if (!['list', 'calendar', 'study'].includes(v)) v = 'list';
   setPref('view', v);
   if (location.hash !== `#${v}`) history.replaceState(null, '', `#${v}`);
 }
@@ -511,6 +540,7 @@ function openPanel(task, presetDay, kind) {
   refreshPickLabels();
   setKind(task ? (isExam(task) ? 'exam' : 'assignment') : (kind || 'assignment'), { isNew: !task });
   $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
+  $('#fStudyBtn').hidden = !task || !!task.done || groupOf(task) === 'done';
   $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
     type: 'button', onclick: () => { $('#fTitle').value = n; $('#fTitle').focus(); },
   }, n)));
@@ -838,6 +868,14 @@ function bind() {
     toast(done ? '제출 완료로 표시했어요' : '완료를 취소했어요');
   });
   $('#scrim').addEventListener('click', closePanel);
+  $('#fStudyBtn').addEventListener('click', () => {
+    const t = state.tasks.find(x => x.id === ui.editingId);
+    closePanel();
+    if (!t) return;
+    setView('study');
+    startFor(t);
+  });
+  $('#timerChip').addEventListener('click', () => setView('study'));
   $('#panelSave').addEventListener('click', savePanel);
   $('#panelDelete').addEventListener('click', deleteFromPanel);
   ['#fTitle', '#fSubject', '#fLocation'].forEach(s =>
@@ -978,17 +1016,20 @@ function bind() {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
     if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!$('#panel').hidden || $('#settings').open) return;
+    if (state.prefs.view === 'study' && studyKey(e)) return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null, null, 'assignment'); }
     else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); openPanel(null, null, 'exam'); }
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === '1') setView('list');
     else if (e.key === '2') setView('calendar');
+    else if (e.key === '3') setView('study');
   });
 
   window.addEventListener('hashchange', () => { if (!openTaskFromHash()) setView(location.hash.slice(1)); });
   // 알림을 눌러 이미 열린 창으로 돌아올 때 (서비스 워커가 보냄)
   navigator.serviceWorker?.addEventListener('message', e => {
     if (e.data && e.data.type === 'open-task') { pendingTaskId = e.data.id; openTaskFromHash(); }
+    if (e.data && e.data.type === 'open-view') setView(e.data.view);
   });
 }
 
@@ -1040,7 +1081,9 @@ bind();
 initPickers();
 applyTheme();
 const hashView = location.hash.slice(1);
-if (['list', 'calendar'].includes(hashView)) state.prefs.view = hashView;
+if (['list', 'calendar', 'study'].includes(hashView)) state.prefs.view = hashView;
+if (isCompact && state.prefs.view === 'study') state.prefs.view = 'list';
+initStudy({ toast, openTask: t => openPanel(t), onTimer });
 renderAll();
 if (state.code) { pull(); loadLms(); }
 openTaskFromHash();
@@ -1050,7 +1093,9 @@ setInterval(() => {
   if ($('#panel').hidden) pull();
   renderNext();                     // 남은 시간 갱신
 }, SYNC_INTERVAL);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.code) { pull(); loadLms(); } });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.code) { pull(); loadLms(); if (state.prefs.view === 'study') loadStudy(); }
+});
 
 // 홈 화면에 추가했을 때 오프라인에서도 열리도록
 if ('serviceWorker' in navigator && !isEmbedded && location.protocol === 'https:') {
