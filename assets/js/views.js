@@ -1,7 +1,7 @@
 // 목록 / 캘린더 보기
 
 import {
-  h, dday, fmtDate, fmtDuration, groupOf, GROUPS, subjectColor,
+  h, dday, fmtDate, fmtShort, fmtDuration, groupOf, GROUPS, subjectColor,
   startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange,
 } from './util.js';
 
@@ -48,7 +48,6 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   }, svg(ICON_STAR));
 
   const title = h('div', { class: 'title' },
-    exam ? h('span', { class: 'kind-tag' }, '시험') : null,
     h('span', { class: 'title-text' }, t.title),
     t.link ? h('a', {
       class: 'lms-link', href: t.link, target: '_blank', rel: 'noopener noreferrer',
@@ -57,8 +56,9 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   );
 
   const meta = h('div', { class: 'meta' },
-    !compact && t.subject ? h('span', { class: 'subj', style: { '--c': subjectColor(t.subject) } }, t.subject) : null,
-    exam ? h('span', null, `${fmtDate(due, false)} ${timeRange(t)}`) : h('span', null, fmtDate(due)),
+    exam ? h('span', { class: 'exam-word' }, '시험') : null,
+    !compact && t.subject ? h('span', { class: 'subj' }, t.subject) : null,
+    exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, fmtShort(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', { class: 'remain' }, remain) : null,
     !compact && t.done ? submissionLine(t) : null,
@@ -73,7 +73,9 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   const badge = h('div', { class: `dday ${info.level}` }, h('span', null, info.label));
 
-  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id } },
+  // 왼쪽 얇은 막대 = 과목 색
+  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id },
+    style: { '--c': subjectColor(t.subject) } },
     main, star, badge);
 }
 

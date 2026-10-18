@@ -21,6 +21,8 @@
   --hl-ink: #1C2540;
   --red: #CE2F3C;
   --green: #23926A;
+  --exam: #7048C8;
+  --exam-soft: rgba(112, 72, 200, 0.07);
   --shadow: 0 1px 0 rgba(28, 37, 64, 0.04), 0 8px 24px rgba(28, 37, 64, 0.08);
   --radius-s: 6px;
   --radius-m: 10px;
@@ -44,6 +46,8 @@
     --hl-pink: #EE7FA9;
     --red: #FF6B76;
     --green: #4CC596;
+    --exam: #B49BFF;
+    --exam-soft: rgba(180, 155, 255, 0.09);
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
     color-scheme: dark;
   }
@@ -63,6 +67,8 @@
   --hl-pink: #EE7FA9;
   --red: #FF6B76;
   --green: #4CC596;
+  --exam: #B49BFF;
+  --exam-soft: rgba(180, 155, 255, 0.09);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
@@ -824,3 +830,22 @@ a.notice-title:hover { text-decoration: underline; text-underline-offset: 3px; }
 .compact-empty { padding: 20px 0; color: var(--pencil); }
 .compact .semester { display: none !important; }
 .compact .topbar { grid-template-columns: 1fr auto; }
+
+/* ───── 과목 막대 · 시험 색 · 짧은 날짜 ───── */
+/* 과목 색은 줄 왼쪽의 얇은 막대로 (점은 글자 줄을 어긋나게 해서 뺌) */
+.row { box-shadow: inset 3px 0 0 var(--c, transparent); padding-left: 16px; }
+.row.done { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--c, transparent) 35%, transparent); }
+.row .meta .subj::before { content: none; }
+.subj { display: inline; }
+
+/* 시험: 칩 대신 연보라 바탕 + 보라 글자 */
+.row.exam { background: var(--exam-soft); }
+.row.exam:hover { background: color-mix(in srgb, var(--exam-soft) 100%, var(--sheet) 40%); }
+.exam-word { color: var(--exam); font-weight: 700; }
+.row .meta .exam-word + span::before { content: none; }
+.row.exam .dday:not(.over):not(.done) { color: var(--exam); }
+.row.exam .dday.soon span, .row.exam .dday.urgent span { color: var(--hl-ink); }
+.next-exam .exam-word { margin-right: 2px; }
+.cal-pill.exam { background: var(--exam-soft); color: var(--exam); box-shadow: none; font-weight: 650; }
+.cal-pill.exam.done { color: var(--pencil-2); }
+@media (max-width: 640px) { .row { padding-left: 12px; } }

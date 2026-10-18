@@ -119,7 +119,7 @@ function renderNext() {
   if (nextExam && new Date(nextExam.due) - now < 7 * 864e5) {
     const d = new Date(nextExam.due);
     parts.push(h('p', { class: 'next-exam' },
-      h('span', { class: 'kind-tag' }, '시험'),
+      h('span', { class: 'exam-word' }, '시험'),
       h('button', { type: 'button', onclick: () => openPanel(nextExam) },
         [nextExam.subject, nextExam.title].filter(Boolean).join(' ')),
       ` ${fmtDate(d, false)} ${timeRange(nextExam)}`,

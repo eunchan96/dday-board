@@ -22,6 +22,11 @@ export function fmtDate(d, withTime = true) {
   const base = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
   return withTime ? `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}` : base;
 }
+// 목록용 짧은 날짜: 10/20 (화) 23:59
+export function fmtShort(d, withTime = true) {
+  const base = `${d.getMonth() + 1}/${d.getDate()} (${WEEK[d.getDay()]})`;
+  return withTime ? `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}` : base;
+}
 export const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export function fmtDuration(ms) {
