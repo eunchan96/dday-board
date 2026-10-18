@@ -1496,3 +1496,72 @@ svg.filled { fill: currentColor; stroke: none; }
   .study-mode .topbar .actions { grid-column: 2; grid-row: 1; }
 }
 .timer-card, .timer-card[data-phase="idle"] { background: color-mix(in srgb, var(--c) 9%, var(--sheet-2)); }
+
+/* ═════ 상단바 타이머: 다른 버튼과 같은 네모 + 글자 ═════ */
+.top-timer { gap: 6px; margin-right: 8px; }
+.tt-btn { height: 36px; padding: 0 14px; }
+.tt-btn.rest { border-color: var(--green); color: var(--green); }
+@media (max-width: 640px) { .tt-btn { padding: 0 11px; font-size: 13.5px; } .top-timer { gap: 4px; margin-right: 2px; } }
+
+/* ═════ 좁은 화면 필터: 칩 대신 버튼 하나 + 펼침 ═════ */
+.flt-bar { display: none; position: relative; }
+@media (max-width: 960px) { .flt-bar { display: block; } }
+.flt-row { display: flex; align-items: center; gap: 4px; }
+.flt-btn {
+  --c: var(--ink);
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; height: 38px; padding: 0 14px 0 12px;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); cursor: pointer;
+  font: 650 14px var(--font); color: var(--ink);
+}
+.flt-btn svg { flex-shrink: 0; width: 16px; height: 16px; color: var(--pencil); }
+.flt-btn.on { border-color: color-mix(in srgb, var(--pen) 45%, var(--rule)); background: color-mix(in srgb, var(--pen) 6%, var(--sheet)); }
+.flt-btn[aria-expanded="true"] { border-color: var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); }
+.flt-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.flt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flt-opts { flex-shrink: 0; font-size: 12.5px; font-weight: 650; color: var(--pen); }
+.flt-clear { width: 34px; height: 34px; }
+.flt-pop {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(340px, 100%);
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.flt-list { list-style: none; max-height: 46vh; overflow-y: auto; padding: 6px; }
+.flt-item {
+  all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.flt-item:hover, .flt-item:focus-visible { background: var(--sheet-2); }
+.flt-item[aria-checked="true"] { color: var(--pen); }
+.flt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flt-count { font-size: 12.5px; color: var(--pencil-2); font-variant-numeric: tabular-nums; }
+.flt-check { width: 16px; height: 16px; display: grid; place-items: center; }
+.flt-check svg { width: 16px; height: 16px; }
+.flt-toggles { border-top: 1px solid var(--rule); padding: 6px; }
+.flt-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 8px; }
+.flt-toggle:hover { background: var(--sheet-2); }
+/* 스위치 */
+.flt-toggle input {
+  appearance: none; flex-shrink: 0; width: 36px; height: 22px; margin: 0; border-radius: 11px; cursor: pointer;
+  background: var(--rule); position: relative; transition: background-color 150ms;
+}
+.flt-toggle input::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 150ms;
+}
+.flt-toggle input:checked { background: var(--pen); }
+.flt-toggle input:checked::after { transform: translateX(14px); }
+.flt-toggle input:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }
+@media (max-width: 960px) { .chips { display: none !important; } .rail { padding-bottom: 12px; } }
+
+/* ═════ 좁은 화면: 양쪽 칸이 위아래로 쌓일 때 구분 띠 ═════ */
+@media (max-width: 960px) {
+  .st-right, .rec-day {
+    margin: 30px -20px 0; padding: 22px 20px 0;
+    border-top: 8px solid color-mix(in srgb, var(--ink) 5%, var(--paper));
+  }
+  .rec-day { margin-top: 30px; }
+  .rail { border-bottom: 1px solid var(--rule); margin-bottom: 14px; }
+}
+@media (max-width: 640px) {
+  .st-right, .rec-day { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; }
+}
+@media (max-width: 640px) { .plan-add .sp-wrap { width: 142px; } }

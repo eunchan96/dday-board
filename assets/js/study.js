@@ -18,9 +18,9 @@ const MIN_SAVE = 60;                          // 1분 미만은 기록하지 않
 const WATCH_MAX = 12 * 3600 * 1000;           // 스톱워치를 켜 둔 채 잊은 경우
 const LIVE_EVERY = 5 * 60 * 1000;
 const MODES = [
+  { key: 'watch', label: '', title: '스톱워치' },
   { key: 'p25', label: '25분', title: '25분 집중 · 5분 휴식', focus: 25, rest: 5 },
   { key: 'p50', label: '50분', title: '50분 집중 · 10분 휴식', focus: 50, rest: 10 },
-  { key: 'watch', label: '', title: '스톱워치' },
 ];
 const GOALS = [60, 120, 180, 240, 300, 360, 480, 600];
 
@@ -189,7 +189,7 @@ const timer = Object.assign({
   subject: '', taskId: null, planId: null, label: '',
 }, readJSON(KEYS.timer, {}));
 const saveTimer = () => storage.set(KEYS.timer, JSON.stringify(timer));
-const modeOf = () => MODES.find(m => m.key === timer.mode) || MODES[0];
+const modeOf = () => MODES.find(m => m.key === timer.mode) || MODES[1];
 const isPomo = () => timer.mode !== 'watch';
 
 function elapsed(now = Date.now()) {
@@ -409,9 +409,6 @@ function svgIcon(d, filled = false) {
   return s;
 }
 const playIcon = () => svgIcon(['M7 5.2v9.6l7.6-4.8z'], true);
-const pauseIcon = () => svgIcon(['M6.5 5h2.2v10H6.5zM11.3 5h2.2v10h-2.2z'], true);
-const stopIcon = () => svgIcon(['M5.5 5.5h9v9h-9z'], true);
-const skipIcon = () => svgIcon(['M5 5.2v9.6l7-4.8zM13.5 5h2v10h-2z'], true);
 const plusIcon = () => svgIcon(['M10 4.5v11M4.5 10h11']);
 const watchIcon = () => svgIcon(['M10 17a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM10 8v3l2 1.4M8.3 2.8h3.4M15 5.5l1.2-1.2']);
 const copyIcon = () => svgIcon(['M7 7h9v9H7zM4 13V4h9']);
@@ -500,11 +497,12 @@ function renderTopTimer() {
   const box = $('#topTimer');
   if (!box) return;
   const idle = timer.phase === 'idle';
-  const b = (icon, label, onclick, cls = '') => h('button', { type: 'button', class: `tc-btn ${cls}`, onclick, title: label, 'aria-label': label }, icon);
-  if (idle) box.replaceChildren(b(playIcon(), '시작 (Space)', start, 'main'));
-  else if (timer.phase === 'rest') box.replaceChildren(b(skipIcon(), '쉬는 시간 끝내기', toIdle, 'main rest'));
-  else if (timer.running) box.replaceChildren(b(pauseIcon(), '일시정지 (Space)', pause, 'main'), b(stopIcon(), '끝내기', stop));
-  else box.replaceChildren(b(playIcon(), '계속 (Space)', resume, 'main'), b(stopIcon(), '끝내기', stop));
+  // 상단바의 다른 버튼과 같은 네모 버튼에 글자로
+  const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
+  if (idle) box.replaceChildren(b('시작', '타이머 시작 (Space)', start, 'primary'));
+  else if (timer.phase === 'rest') box.replaceChildren(b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest'));
+  else if (timer.running) box.replaceChildren(b('일시정지', '일시정지 (Space)', pause, 'primary'), b('끝내기', '끝내고 기록', stop));
+  else box.replaceChildren(b('계속', '이어서 (Space)', resume, 'primary'), b('끝내기', '끝내고 기록', stop));
 }
 
 export function render() {

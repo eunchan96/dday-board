@@ -236,21 +236,10 @@ function renderRail() {
     h('input', { type: 'checkbox', checked: !!state.prefs[key], onchange: e => setPref(key, e.target.checked) }),
     h('span', null, label));
 
-  const chip = (label, pressed, onclick, color) => h('button', {
-    class: 'chip', type: 'button', 'aria-pressed': pressed ? 'true' : 'false', onclick,
-  }, color ? h('i', { class: 'tab', style: { background: color } }) : null, label);
-
-  const chips = h('div', { class: 'chips', role: 'toolbar', 'aria-label': '필터' },
-    chip('전체', cur === null, () => setPref('subject', null)),
-    subjects.map(([name]) => chip(name || '과목 없음', cur === name,
-      () => setPref('subject', cur === name ? null : name), subjectColor(name))),
-    chip('시험만', state.prefs.kind === 'exam', () => setPref('kind', state.prefs.kind === 'exam' ? null : 'exam')),
-    chip('중요만', state.prefs.starredOnly, () => setPref('starredOnly', !state.prefs.starredOnly)),
-    chip('완료 숨기기', state.prefs.hideDone, () => setPref('hideDone', !state.prefs.hideDone)),
-  );
-
+  // 좁은 화면: 칩 대신 필터 버튼 하나 → 펼치면 과목 고르기 + 보기 옵션
+  const flt = buildFilter(subjects, pendingAll);
   rail.replaceChildren(
-    chips,
+    flt,
     h('div', null, list),
     h('div', { class: 'toggles' },
       h('label', { class: 'check-row' },
@@ -261,6 +250,60 @@ function renderRail() {
   );
 
 }
+
+/* ───── 좁은 화면 필터 ───── */
+let fltOpen = false;
+const CHECK_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 10.5l3 3 6-7"/></svg>';
+function buildFilter(subjects, pendingAll) {
+  const cur = state.prefs.subject;
+  const opts = [
+    state.prefs.kind === 'exam' ? '시험만' : null,
+    state.prefs.starredOnly ? '중요만' : null,
+    state.prefs.hideDone ? '완료 숨김' : null,
+  ].filter(Boolean);
+  const label = cur === null ? '전체 과목' : (cur || '과목 없음');
+  const btn = h('button', {
+    type: 'button', class: `flt-btn${cur !== null || opts.length ? ' on' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
+    'aria-haspopup': 'dialog', style: { '--c': cur === null ? 'var(--ink)' : subjectColor(cur) },
+    onclick: () => { fltOpen = !fltOpen; renderRail(); },
+  },
+  h('svg-slot'),
+  h('i', { class: 'flt-dot' }), h('span', { class: 'flt-label' }, label),
+  opts.length ? h('span', { class: 'flt-opts' }, opts.join(' · ')) : null);
+  btn.querySelector('svg-slot').outerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/></svg>';
+  const clear = cur !== null || opts.length ? h('button', {
+    type: 'button', class: 'btn icon ghost flt-clear', title: '필터 지우기', 'aria-label': '필터 지우기',
+    onclick: () => { fltOpen = false; state.prefs.kind = null; state.prefs.starredOnly = false; state.prefs.hideDone = false; setPref('subject', null); },
+  }) : null;
+  if (clear) clear.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+
+  const subjRow = (name, value, count, color) => {
+    const on = cur === value;
+    const li = h('li', null, h('button', {
+      type: 'button', class: 'flt-item', role: 'radio', 'aria-checked': on ? 'true' : 'false', style: { '--c': color },
+      onclick: () => { fltOpen = false; setPref('subject', value); },
+    }, h('i', { class: 'flt-dot' }), h('span', { class: 'flt-name' }, name), h('span', { class: 'flt-count' }, count), h('span', { class: 'flt-check' })));
+    if (on) li.querySelector('.flt-check').innerHTML = CHECK_SVG;
+    return li;
+  };
+  const toggle = (label, on, onchange) => h('label', { class: 'flt-toggle' },
+    h('span', null, label), h('input', { type: 'checkbox', role: 'switch', checked: on, onchange: e => onchange(e.target.checked) }));
+  const pop = fltOpen ? h('div', { class: 'flt-pop', role: 'dialog', 'aria-label': '필터' },
+    h('ul', { class: 'flt-list', role: 'radiogroup', 'aria-label': '과목' },
+      subjRow('전체 과목', null, pendingAll, 'var(--ink)'),
+      subjects.map(([name, c]) => subjRow(name || '과목 없음', name, c.pending, subjectColor(name)))),
+    h('div', { class: 'flt-toggles' },
+      toggle('시험만', state.prefs.kind === 'exam', v => setPref('kind', v ? 'exam' : null)),
+      toggle('중요한 것만', !!state.prefs.starredOnly, v => setPref('starredOnly', v)),
+      toggle('완료 숨기기', !!state.prefs.hideDone, v => setPref('hideDone', v)))) : null;
+  return h('div', { class: 'flt-bar' }, h('div', { class: 'flt-row' }, btn, clear), pop);
+}
+document.addEventListener('pointerdown', e => {
+  if (fltOpen && !e.target.closest('.flt-bar')) { fltOpen = false; renderRail(); }
+}, true);
+document.addEventListener('keydown', e => {
+  if (fltOpen && e.key === 'Escape') { fltOpen = false; renderRail(); $('.flt-btn')?.focus(); }
+});
 
 /* ───── 본문 ───── */
 const ctx = () => ({
