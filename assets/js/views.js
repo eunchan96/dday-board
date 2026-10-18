@@ -5,7 +5,6 @@ import {
   startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange,
 } from './util.js';
 
-const ICON_CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 const ICON_STAR = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg>';
 const ICON_EXTERNAL = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7 9"/></svg>';
 
@@ -41,16 +40,14 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     else if (info.ms >= 0 && info.ms < 2 * 864e5) remain = `${fmtDuration(info.ms)} 남음`;
   }
 
-  const check = h('button', {
-    class: 'check', type: 'button',
-    'aria-label': t.done ? `${t.title} 완료 취소` : `${t.title} ${exam ? '응시 완료' : '완료'}`,
-    'aria-pressed': t.done ? 'true' : 'false',
-    onclick: () => ctx.onToggle(t.id),
-  }, svg(ICON_CHECK));
+  // 왼쪽: 중요 표시 별 (완료는 제출하면 저절로, 시험은 시간이 지나면 저절로)
+  const star = h('button', {
+    class: 'star-btn', type: 'button', 'aria-label': t.starred ? '중요 표시 해제' : '중요 표시',
+    'aria-pressed': t.starred ? 'true' : 'false', title: t.starred ? '중요 표시 해제' : '중요 표시',
+    onclick: () => ctx.onStar(t.id),
+  }, svg(ICON_STAR));
 
   const title = h('div', { class: 'title' },
-    // 넓은 화면의 목록에서는 오른쪽 별 버튼으로 보이므로 제목 옆 별은 CSS로 숨긴다
-    t.starred ? h('span', { class: compact ? 'star-mark' : 'star-mark title-star', 'aria-label': '중요' }, '★') : null,
     exam ? h('span', { class: 'kind-tag' }, '시험') : null,
     h('span', { class: 'title-text' }, t.title),
     t.link ? h('a', {
@@ -74,16 +71,10 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ctx.onOpen(t); } },
   }, title, meta);
 
-  const star = compact ? null : h('button', {
-    class: 'star-btn', type: 'button', 'aria-label': '중요 표시', 'aria-pressed': t.starred ? 'true' : 'false',
-    title: t.starred ? '중요 표시 해제' : '중요 표시', onclick: () => ctx.onStar(t.id),
-  }, svg(ICON_STAR));
-
   const badge = h('div', { class: `dday ${info.level}` }, h('span', null, info.label));
 
-  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}`, dataset: { id: t.id } },
-    check,
-    main, star, badge);
+  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id } },
+    star, main, badge);
 }
 
 function emptyState(ctx, title, text, withButton = true) {

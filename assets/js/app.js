@@ -125,6 +125,11 @@ function renderNext() {
       ` ${fmtDate(d, false)} ${timeRange(nextExam)}`,
       ` · ${dday(nextExam, now).label}`));
   }
+  // 토큰이 만료되면 자동 가져오기가 멈추므로 눈에 띄게
+  if (state.lms.error === 'token_invalid') {
+    parts.push(h('p', { class: 'next-alert' }, '스마트캠퍼스 토큰이 만료돼서 과제를 못 가져오고 있어요. ',
+      h('button', { type: 'button', onclick: () => openSettings() }, '새 토큰 넣기')));
+  }
   fill($('#next'), parts);
 }
 
@@ -178,8 +183,8 @@ function renderRail() {
 
   rail.replaceChildren(
     chips,
-    h('div', null, h('h3', null, '과목'), list),
-    h('div', { class: 'toggles' }, h('h3', null, '보기'),
+    h('div', null, list),
+    h('div', { class: 'toggles' },
       h('label', { class: 'check-row' },
         h('input', { type: 'checkbox', checked: state.prefs.kind === 'exam', onchange: e => setPref('kind', e.target.checked ? 'exam' : null) }),
         h('span', null, '시험만')),
@@ -380,7 +385,6 @@ function renderDurations() {
   const cur = $('#fEnd').value ? minutesBetween(start, $('#fEnd').value) : null;
   const opts = [[50, '50분'], [60, '1시간'], [75, '1시간 15분'], [90, '1시간 30분'], [120, '2시간']];
   $('#durations').replaceChildren(
-    h('span', { class: 'dur-label' }, '시험 시간'),
     ...opts.map(([min, label]) => h('button', {
       type: 'button', 'aria-pressed': cur === min ? 'true' : 'false',
       onclick: () => { autoEnd(min); renderDurations(); },
@@ -394,13 +398,9 @@ function setKind(kind, { isNew }) {
   $('#panel').classList.toggle('is-exam', exam);
   $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
   $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 수정' : '과제 수정');
-  $('#fTitleLabel').textContent = exam ? '시험 이름' : '과제명';
-  $('#fTitle').placeholder = exam ? '예: 중간고사' : '예: HW3 정규화 연습문제';
-  $('#fDateLabel').textContent = exam ? '시험 날짜' : '마감 날짜';
-  $('#fTimeLabel').textContent = exam ? '시작 시각' : '시각';
-  $('#fDoneLabel').textContent = exam ? '응시 완료' : '제출 완료';
-  $('#fMemoLabel').textContent = exam ? '시험 범위와 메모' : '메모';
-  $('#fMemo').placeholder = exam ? '시험 범위, 준비물(학생증, 계산기), 공부할 것 등을 적어 두세요' : '제출 방법, 참고 자료, 할 일 등을 적어 두세요';
+  $('#fTitle').placeholder = exam ? '시험 이름' : '과제 이름';
+  $('#fMemo').placeholder = exam ? '시험 범위, 준비물' : '메모';
+  renderDoneBtn();
   // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
   setTimePresets('fTime', exam ? ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'] : ['09:00', '12:00', '18:00', '23:59']);
   if (isNew) {
@@ -426,7 +426,7 @@ function openPanel(task, presetDay, kind) {
   ui.endAuto = !(task && task.endAt);
   $('#fStar').checked = !!(task && task.starred);
   $('#fDone').checked = !!(task && task.done);
-  $('#fDoneRow').hidden = !task;
+  renderStarBtn();
   $('#fMemo').value = task ? task.memo || '' : '';
   $('#fLocation').value = task ? task.location || '' : '';
   $('#fEnd').value = task && task.endAt ? toTimeInput(new Date(task.endAt)) : '';
@@ -440,8 +440,8 @@ function openPanel(task, presetDay, kind) {
   const note = $('#panelNote');
   if (task && task.source === 'canvas') {
     note.hidden = false;
-    fill(note, '스마트캠퍼스에서 가져온 과제예요. 직접 고친 과제명, 과목, 마감은 이후 자동 가져오기에서도 그대로 유지돼요. ',
-      task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '스마트캠퍼스에서 열기') : null);
+    fill(note, '스마트캠퍼스 과제',
+      task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '열기') : null);
   } else note.hidden = true;
 
   // 스마트캠퍼스에 제출한 기록
@@ -450,13 +450,11 @@ function openPanel(task, presetDay, kind) {
     const files = task.submission?.files || [];
     sub.hidden = false;
     fill(sub, 
-      h('h3', null, '스마트캠퍼스 제출 기록'),
-      h('p', null, task.submittedAt ? `${fmtDate(new Date(task.submittedAt))}에 제출했어요` : '제출했어요'),
+      h('p', { class: 'sub-head' }, task.submittedAt ? `${fmtDate(new Date(task.submittedAt))} 제출` : '제출함'),
       files.length ? h('ul', null, files.map(f => h('li', null,
         h('span', { class: 'fname' }, f.name), f.size != null ? h('span', { class: 'fsize' }, fmtSize(f.size)) : null))) : null,
       task.submission?.url ? h('p', null, '제출한 링크: ', h('a', { href: task.submission.url, target: '_blank', rel: 'noopener noreferrer' }, task.submission.url)) : null,
       !files.length && task.submission?.type === 'online_text_entry' ? h('p', { class: 'muted' }, '글로 직접 입력해 제출했어요') : null,
-      task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '스마트캠퍼스에서 제출물 보기') : null,
     );
   } else sub.hidden = true;
 
@@ -476,6 +474,23 @@ function closePanel() {
   $('#scrim').hidden = true;
   ui.editingId = null;
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+
+function renderStarBtn() {
+  const on = $('#fStar').checked;
+  $('#fStarBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+  $('#fStarBtn').title = on ? '중요 표시 해제' : '중요 표시';
+}
+
+// 과제만: 제출 완료 / 완료 취소 (시험은 시간이 지나면 저절로 끝난 일정으로)
+function renderDoneBtn() {
+  const btn = $('#fDoneBtn');
+  const show = !!ui.editingId && ui.kind !== 'exam';
+  btn.hidden = !show;
+  if (!show) return;
+  const done = $('#fDone').checked;
+  btn.classList.toggle('is-done', done);
+  btn.textContent = done ? '완료 취소' : '제출 완료';
 }
 
 function savePanel() {
@@ -658,7 +673,7 @@ subscribe(what => {
   }
   if (what === 'status') { renderStatus(); return; }
   if (what === 'board' && state.code && pendingImport) setTimeout(() => showImport(pendingImport), 0);
-  if (what === 'lms') { renderLms(); return; }
+  if (what === 'lms') { renderLms(); renderNext(); return; }
   if (what === 'prefs') { applyTheme(); renderSemester(); renderNext(); renderRail(); renderView(); return; }
   renderAll();
 });
@@ -719,7 +734,13 @@ function bind() {
 
   // 패널
   $('#panelClose').addEventListener('click', closePanel);
-  $('#panelCancel').addEventListener('click', closePanel);
+  $('#fStarBtn').addEventListener('click', () => { $('#fStar').checked = !$('#fStar').checked; renderStarBtn(); });
+  $('#fDoneBtn').addEventListener('click', () => {
+    const done = !$('#fDone').checked;
+    $('#fDone').checked = done;
+    savePanel();
+    toast(done ? '제출 완료로 표시했어요' : '완료를 취소했어요');
+  });
   $('#scrim').addEventListener('click', closePanel);
   $('#panelSave').addEventListener('click', savePanel);
   $('#panelDelete').addEventListener('click', deleteFromPanel);

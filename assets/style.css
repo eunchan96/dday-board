@@ -405,7 +405,6 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
   .next { padding: 12px 0 14px; }
   .next-line { font-size: 18px; }
   .row { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 11px 4px; }
-  .row .star-btn { display: none; }
   .cal-day { min-height: 54px; padding: 3px; align-items: center; }
   .cal-day .cal-pill, .cal-day .cal-more { display: none; }
   .cal-dots { display: flex; justify-content: center; }
@@ -730,3 +729,55 @@ body { background-image: none; }
 .cal-pill.exam { background: var(--sheet); color: var(--ink); box-shadow: inset 0 0 0 1px var(--pencil-2); }
 .cal-head h3 { font-size: 20px; font-weight: 750; }
 .cal-grid { border-top: 1px solid var(--rule); border-radius: var(--radius-m); overflow: hidden; }
+
+/* ───── 체크 대신 별 · 라벨 없는 편집 화면 ───── */
+.row { grid-template-columns: 26px minmax(0, 1fr) auto; }
+.row .star-btn { opacity: 1; padding: 3px; color: var(--rule); justify-self: start; }
+.row .star-btn svg { width: 19px; height: 19px; }
+.row:hover .star-btn { color: var(--pencil-2); }
+.row .star-btn[aria-pressed="true"] { color: var(--ink); }
+.row.done .main { opacity: 0.6; }
+@media (max-width: 640px) {
+  .row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .row .star-btn { color: var(--pencil-2); }
+}
+.rail .toggles { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
+
+.next-alert { font-size: 14px; font-weight: 600; color: var(--red); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.next-alert button { all: unset; cursor: pointer; color: var(--pen); text-decoration: underline; text-underline-offset: 3px; }
+
+/* 편집 화면 */
+.panel-head { padding: 12px 12px 12px 16px; }
+.panel-tools { margin-left: auto; display: flex; gap: 2px; }
+.star-toggle[aria-pressed="true"] { color: var(--ink); }
+.star-toggle[aria-pressed="true"] svg { fill: var(--hl-yellow); }
+.panel-body { gap: 12px; padding: 18px 20px; }
+.title-input { font-size: 20px !important; font-weight: 700; border: 0 !important; background: transparent !important; padding: 4px 0 !important; min-height: 0 !important; }
+.title-input:focus { box-shadow: none; outline: none; }
+.title-input::placeholder { color: var(--pencil-2); }
+.when { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.when .pick { width: auto; flex: 1 1 140px; justify-content: flex-start; }
+.when .pick-time { flex: 0 1 130px; }
+.when .pick::before { content: ''; width: 16px; height: 16px; flex-shrink: 0; background: var(--pencil); }
+.when .pick-date::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Crect x='3' y='4.5' width='14' height='12.5' rx='2'/%3E%3Cpath d='M3 8.5h14M7 2.8v3.4M13 2.8v3.4'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Crect x='3' y='4.5' width='14' height='12.5' rx='2'/%3E%3Cpath d='M3 8.5h14M7 2.8v3.4M13 2.8v3.4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.when .pick-time::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7'/%3E%3Cpath d='M10 6v4l2.6 1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7'/%3E%3Cpath d='M10 6v4l2.6 1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.when .pick::after { display: none; }
+.when-sep { color: var(--pencil-2); }
+.panel:not(.is-exam) .when-sep { display: none; }
+.panel .quick-dates { margin-top: 0; }
+.panel-note { display: flex; gap: 10px; align-items: center; padding: 8px 12px; }
+.submission .sub-head { font-weight: 700; color: var(--green); }
+
+/* 제출 완료: 눈에 띄는 초록 버튼, 완료 뒤에는 조용한 버튼 */
+.done-btn { background: var(--green); border-color: var(--green); color: #fff; }
+.done-btn:hover { filter: brightness(1.06); }
+.done-btn.is-done { background: transparent; border-color: var(--rule); color: var(--pencil); }
+.panel-foot .done-btn + .btn.primary { min-width: 72px; }
+.panel.is-exam .when .pick-date { flex-basis: 100%; }
+.panel.is-exam .when .pick-time { flex: 1 1 0; }
