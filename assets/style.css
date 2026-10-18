@@ -1097,20 +1097,7 @@ li:hover > .row-x, .row-x:focus-visible { opacity: 1; }
   .rec-day { margin-top: 28px; }
 }
 @media (max-width: 640px) {
-  /* 일정: [일정] ……… [버튼들] / [검색] / [학기][목록|캘린더] */
-  .topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .semester.lead { display: contents; }
-  .mode-btn { grid-column: 1; grid-row: 1; justify-self: start; padding: 0 8px 0 10px; font-size: 14px; }
-  .sem-select { grid-column: 1; grid-row: 3; }
-  .sem-select select { max-width: 46vw; }
-  .search { grid-column: 1 / -1; grid-row: 2; }
-  .actions { grid-column: 3; grid-row: 1; }
-  #planViews { grid-column: 2 / -1; grid-row: 3; }
-  /* 공부: [공부] ……… [버튼들] / [오늘|기록] */
-  .study-mode .topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .study-mode .views { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
-  .study-mode .views button { flex: 1; }
-  .study-mode .actions { grid-column: 3; grid-row: 1; }
+  .mode-btn { padding: 0 8px 0 10px; font-size: 14px; }
   .fb-label { display: none; }
   .friends-btn { padding: 0 8px; }
   .timer-chip .tc-label { display: none; }
@@ -1191,3 +1178,121 @@ svg.filled { fill: currentColor; stroke: none; }
 }
 .plan-add .btn.icon { flex-shrink: 0; width: 40px; height: 40px; }
 .plan .play svg { width: 19px; height: 19px; }
+
+/* ═════ 상단바 정리 ═════
+   일정: [일정][학기] [목록|캘린더] ……… [검색][공지][설정][추가]
+   공부: [공부] [오늘|기록] ……… [친구][공지][설정]
+   검색은 아이콘을 누르면 상단을 덮는 입력 칸으로, 새로고침은 아래 상태 줄로 */
+.topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.topbar .semester { grid-column: 1; grid-row: 1; }
+.topbar .views { grid-column: 2; grid-row: 1; justify-self: start; }
+.topbar .actions { grid-column: 4; grid-row: 1; }
+.topbar .search { display: none; }
+.search-open .topbar .search {
+  display: flex; align-items: center; gap: 6px;
+  position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 3;
+  padding: 4px 0; background: var(--paper);
+}
+.search-field { position: relative; flex: 1; display: flex; align-items: center; }
+.search-field svg { position: absolute; left: 12px; color: var(--pencil-2); pointer-events: none; }
+.search-field input { padding-left: 38px; min-height: 40px; }
+.study-mode .search, .study-mode #btnSearch { display: none !important; }
+
+.semester select { font-weight: 600; }
+.semester select.is-current { font-weight: 800; color: var(--ink); }
+.semester option { font-weight: 500; }
+.semester option.now { font-weight: 800; }
+
+.statusbar { justify-content: flex-start; gap: 4px; }
+.sync-btn { width: 28px; height: 28px; color: var(--pencil-2); }
+.sync-btn svg { width: 15px; height: 15px; }
+
+@media (max-width: 640px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .topbar .semester { grid-column: 1; grid-row: 1; min-width: 0; }
+  .topbar .actions { grid-column: 2; grid-row: 1; }
+  .topbar .views { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .topbar .views button { flex: 1; }
+  .search-open .topbar .search { top: auto; bottom: 8px; transform: none; padding: 0; }   /* 폰: 목록|캘린더 줄을 덮음 */
+  #btnNew { width: 36px; padding: 0; }
+  #btnNew .new-label { display: none; }
+  /* 공부 모드는 한 줄: [공부][오늘|기록] … [친구][공지][설정] */
+  .study-mode .topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .study-mode .topbar .views { grid-column: 2; grid-row: 1; justify-self: start; }
+  .study-mode .topbar .views button { flex: none; padding: 0 11px; }
+  .study-mode .topbar .actions { grid-column: 3; grid-row: 1; }
+}
+
+/* ═════ 설정: 왼쪽 탭 + 한 번에 한 묶음 ═════ */
+#settings { width: min(760px, calc(100% - 24px)); height: min(640px, calc(100vh - 48px)); }
+#settings[open] { display: flex; flex-direction: column; }
+.settings-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 188px minmax(0, 1fr); }
+.set-nav { display: flex; flex-direction: column; gap: 2px; padding: 12px 10px; border-right: 1px solid var(--rule); background: var(--sheet-2); }
+.set-nav button {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; font-size: 14px; font-weight: 650; color: var(--pencil); cursor: pointer;
+}
+.set-nav button svg { flex-shrink: 0; }
+.set-nav button:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.set-nav button[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 1px 2px rgba(28, 37, 64, 0.1); }
+.set-nav button:focus-visible { outline: 2px solid var(--pen); }
+.nav-dot { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--red); }
+#settings .settings-body { min-height: 0; overflow-y: auto; padding: 22px 26px 26px; gap: 22px; }
+#settings .set-group > h3 { margin: 0 0 14px; font-size: 18px; font-weight: 750; color: var(--ink); letter-spacing: -0.01em; }
+#settings .set-more-group > summary { margin: 4px 0 10px; }
+#settings .set-card { border-radius: 12px; }
+#settings .set-row { padding: 16px 18px; }
+@media (max-width: 640px) {
+  #settings { height: calc(100vh - 24px); }
+  .settings-wrap { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .set-nav { flex-direction: row; gap: 4px; padding: 8px 12px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--rule); scrollbar-width: none; }
+  .set-nav::-webkit-scrollbar { display: none; }
+  .set-nav button { flex-shrink: 0; padding: 7px 11px; font-size: 13.5px; gap: 7px; }
+  .set-nav button svg { width: 16px; height: 16px; }
+  #settings .settings-body { padding: 16px 14px 22px; }
+  #settings .set-group > h3 { display: none; }
+  #settings .set-row { padding: 14px; }
+}
+
+/* ═════ 하루 타임라인: 10분 격자 ═════ */
+.tl-row { border-bottom: 1px solid color-mix(in srgb, var(--rule) 55%, transparent); }
+.tl-row.dash { border-top: 0; }
+.tl-row:has(+ .tl-row.dash) { border-bottom: 1px dashed var(--rule); }
+.tl-track {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--rule) 75%, transparent) 1px, transparent 1px),
+    linear-gradient(to right, color-mix(in srgb, var(--rule) 40%, transparent) 1px, transparent 1px);
+  background-size: 50% 100%, calc(100% / 6) 100%;
+  background-position: -1px 0, -1px 0;
+}
+.timeline { border-top: 1px solid color-mix(in srgb, var(--rule) 55%, transparent); }
+
+/* ═════ 타이머: 숫자 오른쪽에 ▶ · ■ ═════ */
+.timer-main { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 32px; }
+.timer-main .timer-controls { flex-wrap: nowrap; }
+.timer-card .timer-what { margin-top: -4px; }
+
+/* ═════ 오늘 공부: 칸 너비 고정 (D-day가 세로로 줄 맞게) ═════ */
+.plan-list .plan, .plan.soon { grid-template-columns: minmax(0, 1fr) 46px 84px 30px 30px; }
+.plan-name { display: flex; align-items: baseline; gap: 10px; min-width: 0; overflow: hidden; }
+.plan-name .plan-subj { flex-shrink: 0; max-width: 100%; }
+.plan-name .plan-memo { min-width: 0; }
+.plan-dday { justify-self: start; text-align: left; }
+@media (max-width: 640px) {
+  .plan-list .plan, .plan.soon { grid-template-columns: minmax(0, 1fr) 40px 70px 28px 28px; gap: 6px; }
+  .plan-time { font-size: 12px; }
+  .timer-main { gap: 10px 20px; }
+  .timer-digits { font-size: 64px; }
+}
+.search #searchClose svg { position: static; }
+.search input[type=search]::-webkit-search-cancel-button { display: none; }
+@media (max-width: 640px) {
+  .mode-btn svg { display: none; }
+  .mode-btn { gap: 6px; }
+  .topbar .actions { gap: 0; }
+  .semester select { padding: 0 22px 0 9px; background-position: right 6px center; }
+}
+@media (max-width: 380px) {
+  .semester select { font-size: 13px; }
+  .mode-btn { padding: 0 7px 0 8px; font-size: 13.5px; }
+}

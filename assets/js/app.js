@@ -66,11 +66,25 @@ function renderSemester() {
   const value = state.prefs.semester === 'all' ? 'all'
     : (parseSemesterKey(state.prefs.semester) && state.prefs.semester !== cur ? state.prefs.semester : 'current');
   sel.replaceChildren(
-    ...sorted.map(k => h('option', { value: k === cur ? 'current' : k },
-      k === cur ? `${semesterLabel(parseSemesterKey(k))} · 지금` : semesterLabel(parseSemesterKey(k)))),
+    ...sorted.map(k => h('option', { value: k === cur ? 'current' : k, class: k === cur ? 'now' : null },
+      semesterLabel(parseSemesterKey(k)))),
     h('option', { value: 'all' }, '전체 학기'),
   );
   sel.value = value;
+  // 지금 학기는 굵게 (따로 "지금"이라고 적지 않음)
+  sel.classList.toggle('is-current', value === 'current');
+  sel.title = value === 'current' ? '지금 학기' : '';
+}
+
+/* ───── 검색 ───── */
+function openSearch() {
+  document.body.classList.add('search-open');
+  $('#search').focus();
+}
+function closeSearch() {
+  document.body.classList.remove('search-open');
+  if (ui.query) { ui.query = ''; $('#search').value = ''; renderView(); }
+  $('#btnSearch').focus();
 }
 
 /* ───── 필터 적용 ───── */
@@ -236,6 +250,7 @@ function renderView() {
   // 왼쪽 위 버튼: 일정 ↔ 공부. 탭도 모드에 따라 목록·캘린더 / 오늘·기록
   const studying = isStudying();
   document.body.classList.toggle('study-mode', studying);
+  if (studying) document.body.classList.remove('search-open');
   $('#modeLabel').textContent = studying ? '공부' : '일정';
   $('#modeBtn').setAttribute('aria-label', studying ? '공부 모드 · 눌러서 일정으로' : '일정 모드 · 눌러서 공부로');
   $('#planViews').hidden = studying;
@@ -332,6 +347,7 @@ function renderLms() {
   $('#btnTokenSave').textContent = token ? '바꾸기' : '연결';
   $('#tokenSub').textContent = token ? `…${l.tokenHint} 연결됨` : '과제와 제출 파일을 하루 3번 가져와요';
   $('#bookmarkletSection').hidden = token;          // 토큰이 있으면 북마클릿은 필요 없음
+  $('#lmsNavDot').hidden = !l.error;
   const st = $('#lmsState');
   st.className = 'set-sub';
   if (!l.connected) st.textContent = '연결 안 됨';
@@ -681,7 +697,15 @@ function deleteFromPanel() {
 let codeShown = false;
 const mask = c => `${c.slice(0, 5)}-•••••-•••••-${c.slice(-5)}`;
 
-function openSettings() {
+// 설정은 탭으로 나눠 한 번에 한 묶음만
+function setSettingsTab(tab) {
+  if (!['lms', 'push', 'cal', 'device'].includes(tab)) tab = 'lms';
+  $$('#setNav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
+  $$('#settings .set-group').forEach(g => { g.hidden = g.dataset.tab !== tab; });
+  $('#settings .settings-body').scrollTop = 0;
+}
+function openSettings(tab = 'lms') {
+  setSettingsTab(typeof tab === 'string' ? tab : 'lms');
   codeShown = false;
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
@@ -865,6 +889,11 @@ function bind() {
   $('#btnFriends').addEventListener('click', openFriends);
   $('#friendsClose').addEventListener('click', () => $('#friendsDialog').close());
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
+  // 검색은 평소엔 아이콘, 누르면 상단을 덮는 입력 칸
+  $('#btnSearch').addEventListener('click', openSearch);
+  $('#searchClose').addEventListener('click', closeSearch);
+  $('#search').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeSearch(); } });
+  $$('#setNav button').forEach(b => b.addEventListener('click', () => setSettingsTab(b.dataset.tab)));
   const presetDay = () => (state.prefs.view === 'calendar' ? ui.selectedDay : null);
   $('#btnNew').addEventListener('click', () => openPanel(null, presetDay(), 'assignment'));
   $$('#kindPicker button').forEach(b => b.addEventListener('click', () => setKind(b.dataset.kind, { isNew: !ui.editingId })));
@@ -873,7 +902,7 @@ function bind() {
     if (state.lms.connected) runLmsSync(e.currentTarget, { quiet: true });
     else { pull(); loadLms(); }
   });
-  $('#btnSettings').addEventListener('click', openSettings);
+  $('#btnSettings').addEventListener('click', () => openSettings());
   $('#status').addEventListener('click', () => { if (state.syncError) pull(); });
 
   // 패널
@@ -1042,7 +1071,7 @@ function bind() {
     if (isStudying() && studyKey(e)) return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null, null, 'assignment'); }
     else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); openPanel(null, null, 'exam'); }
-    else if (e.key === '/' && !isStudying()) { e.preventDefault(); $('#search').focus(); }
+    else if (e.key === '/' && !isStudying()) { e.preventDefault(); openSearch(); }
     else if (e.key === 's' || e.key === 'S') toggleMode();
     else if (e.key === '1') setView(isStudying() ? 'today' : 'list');
     else if (e.key === '2') setView(isStudying() ? 'records' : 'calendar');

@@ -437,8 +437,10 @@ function build(root) {
   el.controls = h('div', { class: 'timer-controls' });
   el.timerCard = h('section', { class: 'timer-card', 'aria-label': '타이머' },
     el.modes,
-    h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
-    el.what, el.controls);
+    h('div', { class: 'timer-face' }, el.phase,
+      h('div', { class: 'timer-main' }, el.digits, el.controls),
+      h('div', { class: 'timer-bar' }, el.bar)),
+    el.what);
 
   /* 오늘: 계획 */
   el.planList = h('ul', { class: 'plan-list' });
@@ -591,8 +593,10 @@ function renderPlans() {
     const spent = planProgress(p);
     const now = !idle && timer.planId === p.id;
     return h('li', { class: `plan${now ? ' now' : ''}`, style: { '--c': subjectColor(p.subject) } },
-      h('span', { class: 'plan-subj' }, p.subject || memo || '공부'),
-      h('span', { class: 'plan-memo' }, p.subject ? memo : ''),
+      h('span', { class: 'plan-name' },
+        h('span', { class: 'plan-subj' }, p.subject || memo || '공부'),
+        p.subject && memo ? h('span', { class: 'plan-memo' }, memo) : null),
+      h('span', { class: 'plan-dday' }),
       h('span', { class: 'plan-time' }, spent ? fmtSpent(spent) : ''),
       playBtn(p.subject || memo, { subject: p.subject, planId: p.id, label: memo ? `${p.subject ? `${p.subject} · ` : ''}${memo}` : '' }),
       h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '지우기', 'aria-label': `${p.subject || memo} 지우기`, onclick: () => removePlan(p) }, xIcon()));
@@ -609,7 +613,8 @@ function renderPlans() {
     if (timer.phase === 'focus' && t.subject && timer.subject === t.subject) sec += runningFocusSec();
     const nowT = !idle && timer.taskId === t.id;
     return h('li', { class: `plan soon${isExam(t) ? ' exam' : ''}${nowT ? ' now' : ''}`, style: { '--c': subjectColor(t.subject) } },
-      h('button', { type: 'button', class: 'plan-subj link', onclick: () => ctx.openTask(t) }, displayTitle(t)),
+      h('span', { class: 'plan-name' },
+        h('button', { type: 'button', class: 'plan-subj link', onclick: () => ctx.openTask(t) }, displayTitle(t))),
       h('span', { class: 'plan-dday' }, dday(t, now).label),
       h('span', { class: 'plan-time', title: '최근 2주 이 과목 공부' }, sec ? fmtSpent(sec) : ''),
       playBtn(displayTitle(t), { subject: t.subject, taskId: t.id, label: displayTitle(t) }),
