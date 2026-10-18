@@ -14,7 +14,7 @@ import {
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
-import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy } from './study.js';
+import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
 
@@ -226,12 +226,23 @@ const ctx = () => ({
 });
 
 let studyShown = false;
+const isStudying = () => state.prefs.mode === 'study' && !isCompact;
+const studyTab = () => (state.prefs.studyView === 'records' ? 'records' : 'today');
+// 지금 화면에 맞는 주소 해시: #list #calendar #study #records
+const curHash = () => (isStudying() ? (studyTab() === 'records' ? 'records' : 'study') : state.prefs.view);
+
 function renderView() {
   const view = state.prefs.view;
-  $$('.views button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view ? 'true' : 'false'));
-  // 공부 모드: 일정 화면 대신 타이머 · 기록
-  const studying = view === 'study' && !isCompact;
+  // 왼쪽 위 버튼: 일정 ↔ 공부. 탭도 모드에 따라 목록·캘린더 / 오늘·기록
+  const studying = isStudying();
   document.body.classList.toggle('study-mode', studying);
+  $('#modeLabel').textContent = studying ? '공부' : '일정';
+  $('#modeBtn').setAttribute('aria-label', studying ? '공부 모드 · 눌러서 일정으로' : '일정 모드 · 눌러서 공부로');
+  $('#planViews').hidden = studying;
+  $('#studyViews').hidden = !studying;
+  $('#btnFriends').hidden = !studying;
+  $$('#planViews button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view ? 'true' : 'false'));
+  $$('#studyViews button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === studyTab() ? 'true' : 'false'));
   $('#viewStudy').hidden = !studying;
   renderTimerChip();
   if (studying) {
@@ -268,7 +279,7 @@ function renderCompact(root, tasks) {
 function renderTimerChip() {
   const chip = $('#timerChip');
   const t = timerSummary();
-  const show = !!t && state.prefs.view !== 'study' && !isCompact;
+  const show = !!t && !isStudying() && !isCompact;
   chip.hidden = !show;
   if (!show) return;
   chip.className = `timer-chip${t.rest ? ' rest' : ''}${t.paused ? ' paused' : ''}`;
@@ -281,10 +292,18 @@ function onTimer() {
   document.title = t && !t.paused ? `${t.text} ${t.rest ? '휴식' : '집중'} · S-DAY` : 'S-DAY';
 }
 
+// v: list | calendar (일정) · study | today | records (공부)
 function setView(v) {
-  if (!['list', 'calendar', 'study'].includes(v)) v = 'list';
-  setPref('view', v);
-  if (location.hash !== `#${v}`) history.replaceState(null, '', `#${v}`);
+  const p = state.prefs;
+  if (v === 'study' || v === 'today') { p.mode = 'study'; p.studyView = 'today'; }
+  else if (v === 'records') { p.mode = 'study'; p.studyView = 'records'; }
+  else { p.mode = 'plan'; p.view = ['list', 'calendar'].includes(v) ? v : 'list'; }
+  setPref('studyView', p.studyView || 'today');      // 저장하고 다시 그리기
+  const hash = `#${curHash()}`;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+}
+function toggleMode() {
+  setView(state.prefs.mode === 'study' ? state.prefs.view : studyTab());
 }
 
 /* ───── 상태 표시 ───── */
@@ -760,7 +779,7 @@ async function confirmImport() {
     if (r.added) parts.push(`새 과제 ${r.added}개`);
     if (r.updated) parts.push(`업데이트 ${r.updated}개`);
     toast(parts.length ? `스마트캠퍼스에서 ${parts.join(', ')}를 반영했어요` : '이미 모두 반영되어 있어요');
-    if (location.hash === '#import') history.replaceState(null, '', `#${state.prefs.view}`);
+    if (location.hash === '#import') history.replaceState(null, '', `#${curHash()}`);
   } catch (e) {
     msg.className = 'msg err'; msg.textContent = errText(e);
   } finally { btn.disabled = false; }
@@ -842,6 +861,9 @@ function bind() {
     renderView();
   });
   $$('.views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  $('#modeBtn').addEventListener('click', toggleMode);
+  $('#btnFriends').addEventListener('click', openFriends);
+  $('#friendsClose').addEventListener('click', () => $('#friendsDialog').close());
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
   const presetDay = () => (state.prefs.view === 'calendar' ? ui.selectedDay : null);
   $('#btnNew').addEventListener('click', () => openPanel(null, presetDay(), 'assignment'));
@@ -1016,13 +1038,14 @@ function bind() {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
     if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!$('#panel').hidden || $('#settings').open) return;
-    if (state.prefs.view === 'study' && studyKey(e)) return;
+    if ($('#friendsDialog').open || $('#noticesDialog').open) return;
+    if (isStudying() && studyKey(e)) return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null, null, 'assignment'); }
     else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); openPanel(null, null, 'exam'); }
-    else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
-    else if (e.key === '1') setView('list');
-    else if (e.key === '2') setView('calendar');
-    else if (e.key === '3') setView('study');
+    else if (e.key === '/' && !isStudying()) { e.preventDefault(); $('#search').focus(); }
+    else if (e.key === 's' || e.key === 'S') toggleMode();
+    else if (e.key === '1') setView(isStudying() ? 'today' : 'list');
+    else if (e.key === '2') setView(isStudying() ? 'records' : 'calendar');
   });
 
   window.addEventListener('hashchange', () => { if (!openTaskFromHash()) setView(location.hash.slice(1)); });
@@ -1039,14 +1062,14 @@ function openTaskFromHash() {
   // 알림에서 연 경우: 설정 · 공지
   if ((location.hash === '#settings' || location.hash === '#notices') && state.code) {
     const which = location.hash;
-    history.replaceState(null, '', `#${state.prefs.view}`);
+    history.replaceState(null, '', `#${curHash()}`);
     setTimeout(() => { if (which === '#settings') openSettings(); else loadNotices().then(openNotices); }, 0);
     return true;
   }
   // 앱 바로가기: 새 과제 / 새 시험
   if ((location.hash === '#new' || location.hash === '#new-exam') && state.code) {
     const kind = location.hash === '#new' ? 'assignment' : 'exam';
-    history.replaceState(null, '', `#${state.prefs.view}`);
+    history.replaceState(null, '', `#${curHash()}`);
     setTimeout(() => openPanel(null, null, kind), 0);
     return true;
   }
@@ -1056,7 +1079,7 @@ function openTaskFromHash() {
   const t = state.tasks.find(x => x.id === pendingTaskId);
   if (!t) return true;                      // 아직 불러오기 전이면 불러온 뒤 다시 시도
   pendingTaskId = null;
-  history.replaceState(null, '', `#${state.prefs.view}`);
+  history.replaceState(null, '', `#${curHash()}`);
   openPanel(t);
   return true;
 }
@@ -1081,8 +1104,10 @@ bind();
 initPickers();
 applyTheme();
 const hashView = location.hash.slice(1);
-if (['list', 'calendar', 'study'].includes(hashView)) state.prefs.view = hashView;
-if (isCompact && state.prefs.view === 'study') state.prefs.view = 'list';
+// 예전 버전은 공부를 view='study'로 저장했음
+if (state.prefs.view === 'study') { state.prefs.view = 'list'; state.prefs.mode = 'study'; }
+if (['list', 'calendar'].includes(hashView)) { state.prefs.view = hashView; state.prefs.mode = 'plan'; }
+else if (hashView === 'study' || hashView === 'records') { state.prefs.mode = 'study'; state.prefs.studyView = hashView === 'records' ? 'records' : 'today'; }
 initStudy({ toast, openTask: t => openPanel(t), onTimer });
 renderAll();
 if (state.code) { pull(); loadLms(); }
@@ -1094,7 +1119,7 @@ setInterval(() => {
   renderNext();                     // 남은 시간 갱신
 }, SYNC_INTERVAL);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.code) { pull(); loadLms(); if (state.prefs.view === 'study') loadStudy(); }
+  if (!document.hidden && state.code) { pull(); loadLms(); if (isStudying()) loadStudy(); }
 });
 
 // 홈 화면에 추가했을 때 오프라인에서도 열리도록

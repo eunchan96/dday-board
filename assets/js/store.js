@@ -30,7 +30,7 @@ export const state = {
   lastSync: null,
   syncError: null,
   lms: { connected: false, syncedAt: null, error: null },
-  prefs: Object.assign({ view: 'list', hideDone: false, theme: 'system', subject: null, starredOnly: false, kind: null, semester: 'current' },
+  prefs: Object.assign({ view: 'list', mode: 'plan', studyView: 'today', hideDone: false, theme: 'system', subject: null, starredOnly: false, kind: null, semester: 'current' },
                        readJSON(KEYS.prefs, {})),
 };
 let localVersion = 0;

@@ -1,4 +1,4 @@
-// 공부 모드: 타이머(뽀모도로 · 스톱워치), 오늘 공부 시간, 공부 계획, 이번 주, 시험까지, 친구
+// 공부 모드: 오늘(타이머 · 계획 · 하루 타임라인), 기록(주간 · 월간), 친구
 //
 // - 하루는 새벽 5시에 바뀐다 (밤새 공부한 시간은 전날로) — 서버(app.study_day)와 같은 기준
 // - 타이머는 이 기기에만 저장 (창을 닫았다 열어도 이어짐). 끝낸 공부만 서버에 기록
@@ -53,6 +53,7 @@ const study = {
   friends: [],
   friendsError: null,
   windowStart: null,          // sessions를 받아 온 시작 시각
+  extra: new Map(),           // 기록 탭에서 더 불러온 예전 기록 (id → 기록)
 };
 
 function readJSON(k, fallback) {
@@ -124,8 +125,13 @@ export async function loadFriends() {
 }
 
 /* ───── 계산 ───── */
+function allSessions() {
+  if (!study.extra.size) return study.sessions;
+  const ids = new Set(study.sessions.map(s => s.id));
+  return [...study.sessions, ...[...study.extra.values()].filter(s => !ids.has(s.id))];
+}
 function sessionsOn(key) {
-  return study.sessions.filter(s => studyKey(s.startedAt) === key);
+  return allSessions().filter(s => studyKey(s.startedAt) === key);
 }
 function runningFocusSec() {
   return timer.phase === 'focus' ? Math.floor(elapsed() / 1000) : 0;
@@ -367,30 +373,63 @@ function autoCompletePlan(planId) {
     ctx.toast(`"${p.title}" 계획을 다 채웠어요`);
   }
 }
+// 받아 온 기간(최근 2주) 밖의 기록은 서버 날짜별 합계도 같이 고친다
+function adjustDaily(s, sign) {
+  if (study.windowStart && new Date(s.startedAt) >= study.windowStart) return;
+  const k = studyKey(s.startedAt);
+  study.daily.set(k, Math.max(0, (study.daily.get(k) || 0) + sign * s.seconds));
+}
 function removeSession(s) {
+  const wasMain = study.sessions.some(x => x.id === s.id);
   study.sessions = study.sessions.filter(x => x.id !== s.id);
+  const wasExtra = study.extra.delete(s.id);
+  if (wasExtra && !wasMain) adjustDaily(s, -1);
   queue = queue.filter(x => x.id !== s.id); saveQueue();
   render();
   api.studyRemove(state.code, s.id).catch(e => ctx.toast(errText(e)));
   ctx.toast(`${fmtSpent(s.seconds)} 기록을 지웠어요`, '되돌리기', () => {
-    study.sessions.push(s); render();
+    if (wasMain) study.sessions.push(s);
+    if (wasExtra) { study.extra.set(s.id, s); if (!wasMain) adjustDaily(s, 1); }
+    render();
     api.studyRemove(state.code, s.id, false).catch(e => ctx.toast(errText(e)));
   });
 }
 
-/* ───── 화면 ───── */
-let built = false;
+/* ───── 화면 ─────
+   오늘: 왼쪽 = 무엇을 공부할지(타이머, 계획), 오른쪽 = 그날 타임라인
+   기록: 주간(요일별 띠) · 월간(달력), 고른 날의 타임라인과 기록 */
 let showAllSubjects = false;
+let builtFor = null;
 const el = {};
+const rec = { mode: 'week', anchor: null, day: null };
+const loadedRanges = new Set();
+const studyView = () => (state.prefs.studyView === 'records' ? 'records' : 'today');
+
+// DOM의 append/replaceChildren은 null을 "null" 글자로 넣으므로 걸러서
+const fill = (node, ...kids) => node.replaceChildren(...kids.flat().filter(k => k != null && k !== false));
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgIcon(d) {
+  const s = document.createElementNS(SVGNS, 'svg');
+  s.setAttribute('viewBox', '0 0 20 20'); s.setAttribute('aria-hidden', 'true');
+  for (const path of d) { const p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', path); s.append(p); }
+  return s;
+}
+const playIcon = () => svgIcon(['M7 5.5v9l7.5-4.5z']);
+const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
+const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
+const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
+const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 
 function subjectSelect(id, value) {
   return h('select', { id, 'aria-label': '과목' },
     h('option', { value: '' }, '과목 없음'),
     currentSubjects().map(n => h('option', { value: n, selected: n === value }, n)));
 }
+const fmtDay = d => `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
 
 function build(root) {
-  el.root = root;
+  /* 오늘: 타이머 */
   el.modes = h('div', { class: 'segmented timer-modes', role: 'radiogroup', 'aria-label': '타이머 종류' });
   el.phase = h('p', { class: 'timer-phase' });
   el.digits = h('div', { class: 'timer-digits', role: 'timer', 'aria-live': 'off' });
@@ -402,16 +441,7 @@ function build(root) {
     h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
     el.what, el.controls);
 
-  // 오늘
-  el.today = h('section', { class: 's-block s-today', 'aria-label': '오늘 공부' });
-  el.week = h('section', { class: 's-block s-week' });
-  el.exams = h('section', { class: 's-block s-exams' });
-
-  // 친구
-  el.friendsBody = h('div', { class: 'friends-body' });
-  el.friends = h('section', { class: 's-block s-friends' }, h('h3', null, '친구'), el.friendsBody);
-
-  // 계획
+  /* 오늘: 계획 */
   el.planList = h('ul', { class: 'plan-list' });
   el.planTitle = h('input', { type: 'text', maxlength: 100, placeholder: '오늘 할 공부 (예: 3장 복습)', 'aria-label': '오늘 할 공부' });
   el.planMinutes = h('select', { 'aria-label': '목표 시간' }, PLAN_MINUTES.map(([v, l]) => h('option', { value: v }, l)));
@@ -425,29 +455,44 @@ function build(root) {
     el.planTitle.focus();
   };
   el.planTitle.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addPlan(); } });
-  el.plans = h('section', { class: 's-block s-plans' },
+  el.plans = h('section', { class: 's-plans' },
     h('h3', null, '오늘 계획'),
     el.planList,
     h('div', { class: 'plan-add' }, el.planTitle, el.planSubjectWrap, el.planMinutes,
       h('button', { class: 'btn', type: 'button', onclick: addPlan }, '추가')));
 
-  // 기록
-  el.recordList = h('ul', { class: 'record-list' });
-  el.manualSubjectWrap = h('span');
+  /* 오늘: 타임라인 */
+  el.dayHead = h('div', { class: 'tl-head' });
+  el.timeline = h('div', { class: 'tl-wrap' });
+  el.manualSubjectWrap = h('span', { class: 'plan-subject' });
   el.manualMinutes = h('input', { type: 'number', min: 1, max: 600, step: 5, value: 30, 'aria-label': '공부한 시간(분)', inputmode: 'numeric' });
-  el.records = h('section', { class: 's-block s-records' },
-    h('h3', null, '오늘 기록'),
-    el.recordList,
-    h('details', { class: 'more manual' },
-      h('summary', null, '타이머 없이 공부한 시간 넣기'),
-      h('div', { class: 'plan-add' }, el.manualSubjectWrap, el.manualMinutes, h('span', { class: 'unit' }, '분'),
-        h('button', { class: 'btn', type: 'button', onclick: addManual }, '기록'))));
+  el.manual = h('details', { class: 'more manual' },
+    h('summary', null, '타이머 없이 공부한 시간 넣기'),
+    h('div', { class: 'plan-add' }, el.manualSubjectWrap, el.manualMinutes, h('span', { class: 'unit' }, '분'),
+      h('button', { class: 'btn', type: 'button', onclick: addManual }, '기록')));
 
-  root.replaceChildren(h('div', { class: 'study-grid' },
-    el.timerCard,
-    h('div', { class: 'study-side' }, el.today, el.week, el.exams, el.friends),
-    el.plans, el.records));
-  built = true;
+  el.todayRoot = h('div', { class: 'st-today' },
+    h('div', { class: 'st-left' }, el.timerCard, el.plans),
+    h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.manual));
+
+  /* 기록 */
+  el.recModes = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': '기간' });
+  el.recTitle = h('button', { type: 'button', class: 'rec-title', title: '이번 기간으로' });
+  el.recPrev = h('button', { type: 'button', class: 'btn icon ghost', 'aria-label': '이전' }, prevIcon());
+  el.recNext = h('button', { type: 'button', class: 'btn icon ghost', 'aria-label': '다음' }, nextIcon());
+  el.recSummary = h('p', { class: 'rec-summary' });
+  el.recMain = h('div', { class: 'rec-main' });
+  el.recDay = h('aside', { class: 'rec-day', 'aria-label': '고른 날' });
+  el.recPrev.addEventListener('click', () => shiftPeriod(-1));
+  el.recNext.addEventListener('click', () => shiftPeriod(1));
+  el.recTitle.addEventListener('click', () => { rec.anchor = studyDate(); rec.day = studyKey(); renderRecords(); });
+  el.recRoot = h('div', { class: 'st-records' },
+    h('div', { class: 'rec-bar' }, el.recModes, h('div', { class: 'rec-nav' }, el.recPrev, el.recTitle, el.recNext)),
+    el.recSummary,
+    h('div', { class: 'rec-grid' }, el.recMain, el.recDay));
+
+  root.replaceChildren(el.todayRoot, el.recRoot);
+  builtFor = root;
 }
 
 function addManual() {
@@ -461,16 +506,23 @@ function addManual() {
     startedAt: new Date(start).toISOString(), endedAt: new Date(end).toISOString(),
     seconds: Math.min(min * 60, Math.round((end - start) / 1000) + 60),
   });
+  el.manual.open = false;
   ctx.toast(`${fmtSpent(min * 60)} 기록했어요`);
 }
 
 export function render() {
+  renderFriendsBtn();
   const root = $('#viewStudy');
   if (!root || root.hidden) return;
-  if (!built || el.root !== root) build(root);
-  renderTimer(); renderToday(); renderWeek(); renderExams(); renderPlans(); renderRecords(); renderFriends();
+  if (builtFor !== root) build(root);
+  const v = studyView();
+  el.todayRoot.hidden = v !== 'today';
+  el.recRoot.hidden = v !== 'records';
+  if (v === 'today') { renderTimer(); renderPlans(); renderDay(); }
+  else renderRecords();
 }
 
+/* ───── 타이머 ───── */
 function renderTimer() {
   const idle = timer.phase === 'idle';
   el.timerCard.style.setProperty('--c', timer.phase === 'rest' ? 'var(--green)' : subjectColor(timer.subject));
@@ -496,18 +548,17 @@ function renderTimer() {
     const tasks = upcomingTasks(3);
     const subjects = currentSubjects();
     const shown = showAllSubjects || subjects.length <= 7 ? subjects
-      : subjects.slice(0, 6).concat(subjects.includes(timer.subject) && subjects.indexOf(timer.subject) >= 6 ? [timer.subject] : []);
-    el.what.replaceChildren(
-      ...tasks.map(t => sel({ subject: t.subject, taskId: t.id, label: displayTitle(t) }, displayTitle(t), dday(t).label)),
-      ...shown.map(n => sel({ subject: n }, n)),
-      ...(shown.length < subjects.length ? [h('button', {
+      : subjects.slice(0, 6).concat(subjects.indexOf(timer.subject) >= 6 ? [timer.subject] : []);
+    fill(el.what,
+      tasks.map(t => sel({ subject: t.subject, taskId: t.id, label: displayTitle(t) }, displayTitle(t), dday(t).label)),
+      shown.map(n => sel({ subject: n }, n)),
+      shown.length < subjects.length ? h('button', {
         type: 'button', class: 'chip more-chip', onclick: () => { showAllSubjects = true; renderTimer(); },
-      }, `과목 ${subjects.length - shown.length}개 더`)] : []),
-    );
+      }, `과목 ${subjects.length - shown.length}개 더`) : null);
     el.what.hidden = !el.what.children.length;
   } else {
     el.what.hidden = false;
-    el.what.replaceChildren(h('p', { class: 'timer-now', style: { '--c': subjectColor(timer.subject) } },
+    fill(el.what, h('p', { class: 'timer-now', style: { '--c': subjectColor(timer.subject) } },
       h('i', { class: 'tab' }),
       timer.label || timer.subject || '과목 없이 공부 중',
       timer.label && timer.subject && !timer.label.includes(timer.subject) ? h('span', { class: 'chip-sub' }, timer.subject) : null));
@@ -521,8 +572,9 @@ function renderTimer() {
   renderClock();
 }
 
+let lastTimelineMin = 0;
 function renderClock() {
-  if (!built || $('#viewStudy')?.hidden) return;
+  if (builtFor == null || $('#viewStudy')?.hidden || studyView() !== 'today') return;
   const idle = timer.phase === 'idle';
   const len = phaseLength();
   const el0 = idle ? 0 : elapsed();
@@ -533,99 +585,16 @@ function renderClock() {
     : !timer.running ? '멈춤'
     : `집중 · ${fmtClock(new Date(timer.sessStart || Date.now()))}부터`;
   el.bar.style.width = isPomo() && !idle ? `${Math.min(100, (el0 / len) * 100)}%` : '0%';
-  // 오늘 합계도 같이 움직이게
   const t = $('#todayTotal');
   if (t) t.textContent = fmtSpent(todaySeconds());
   const g = $('#todayGoalBar');
   if (g) g.style.width = `${Math.min(100, todaySeconds() / (study.goal * 60) * 100)}%`;
+  // 타임라인은 1분마다 (지금 공부 중인 막대가 자라도록)
+  const m = Math.floor(Date.now() / 60000);
+  if (m !== lastTimelineMin) { lastTimelineMin = m; renderTimeline(); }
 }
 
-function renderToday() {
-  const sec = todaySeconds();
-  const goalSel = h('select', {
-    class: 'goal-select', 'aria-label': '하루 목표',
-    onchange: async e => {
-      const v = Number(e.target.value);
-      study.goal = v; render();
-      try { await api.studyGoal(state.code, v); } catch (err) { ctx.toast(errText(err)); }
-    },
-  }, [...new Set([...GOALS, study.goal])].sort((a, b) => a - b)
-    .map(m => h('option', { value: m, selected: m === study.goal }, `목표 ${fmtSpent(m * 60)}`)));
-  const subj = bySubject(sessionsOn(studyKey()));
-  const max = Math.max(1, ...subj.map(([, v]) => v));
-  el.today.replaceChildren(
-    h('div', { class: 'today-head' },
-      h('p', { class: 'today-total', id: 'todayTotal' }, fmtSpent(sec)),
-      goalSel),
-    h('div', { class: 'goal-bar' }, h('i', { id: 'todayGoalBar', style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
-    subj.length
-      ? h('ul', { class: 'subject-bars' }, subj.map(([name, v]) => h('li', { style: { '--c': subjectColor(name) } },
-          h('span', { class: 'sb-name' }, name || '과목 없음'),
-          h('span', { class: 'sb-bar' }, h('i', { style: { width: `${(v / max) * 100}%` } })),
-          h('span', { class: 'sb-time' }, fmtSpent(v)))))
-      : h('p', { class: 'muted' }, study.error ? study.error : study.loaded ? '오늘은 아직 공부 기록이 없어요.' : '불러오는 중…'),
-  );
-}
-
-function renderWeek() {
-  const m = dailyMap();
-  const today = studyDate();
-  const start = startOfWeek(today);
-  const days = [...Array(7)].map((_, i) => addDays(start, i));
-  const vals = days.map(d => m.get(dayKey(d)) || 0);
-  const top = Math.max(study.goal * 60, ...vals, 1);
-  const total = vals.reduce((a, b) => a + b, 0);
-  const n = streak(m);
-  el.week.replaceChildren(
-    h('div', { class: 's-head' }, h('h3', null, '이번 주'),
-      h('span', { class: 's-aside' }, fmtSpent(total), n > 1 ? ` · ${n}일 연속` : '')),
-    h('div', { class: 'week-bars', role: 'img', 'aria-label': `이번 주 공부 ${fmtSpent(total)}` },
-      days.map((d, i) => h('div', {
-        class: `wb${dayKey(d) === dayKey(today) ? ' today' : ''}${d > today ? ' future' : ''}`,
-        title: `${d.getMonth() + 1}/${d.getDate()} (${WEEK[d.getDay()]}) ${fmtSpent(vals[i])}`,
-      },
-      h('span', { class: 'wb-col' }, h('i', { style: { height: `${(vals[i] / top) * 100}%` } }),
-        h('b', { class: 'wb-goal', style: { bottom: `${(study.goal * 60 / top) * 100}%` } })),
-      h('span', { class: 'wb-day' }, WEEK[d.getDay()])))),
-  );
-}
-
-function renderExams() {
-  const now = new Date();
-  const exams = state.tasks
-    .filter(t => isExam(t) && !t.done && new Date(t.due) > now && new Date(t.due) - now < 21 * DAY)
-    .sort((a, b) => new Date(a.due) - new Date(b.due)).slice(0, 4);
-  el.exams.hidden = !exams.length;
-  if (!exams.length) return;
-  const since = dayStart(addDays(studyDate(), -13));
-  el.exams.replaceChildren(
-    h('div', { class: 's-head' }, h('h3', null, '시험까지'), h('span', { class: 's-aside' }, '최근 2주 공부')),
-    h('ul', { class: 'exam-study' }, exams.map(t => {
-      let sec = study.sessions.filter(s => t.subject && s.subject === t.subject && new Date(s.startedAt) >= since)
-        .reduce((a, s) => a + s.seconds, 0);
-      if (timer.phase === 'focus' && t.subject && timer.subject === t.subject) sec += runningFocusSec();
-      return h('li', { style: { '--c': subjectColor(t.subject) } },
-        h('button', { type: 'button', class: 'es-title', onclick: () => ctx.openTask(t) }, displayTitle(t)),
-        h('span', { class: 'es-dday' }, dday(t, now).label),
-        h('span', { class: 'es-time' }, sec ? fmtSpent(sec) : '아직 없음'),
-        timer.phase === 'idle' ? h('button', {
-          type: 'button', class: 'btn icon ghost sm-icon', title: '이 시험 공부 시작', 'aria-label': `${displayTitle(t)} 공부 시작`,
-          onclick: () => startFor(t),
-        }, playIcon()) : null);
-    })));
-}
-
-const SVGNS = 'http://www.w3.org/2000/svg';
-function svgIcon(d) {
-  const s = document.createElementNS(SVGNS, 'svg');
-  s.setAttribute('viewBox', '0 0 20 20'); s.setAttribute('aria-hidden', 'true');
-  for (const path of d) { const p = document.createElementNS(SVGNS, 'path'); p.setAttribute('d', path); s.append(p); }
-  return s;
-}
-const playIcon = () => svgIcon(['M7 5.5v9l7.5-4.5z']);
-const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
-const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
-
+/* ───── 계획 ───── */
 function renderPlans() {
   const today = studyKey();
   const weekAgo = dayKey(addDays(studyDate(), -7));
@@ -634,7 +603,7 @@ function renderPlans() {
     .filter(p => p.day === today || (!p.done && p.day < today && p.day >= weekAgo))
     .sort((a, b) => (b.day === today) - (a.day === today) || a.done - b.done);
   el.planSubjectWrap.replaceChildren(subjectSelect('planSubject', $('#planSubject')?.value ?? timer.subject));
-  el.planList.replaceChildren(...(list.length ? list.map(p => {
+  fill(el.planList, list.length ? list.map(p => {
     const prog = planProgress(p);
     const past = p.day !== today;
     return h('li', { class: `plan${p.done ? ' done' : ''}`, style: { '--c': subjectColor(p.subject) } },
@@ -657,28 +626,247 @@ function renderPlans() {
         onclick: () => { selectWhat({ subject: p.subject, planId: p.id, label: p.title }); start(); },
       }, playIcon()) : null,
       h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '계획 지우기', 'aria-label': `${p.title} 지우기`, onclick: () => removePlan(p) }, xIcon()));
-  }) : [h('li', { class: 'empty' }, '오늘 할 공부를 적어 두면 타이머로 바로 시작할 수 있어요.')]));
+  }) : h('li', { class: 'empty' }, '오늘 할 공부를 적어 두면 ▶로 바로 시작할 수 있어요.'));
+}
+
+/* ───── 오늘 타임라인 ───── */
+function renderDay() {
+  const sec = todaySeconds();
+  const goalSel = h('select', {
+    class: 'goal-select', 'aria-label': '하루 목표',
+    onchange: async e => {
+      const v = Number(e.target.value);
+      study.goal = v; render();
+      try { await api.studyGoal(state.code, v); } catch (err) { ctx.toast(errText(err)); }
+    },
+  }, [...new Set([...GOALS, study.goal])].sort((a, b) => a - b)
+    .map(m => h('option', { value: m, selected: m === study.goal }, `목표 ${fmtSpent(m * 60)}`)));
+  fill(el.dayHead,
+    h('div', { class: 'today-head' }, h('p', { class: 'today-total', id: 'todayTotal' }, fmtSpent(sec)), goalSel),
+    h('div', { class: 'goal-bar' }, h('i', { id: 'todayGoalBar', style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
+    study.error ? h('p', { class: 'msg err' }, study.error) : null);
+  el.manualSubjectWrap.replaceChildren(subjectSelect('manualSubject', $('#manualSubject')?.value ?? timer.subject));
+  renderTimeline();
+}
+function renderTimeline() {
+  if (!el.timeline) return;
+  const today = studyDate();
+  el.timeline.replaceChildren(timeline(today, segmentsOn(dayKey(today), true), { showNow: true }));
+}
+
+// 그날 막대들: 기록 + (오늘이면) 지금 돌고 있는 타이머
+function segmentsOn(key, withLive) {
+  const titleOf = s => {
+    if (s.planId) { const p = study.plans.find(x => x.id === s.planId); if (p) return p.title; }
+    if (s.taskId) { const t = state.tasks.find(x => x.id === s.taskId); if (t) return displayTitle(t); }
+    return s.subject || '과목 없음';
+  };
+  const segs = sessionsOn(key).map(s => ({
+    start: new Date(s.startedAt), end: new Date(s.endedAt), subject: s.subject, title: titleOf(s), seconds: s.seconds,
+  }));
+  if (withLive && timer.phase === 'focus' && timer.sessStart) {
+    const end = timer.running ? Date.now() : timer.sessStart + timer.acc;
+    segs.push({ start: new Date(timer.sessStart), end: new Date(end), subject: timer.subject, title: timer.label || timer.subject || '공부 중', live: true });
+  }
+  return segs;
+}
+
+// 한 시간이 한 줄, 줄 안에서 0~60분 위치에 막대
+function timeline(date, segs, { showNow = false } = {}) {
+  const mid = date.getTime();
+  const toH = t => (t.getTime() - mid) / 3.6e6;
+  let lo = 8, hi = 26;                        // 기본 08시 ~ 다음 날 02시
+  for (const s of segs) { lo = Math.min(lo, Math.floor(toH(s.start))); hi = Math.max(hi, Math.ceil(toH(s.end))); }
+  const nowH = toH(new Date());
+  if (showNow) { lo = Math.min(lo, Math.floor(nowH)); hi = Math.max(hi, Math.floor(nowH) + 1); }
+  lo = Math.max(5, lo); hi = Math.min(29, hi);
+  const label = hr => (hr < 24 ? String(hr) : hr === 24 ? '24' : pad(hr - 24));
+  const rows = [];
+  for (let hr = lo; hr < hi; hr++) {
+    const pieces = [];
+    for (const s of segs) {
+      const a = Math.max(toH(s.start), hr), b = Math.min(toH(s.end), hr + 1);
+      if (b <= a || (b - a < 1 / 60 && !s.live)) continue;   // 1분도 안 걸친 조각은 점처럼 보여서 생략 (지금 공부 중은 표시)
+      pieces.push(h('i', {
+        class: `tl-seg${s.live ? ' live' : ''}`,
+        style: { '--c': subjectColor(s.subject), left: `${(a - hr) * 100}%`, width: `${Math.max(2.5, (b - a) * 100)}%` },
+        title: `${s.title} · ${fmtClock(s.start)}–${fmtClock(s.end)}`,
+      }));
+    }
+    const now = showNow && nowH >= hr && nowH < hr + 1
+      ? h('b', { class: 'tl-now', style: { left: `${(nowH - hr) * 100}%` } }) : null;
+    rows.push(h('li', { class: `tl-row${hr % 6 === 0 ? ' dash' : ''}` },
+      h('span', { class: 'tl-h' }, label(hr)),
+      h('span', { class: 'tl-track' }, pieces, now)));
+  }
+  return h('ol', { class: 'timeline', 'aria-label': `${fmtDay(date)} 공부 타임라인` }, rows);
+}
+
+/* ───── 기록 ───── */
+function period() {
+  const a = rec.anchor || studyDate();
+  if (rec.mode === 'month') {
+    const start = new Date(a.getFullYear(), a.getMonth(), 1);
+    return { start, end: new Date(a.getFullYear(), a.getMonth() + 1, 1) };
+  }
+  const start = startOfWeek(a);
+  return { start, end: addDays(start, 7) };
+}
+function shiftPeriod(dir) {
+  const a = rec.anchor || studyDate();
+  rec.anchor = rec.mode === 'month' ? new Date(a.getFullYear(), a.getMonth() + dir, 1) : addDays(a, 7 * dir);
+  const { start, end } = period();
+  const today = studyDate();
+  // 고른 날을 새 기간 안으로 (이번 기간이면 오늘, 아니면 마지막 날)
+  rec.day = today >= start && today < end ? dayKey(today) : dayKey(addDays(end, -1));
+  renderRecords();
+}
+function periodTitle({ start, end }) {
+  if (rec.mode === 'month') return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
+  const last = addDays(end, -1);
+  return start.getMonth() === last.getMonth()
+    ? `${start.getMonth() + 1}월 ${start.getDate()}일 – ${last.getDate()}일`
+    : `${start.getMonth() + 1}월 ${start.getDate()}일 – ${last.getMonth() + 1}월 ${last.getDate()}일`;
+}
+
+// 받아 온 범위(최근 2주)보다 이전이면 서버에서 그 기간 기록을 더 불러온다
+async function ensureRange(start, end) {
+  if (!state.code || !study.windowStart) return;
+  const from = dayStart(start), to = dayStart(end);
+  if (from >= study.windowStart) return;
+  const key = `${dayKey(start)}~${dayKey(end)}`;
+  if (loadedRanges.has(key)) return;
+  loadedRanges.add(key);
+  try {
+    const list = await api.studyRange(state.code, from.toISOString(), to.toISOString());
+    for (const s of list || []) study.extra.set(s.id, s);
+    renderRecords();
+  } catch (e) {
+    loadedRanges.delete(key);
+    ctx.toast(errText(e));
+  }
 }
 
 function renderRecords() {
-  el.manualSubjectWrap.replaceChildren(subjectSelect('manualSubject', $('#manualSubject')?.value ?? timer.subject));
-  const list = sessionsOn(studyKey()).slice().sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+  if (builtFor == null || studyView() !== 'records') return;
+  const p = period();
+  const today = studyDate();
+  if (!rec.day) rec.day = dayKey(today);
+  ensureRange(p.start, p.end);
+
+  el.recModes.replaceChildren(...[['week', '주간'], ['month', '월간']].map(([k, l]) => h('button', {
+    type: 'button', role: 'radio', 'aria-checked': rec.mode === k ? 'true' : 'false',
+    onclick: () => { rec.mode = k; rec.anchor = rec.day ? new Date(`${rec.day}T00:00`) : today; renderRecords(); },
+  }, l)));
+  el.recTitle.textContent = periodTitle(p);
+  el.recNext.disabled = p.end > today;
+
+  const m = dailyMap();
+  const days = [];
+  for (let d = p.start; d < p.end; d = addDays(d, 1)) days.push(d);
+  const past = days.filter(d => d <= today);
+  const total = past.reduce((a, d) => a + (m.get(dayKey(d)) || 0), 0);
+  const studied = past.filter(d => m.get(dayKey(d))).length;
+  fill(el.recSummary,
+    h('b', null, fmtSpent(total)),
+    past.length ? h('span', null, `하루 평균 ${fmtSpent(Math.round(total / past.length))}`) : null,
+    h('span', null, `${studied}일 공부`),
+    p.end > today && streak(m) > 1 ? h('span', null, `${streak(m)}일 연속`) : null);
+
+  // 기간 안 과목별 시간 (기록을 불러온 경우)
+  const inPeriod = allSessions().filter(s => { const k = studyKey(s.startedAt); return k >= dayKey(p.start) && k < dayKey(p.end); });
+  const subj = bySubjectOf(inPeriod);
+  const max = Math.max(1, ...subj.map(([, v]) => v));
+  const subjects = subj.length ? h('ul', { class: 'subject-bars' }, subj.map(([name, v]) => h('li', { style: { '--c': subjectColor(name) } },
+    h('span', { class: 'sb-name' }, name || '과목 없음'),
+    h('span', { class: 'sb-bar' }, h('i', { style: { width: `${(v / max) * 100}%` } })),
+    h('span', { class: 'sb-time' }, fmtSpent(v))))) : null;
+
+  fill(el.recMain, rec.mode === 'month' ? monthGrid(p, m, today) : weekStrips(days, m, today), subjects);
+  renderRecDay();
+}
+
+function bySubjectOf(list) {
+  const map = new Map();
+  for (const s of list) map.set(s.subject || '', (map.get(s.subject || '') || 0) + s.seconds);
+  return [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+}
+
+// 주간: 하루가 한 줄, 새벽 5시 ~ 다음 날 5시 띠 위에 공부한 시간
+function weekStrips(days, m, today) {
+  const ticks = [6, 9, 12, 15, 18, 21, 24, 27];
+  const pos = hr => `${((hr - 5) / 24) * 100}%`;
+  return h('div', { class: 'week-strips' },
+    h('div', { class: 'ws-axis', 'aria-hidden': 'true' }, h('span'), h('span', { class: 'ws-ticks' },
+      ticks.map(t => h('span', { style: { left: pos(t) } }, t <= 24 ? String(t) : pad(t - 24)))), h('span')),
+    h('ul', null, days.map(d => {
+      const key = dayKey(d);
+      const mid = d.getTime();
+      const segs = segmentsOn(key, key === dayKey(today));
+      const sec = m.get(key) || 0;
+      return h('li', null, h('button', {
+        type: 'button', class: `ws-row${key === rec.day ? ' sel' : ''}${key === dayKey(today) ? ' today' : ''}${d > today ? ' future' : ''}`,
+        disabled: d > today, onclick: () => { rec.day = key; renderRecords(); },
+        'aria-label': `${fmtDay(d)} ${fmtSpent(sec)}`,
+      },
+      h('span', { class: 'ws-day' }, h('b', null, WEEK[d.getDay()]), h('span', null, `${d.getMonth() + 1}/${d.getDate()}`)),
+      h('span', { class: 'ws-track' },
+        ticks.map(t => h('span', { class: 'ws-grid', style: { left: pos(t) } })),
+        segs.map(s => {
+          const a = Math.max(5, (s.start - mid) / 3.6e6), b = Math.min(29, (s.end - mid) / 3.6e6);
+          return b > a ? h('i', { class: s.live ? 'live' : '', style: { '--c': subjectColor(s.subject), left: pos(a), width: `${Math.max(0.6, ((b - a) / 24) * 100)}%` } }) : null;
+        })),
+      h('span', { class: 'ws-total' }, sec ? fmtSpent(sec) : '')));
+    })));
+}
+
+// 월간: 달력, 목표 대비 공부한 만큼 진하게
+function monthGrid({ start, end }, m, today) {
+  const first = startOfWeek(start);
+  const cells = [];
+  for (let d = first; d < end || cells.length % 7; d = addDays(d, 1)) cells.push(d);
+  const goal = study.goal * 60;
+  return h('div', { class: 'month-grid' },
+    h('div', { class: 'mg-head' }, ['월', '화', '수', '목', '금', '토', '일'].map(w => h('span', null, w))),
+    h('div', { class: 'mg-body' }, cells.map(d => {
+      const key = dayKey(d);
+      const sec = m.get(key) || 0;
+      const r = sec / goal;
+      const lv = !sec ? 0 : r < 0.25 ? 1 : r < 0.5 ? 2 : r < 1 ? 3 : 4;
+      const out = d < start || d >= end;
+      return h('button', {
+        type: 'button', class: `mg-day lv${lv}${out ? ' out' : ''}${key === rec.day ? ' sel' : ''}${key === dayKey(today) ? ' today' : ''}`,
+        disabled: d > today, onclick: () => { rec.day = key; if (out) rec.anchor = d; renderRecords(); },
+        'aria-label': `${fmtDay(d)} ${fmtSpent(sec)}`,
+      }, h('span', { class: 'mg-n' }, d.getDate()), sec ? h('span', { class: 'mg-t' }, fmtSpent(sec, { short: true })) : null);
+    })));
+}
+
+function renderRecDay() {
+  const date = new Date(`${rec.day}T00:00`);
+  const isToday = rec.day === studyKey();
+  const segs = segmentsOn(rec.day, isToday);
+  const list = sessionsOn(rec.day).slice().sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt));
+  const sec = (dailyMap().get(rec.day) || 0);
   const titleOf = s => {
     if (s.planId) { const p = study.plans.find(x => x.id === s.planId); if (p) return p.title; }
     if (s.taskId) { const t = state.tasks.find(x => x.id === s.taskId); if (t) return displayTitle(t); }
     return null;
   };
-  el.recordList.replaceChildren(...(list.length ? list.map(s => {
-    const what = titleOf(s);
-    return h('li', { style: { '--c': subjectColor(s.subject) } },
-      h('span', { class: 'rec-time' }, `${fmtClock(new Date(s.startedAt))}–${fmtClock(new Date(s.endedAt))}`),
-      h('span', { class: 'rec-what' }, what || s.subject || '과목 없음', what && s.subject ? h('span', { class: 'chip-sub' }, s.subject) : null),
-      h('span', { class: 'rec-len' }, fmtSpent(s.seconds)),
-      h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '기록 지우기', 'aria-label': '기록 지우기', onclick: () => removeSession(s) }, xIcon()));
-  }) : [h('li', { class: 'empty' }, '타이머를 끝내면 여기에 쌓여요.')]));
+  fill(el.recDay,
+    h('div', { class: 'rd-head' }, h('h3', null, isToday ? `오늘 · ${fmtDay(date)}` : fmtDay(date)), h('b', null, fmtSpent(sec))),
+    timeline(date, segs, { showNow: isToday }),
+    list.length ? h('ul', { class: 'record-list' }, list.map(s => {
+      const what = titleOf(s);
+      return h('li', { style: { '--c': subjectColor(s.subject) } },
+        h('span', { class: 'rec-time' }, `${fmtClock(new Date(s.startedAt))}–${fmtClock(new Date(s.endedAt))}`),
+        h('span', { class: 'rec-what' }, what || s.subject || '과목 없음', what && s.subject ? h('span', { class: 'chip-sub' }, s.subject) : null),
+        h('span', { class: 'rec-len' }, fmtSpent(s.seconds)),
+        h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '기록 지우기', 'aria-label': '기록 지우기', onclick: () => removeSession(s) }, xIcon()));
+    })) : h('p', { class: 'muted' }, sec ? '불러오는 중…' : '이날은 공부 기록이 없어요.'));
 }
 
-/* ───── 친구 ───── */
+/* ───── 친구 (위쪽 버튼 → 창) ───── */
 let friendMsg = { text: '', err: false };
 function setFriendMsg(text, err = false) { friendMsg = { text, err }; renderFriends(); }
 
@@ -687,12 +875,29 @@ async function friendAction(fn, ok) {
   catch (e) { setFriendMsg(errText(e), true); }
 }
 
-// DOM의 replaceChildren은 null을 "null" 글자로 넣으므로 걸러서
-const fillBody = (node, ...kids) => node.replaceChildren(...kids.flat().filter(k => k != null && k !== false));
+function renderFriendsBtn() {
+  const badge = $('#friendsLive');
+  if (!badge) return;
+  const n = study.profile && study.profile.visible ? study.friends.filter(f => f.liveSince).length : 0;
+  badge.hidden = !n;
+  badge.textContent = n;
+  const btn = $('#btnFriends');
+  if (btn) btn.title = n ? `친구 ${n}명 공부 중` : '친구';
+}
+
+export async function openFriends() {
+  friendMsg = { text: '', err: false };
+  renderFriends();
+  const d = $('#friendsDialog');
+  if (d && !d.open) d.showModal();
+  if (!study.loaded) await loadStudy();
+  await loadFriends();
+}
 
 function renderFriends() {
-  if (!built) return;
-  const body = el.friendsBody;
+  renderFriendsBtn();
+  const body = $('#friendsBody');
+  if (!body) return;
   const msg = friendMsg.text ? h('p', { class: `msg${friendMsg.err ? ' err' : ' ok'}`, role: 'status' }, friendMsg.text) : null;
   const p = study.profile;
 
@@ -703,15 +908,14 @@ function renderFriends() {
       await loadFriends();
     }, p ? '다시 공개했어요' : '친구 코드를 만들었어요. 친구에게 알려 주세요');
     nick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) go(); });
-    fillBody(body,
+    fill(body,
       h('p', { class: 'help' }, p ? '지금은 친구에게 공부 시간을 보여 주지 않고 있어요.'
-        : '친구 코드를 주고받으면 서로 오늘 공부한 시간과 지금 공부 중인지 볼 수 있어요. 과목이나 계획은 보이지 않아요.'),
+        : '닉네임을 정하면 친구 코드가 생겨요. 코드를 주고받으면 서로 오늘 공부한 시간과 지금 공부 중인지 볼 수 있어요. 과목이나 계획은 보이지 않아요.'),
       h('div', { class: 'inline-form' }, nick, h('button', { type: 'button', class: 'btn primary', onclick: go }, p ? '다시 공개' : '시작하기')),
       msg);
     return;
   }
 
-  // 나 + 친구들, 오늘 공부한 시간 순
   const me = { me: true, nickname: p.nickname, today: todaySeconds(), liveSince: timer.phase === 'focus' && timer.running ? new Date(timer.sessStart).toISOString() : null };
   const rows = [me, ...study.friends].sort((a, b) => b.today - a.today);
   const top = Math.max(1, ...rows.map(r => r.today));
@@ -721,8 +925,7 @@ function renderFriends() {
     const before = study.friends.length;
     study.friends = await api.friendAdd(state.code, code.value);
     code.value = '';
-    if (study.friends.length === before) friendMsg = { text: '이미 추가한 친구예요', err: false };
-    else friendMsg = { text: '친구를 추가했어요', err: false };
+    friendMsg = { text: study.friends.length === before ? '이미 추가한 친구예요' : '친구를 추가했어요', err: false };
   });
   code.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) add(); });
 
@@ -739,17 +942,9 @@ function renderFriends() {
     friendAction(async () => { study.profile = await api.studyNewCode(state.code); }, '새 코드를 만들었어요. 이전 코드로 나를 추가한 친구는 더 이상 볼 수 없어요');
   });
 
-  fillBody(body,
-    h('div', { class: 'my-code' },
-      h('span', null, '내 코드'),
-      h('b', { class: 'code' }, p.friendCode),
-      h('button', {
-        type: 'button', class: 'btn sm ghost',
-        onclick: async () => {
-          try { await navigator.clipboard.writeText(p.friendCode); setFriendMsg('복사했어요'); }
-          catch { setFriendMsg(`코드: ${p.friendCode}`); }
-        },
-      }, '복사')),
+  fill(body,
+    h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn primary', onclick: add }, '친구 추가')),
+    msg,
     h('ul', { class: 'friend-list' }, rows.map(r => {
       const liveMin = r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 60000)) : null;
       return h('li', { class: r.me ? 'me' : '' },
@@ -765,9 +960,17 @@ function renderFriends() {
           }, `${r.nickname} 님을 친구에서 뺐어요`),
         }, xIcon()));
     })),
-    rows.length === 1 ? h('p', { class: 'help fine' }, '친구 코드를 넣으면 여기에 함께 보여요.') : null,
-    h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn', onclick: add }, '추가')),
-    msg,
+    rows.length === 1 ? h('p', { class: 'help fine' }, '친구 코드를 넣으면 여기에 오늘 공부 시간이 함께 보여요.') : null,
+    h('div', { class: 'my-code' },
+      h('span', null, '내 친구 코드'),
+      h('b', { class: 'code' }, p.friendCode),
+      h('button', {
+        type: 'button', class: 'btn sm ghost',
+        onclick: async () => {
+          try { await navigator.clipboard.writeText(p.friendCode); setFriendMsg('내 코드를 복사했어요'); }
+          catch { setFriendMsg(`내 코드: ${p.friendCode}`); }
+        },
+      }, '복사')),
     h('details', { class: 'more friend-manage' },
       h('summary', null, '관리'),
       h('div', { class: 'inline-form' }, newNick, h('button', {
@@ -789,25 +992,25 @@ export function initStudy(options) {
   ctx = { ...ctx, ...options };
   subscribe(what => {
     if (what === 'board') {
-      Object.assign(study, { loaded: false, sessions: [], daily: new Map(), plans: [], profile: null, friends: [] });
-      built = false;
+      Object.assign(study, { loaded: false, sessions: [], daily: new Map(), plans: [], profile: null, friends: [], extra: new Map() });
+      loadedRanges.clear();
+      builtFor = null;
     }
   });
-  // 친구 목록은 공부 화면을 보고 있을 때 1분마다
+  // 친구 목록은 공부 모드일 때 1분마다 (위쪽 버튼의 "공부 중" 숫자)
   setInterval(() => {
-    if (!document.hidden && !$('#viewStudy')?.hidden) loadFriends();
+    if (!document.hidden && (!$('#viewStudy')?.hidden || $('#friendsDialog')?.open)) loadFriends();
   }, 60000);
-  // 창을 닫으면 "공부 중"을 바로 끄진 못하지만, 일시정지 상태라면 서버는 15분 뒤 저절로 끈다
   tick();
 }
 
 export function onShowStudy() {
-  built = built && el.root === $('#viewStudy');
   render();
   loadStudy();
 }
 
 export function handleKey(e) {
+  if (studyView() !== 'today') return false;
   if (e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
     if (timer.phase === 'idle') start();

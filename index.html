@@ -54,10 +54,16 @@
 <!-- 앱 -->
 <div class="app" id="viewApp" hidden>
   <header class="topbar">
-    <label class="semester">
-      <span class="sr-only">학기</span>
-      <select id="semester"></select>
-    </label>
+    <div class="semester lead">
+      <button type="button" class="mode-btn" id="modeBtn" title="일정 · 공부 바꾸기 (S)">
+        <i aria-hidden="true"></i><span id="modeLabel">일정</span>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4-4 4 4M6 12l4 4 4-4"/></svg>
+      </button>
+      <label class="sem-select">
+        <span class="sr-only">학기</span>
+        <select id="semester"></select>
+      </label>
+    </div>
 
     <label class="search">
       <span class="sr-only">과제 검색</span>
@@ -66,14 +72,21 @@
       <kbd class="hint">/</kbd>
     </label>
 
-    <nav class="views" role="tablist" aria-label="보기 방식">
+    <nav class="views" id="planViews" role="tablist" aria-label="보기 방식">
       <button role="tab" data-view="list" id="tabList">목록</button>
       <button role="tab" data-view="calendar" id="tabCalendar">캘린더</button>
-      <button role="tab" data-view="study" id="tabStudy">공부</button>
+    </nav>
+    <nav class="views" id="studyViews" role="tablist" aria-label="공부 보기" hidden>
+      <button role="tab" data-view="today" id="tabToday">오늘</button>
+      <button role="tab" data-view="records" id="tabRecords">기록</button>
     </nav>
 
     <div class="actions">
       <button class="timer-chip" id="timerChip" type="button" title="공부 타이머로 가기" hidden></button>
+      <button class="btn ghost friends-btn" id="btnFriends" type="button" title="친구" hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="7" r="2.8"/><path d="M2.8 16c.5-2.8 2.4-4.3 4.7-4.3s4.2 1.5 4.7 4.3"/><path d="M13 4.6a2.6 2.6 0 0 1 0 5M14.6 11.9c1.4.5 2.4 1.8 2.7 4.1"/></svg>
+        <span class="fb-label">친구</span><span class="fb-live" id="friendsLive" hidden></span>
+      </button>
       <button class="btn icon ghost notice-btn" id="btnNotices" title="스마트캠퍼스 공지" aria-label="스마트캠퍼스 공지" hidden>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8a4.5 4.5 0 0 1 9 0c0 4 1.8 5.5 1.8 5.5H3.7S5.5 12 5.5 8z"/><path d="M8.3 16a1.8 1.8 0 0 0 3.4 0"/></svg>
         <span class="dot" id="noticeDot" hidden></span>
@@ -325,7 +338,7 @@
           </div>
         </div>
         <div class="set-row">
-          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 목록 · 캘린더 · 공부 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
+          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
         </div>
       </div>
     </details>
@@ -341,6 +354,17 @@
     </button>
   </header>
   <div class="settings-body"><ul class="notice-list" id="noticeList"></ul></div>
+</dialog>
+
+<!-- 친구 -->
+<dialog class="settings" id="friendsDialog" aria-labelledby="friendsTitle">
+  <header class="panel-head">
+    <h2 id="friendsTitle">친구</h2>
+    <button class="btn icon ghost" id="friendsClose" aria-label="닫기">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </header>
+  <div class="settings-body friends-body" id="friendsBody"></div>
 </dialog>
 
 <!-- 새 보드 코드 안내 -->
