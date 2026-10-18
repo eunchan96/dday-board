@@ -1355,3 +1355,104 @@ svg.filled { fill: currentColor; stroke: none; }
   .plan-add .sp-wrap { width: 128px; flex-shrink: 0; }
   .sp-list li { padding: 11px 10px; }
 }
+
+/* ═════ 타이머: ▶ · ■ 를 맨 위 줄 오른쪽에 ═════ */
+.timer-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.timer-top .timer-controls { gap: 8px; margin-left: auto; }
+.timer-top .tc-btn { width: 44px; height: 44px; }
+.timer-top .tc-btn svg { width: 18px; height: 18px; }
+.timer-top .tc-btn.main { width: 52px; height: 52px; }
+.timer-top .tc-btn.main svg { width: 22px; height: 22px; }
+
+/* ═════ 타임라인에서 직접 기록 ═════ */
+.timeline.editable .tl-track { cursor: crosshair; touch-action: pan-y; }
+.tl-seg.sel {
+  background: color-mix(in srgb, var(--pen) 14%, transparent);
+  outline: 1.5px dashed var(--pen); outline-offset: -1.5px; border-radius: 6px; z-index: 1;
+}
+.tl-add { margin-top: 12px; }
+.tl-hint { font-size: 12.5px; color: var(--pencil-2); }
+.tl-add.open { padding: 12px; border: 1px solid var(--pen); border-radius: 12px; background: var(--sheet); box-shadow: 0 0 0 3px var(--pen-soft); }
+.tl-add-form { display: flex; flex-direction: column; gap: 10px; }
+.tl-add-times { display: flex; align-items: center; gap: 6px; }
+.tl-time { width: auto !important; min-height: 36px !important; padding: 4px 8px !important; font: 650 15px var(--font) !important; font-variant-numeric: tabular-nums; }
+.tl-dash { color: var(--pencil); }
+.tl-len { margin-left: auto; font-weight: 750; font-variant-numeric: tabular-nums; }
+.tl-add-row { display: flex; align-items: center; gap: 6px; }
+.tl-add-row .sp-wrap { flex: 1; min-width: 0; }
+.tl-add-row .btn.icon { flex-shrink: 0; width: 40px; height: 40px; }
+.tl-add .msg:empty { display: none; }
+.rec-day .tl-add { margin-bottom: 4px; }
+
+/* ═════ 설정: 펼치기는 오른쪽 꺾쇠, 펼친 내용은 같은 칸 ═════ */
+.set-more > summary::before, .set-more-group > summary::before { content: none; }
+.more > summary, .set-more > summary, .set-more-group > summary { list-style: none; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary, .set-more > summary, .set-more-group > summary {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+}
+.more > summary::after, .set-more > summary::after, .set-more-group > summary::after {
+  content: ''; flex-shrink: 0; width: 16px; height: 16px; background: currentColor; opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+  transition: transform 150ms;
+}
+.more[open] > summary::after, .set-more[open] > summary::after, .set-more-group[open] > summary::after { transform: rotate(180deg); }
+.more[open] > summary { margin-bottom: 8px; }
+/* 카드 안 펼치기: 줄 전체가 버튼, 꺾쇠는 오른쪽 끝 */
+#settings .set-more > summary, #settings .set-more-group > summary {
+  justify-content: space-between; padding: 14px 18px; margin: 0;
+  font-size: 14px; font-weight: 650; color: var(--ink);
+}
+#settings .set-more > summary:hover, #settings .set-more-group > summary:hover { background: var(--sheet-2); }
+#settings .set-card > details > .set-row { border-top: 0; }
+#settings .set-card > details > .set-row + .set-row { border-top: 1px dashed var(--rule); }
+#settings .set-card > details[open] > summary { padding-bottom: 6px; }
+#settings .set-card > details[open] > summary:hover { background: transparent; }
+#settings .set-card > details > .set-row:first-of-type { padding-top: 4px; }
+/* 백업 · 단축키: 묶음 자체를 카드로 */
+#settings .set-more-group { border: 1px solid var(--rule); border-radius: 12px; background: var(--sheet); overflow: hidden; }
+#settings .set-more-group > .set-card { border: 0; border-radius: 0; }
+#settings .set-more-group[open] > summary { padding-bottom: 6px; }
+#settings .set-more-group > .set-card > .set-row:first-child { padding-top: 4px; }
+/* 칸 높이를 고르게: 빈 안내 문구는 자리를 차지하지 않게, 펼치기 링크는 위아래 여백 없이 */
+#settings .set-card .msg:empty { display: none; }
+#settings .set-row.stack { gap: 12px; }
+#settings .set-row .more > summary { margin: 0; font-size: 13px; color: var(--pencil); }
+#settings .set-row .more[open] > summary { margin-bottom: 8px; }
+.set-lead { margin: -6px 0 14px; }
+
+/* ═════ 과목 색: 누르면 그 과목만 색 고르기가 펼쳐짐 ═════ */
+#settings .color-row { padding: 0; gap: 0; }
+.cr-head { display: flex; align-items: center; gap: 8px; padding-right: 12px; }
+.cr-name {
+  all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; font-weight: 650; font-size: 14px; cursor: pointer;
+}
+.cr-name:hover { background: var(--sheet-2); }
+.cr-name:focus-visible { outline: 2px solid var(--pen); outline-offset: -2px; }
+.cr-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-name::after {
+  content: ''; margin-left: auto; flex-shrink: 0; width: 16px; height: 16px; background: currentColor; opacity: 0.45;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+  transition: transform 150ms;
+}
+.color-row.open .cr-name::after { transform: rotate(180deg); }
+.cr-dot { flex-shrink: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--c); }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 16px 42px; }
+.swatch {
+  width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 3px solid var(--sheet); background: var(--s); box-shadow: 0 0 0 1px color-mix(in srgb, var(--s) 45%, transparent);
+  transition: transform 100ms;
+}
+.swatch:hover { transform: scale(1.1); }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ink); }
+@media (max-width: 640px) { .swatches { padding-left: 18px; } }
+
+/* ═════ 공지: 과목 색 막대 ═════ */
+.notice { padding: 14px 4px 14px 16px; box-shadow: inset 3px 0 0 var(--c); }
+
+/* 직접 기록 칸: 시각 두 개 + 길이를 한 줄에 */
+.tl-add-times .tl-time { flex: 1; min-width: 0; }
+.tl-len { white-space: nowrap; font-size: 14px; }

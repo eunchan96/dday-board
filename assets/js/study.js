@@ -437,10 +437,8 @@ function build(root) {
   el.what = h('div', { class: 'timer-what' });
   el.controls = h('div', { class: 'timer-controls' });
   el.timerCard = h('section', { class: 'timer-card', 'aria-label': '타이머' },
-    el.modes,
-    h('div', { class: 'timer-face' }, el.phase,
-      h('div', { class: 'timer-main' }, el.digits, el.controls),
-      h('div', { class: 'timer-bar' }, el.bar)),
+    h('div', { class: 'timer-top' }, el.modes, el.controls),
+    h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
     el.what);
 
   /* 오늘: 계획 */
@@ -468,17 +466,11 @@ function build(root) {
   /* 오늘: 타임라인 */
   el.dayHead = h('div', { class: 'tl-head' });
   el.timeline = h('div', { class: 'tl-wrap' });
-  el.manualPick = subjectPicker({ id: 'manualSubject', options: studySubjects });
-  el.manualSubjectWrap = h('span', { class: 'plan-subject' }, el.manualPick.el);
-  el.manualMinutes = h('input', { type: 'number', min: 1, max: 600, step: 5, value: 30, 'aria-label': '공부한 시간(분)', inputmode: 'numeric' });
-  el.manual = h('details', { class: 'more manual' },
-    h('summary', { title: '타이머 없이 공부한 시간 넣기' }, '직접 기록'),
-    h('div', { class: 'plan-add' }, el.manualSubjectWrap, el.manualMinutes, h('span', { class: 'unit' }, '분'),
-      h('button', { class: 'btn icon primary', type: 'button', onclick: addManual, title: '기록', 'aria-label': '기록' }, checkIcon())));
+  el.addBox = makeAddBox('manualSubject');
 
   el.todayRoot = h('div', { class: 'st-today' },
     h('div', { class: 'st-left' }, el.timerCard, el.plans),
-    h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.manual));
+    h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.addBox.box));
 
   /* 기록 */
   el.recModes = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': '기간' });
@@ -488,6 +480,7 @@ function build(root) {
   el.recSummary = h('p', { class: 'rec-summary' });
   el.recMain = h('div', { class: 'rec-main' });
   el.recDay = h('aside', { class: 'rec-day', 'aria-label': '고른 날' });
+  el.recAddBox = makeAddBox('recSubject');
   el.recPrev.addEventListener('click', () => shiftPeriod(-1));
   el.recNext.addEventListener('click', () => shiftPeriod(1));
   el.recTitle.addEventListener('click', () => { rec.anchor = studyDate(); rec.day = studyKey(); renderRecords(); });
@@ -501,22 +494,6 @@ function build(root) {
 
   root.replaceChildren(el.todayRoot, el.recRoot);
   builtFor = root;
-}
-
-function addManual() {
-  const min = Math.round(Number(el.manualMinutes.value));
-  if (!(min >= 1 && min <= 600)) { ctx.toast('1분에서 600분 사이로 적어 주세요'); return; }
-  const end = Date.now();
-  // 오늘(새벽 5시 이후)에 들어가도록, 너무 길면 시작 시각을 오늘 시작으로
-  const start = Math.max(dayStart(studyDate()).getTime(), end - min * 60000);
-  addSession({
-    id: newId(), subject: el.manualPick.value, taskId: null, planId: null,
-    startedAt: new Date(start).toISOString(), endedAt: new Date(end).toISOString(),
-    seconds: Math.min(min * 60, Math.round((end - start) / 1000) + 60),
-  });
-  rememberSubject(el.manualPick.value);
-  el.manual.open = false;
-  ctx.toast(`${fmtSpent(min * 60)} 기록했어요`);
 }
 
 export function render() {
@@ -654,7 +631,148 @@ function renderDay() {
 function renderTimeline() {
   if (!el.timeline) return;
   const today = studyDate();
-  el.timeline.replaceChildren(timeline(today, segmentsOn(dayKey(today), true), { showNow: true }));
+  el.timeline.replaceChildren(timeline(today, segmentsOn(dayKey(today), true), { showNow: true, editable: true }));
+  renderAddBox(el.addBox, dayKey(today));
+}
+
+/* ───── 타임라인에서 직접 기록 넣기 ─────
+   마우스: 빈 곳을 끌어서 범위 고르기 / 폰: 누르면 그 시각부터 30분
+   고른 범위는 아래 칸에서 시각을 고치고 과목을 골라 기록 */
+let sel = null;                                  // { key, start: ms, end: ms }
+const SNAP = 5 * 60000;
+const snap = t => Math.round(t / SNAP) * SNAP;
+const dateOfKey = key => new Date(`${key}T00:00`);
+
+function selLimits(key) {
+  const mid = dateOfKey(key).getTime();
+  let max = mid + 29 * 3.6e6;                    // 다음 날 새벽 5시
+  if (key === studyKey()) max = Math.min(max, Math.floor(Date.now() / 60000) * 60000);
+  return { min: mid + 5 * 3.6e6, max };
+}
+function setSel(key, a, b) {
+  const { min, max } = selLimits(key);
+  if (Math.min(a, b) >= max - 60000) { ctx.toast('아직 오지 않은 시간이에요'); return false; }
+  let start = Math.max(min, Math.min(a, b)), end = Math.min(max, Math.max(a, b));
+  if (end - start < SNAP) {
+    if (start + SNAP <= max) end = start + SNAP; else start = Math.max(min, end - SNAP);
+  }
+  if (end <= start) { ctx.toast('아직 오지 않은 시간이에요'); return false; }
+  if (end - start > 12 * 3.6e6) start = end - 12 * 3.6e6;
+  sel = { key, start, end };
+  return true;
+}
+function timeAt(ol, e, date) {
+  const rows = [...ol.children];
+  let row = rows.find(r => { const rc = r.getBoundingClientRect(); return e.clientY >= rc.top && e.clientY < rc.bottom; });
+  if (!row) row = e.clientY < rows[0].getBoundingClientRect().top ? rows[0] : rows[rows.length - 1];
+  const tr = row.querySelector('.tl-track').getBoundingClientRect();
+  const frac = Math.min(1, Math.max(0, (e.clientX - tr.left) / tr.width));
+  return snap(date.getTime() + (Number(row.dataset.h) + frac) * 3.6e6);
+}
+// 고른 범위를 타임라인 위에 점선 막대로 (끄는 동안에는 목록을 다시 만들지 않고 이것만)
+function paintSel(ol, date) {
+  ol.querySelectorAll('.tl-seg.sel').forEach(n => n.remove());
+  if (!sel || sel.key !== dayKey(date)) return;
+  const mid = date.getTime();
+  for (const row of ol.children) {
+    const hr = Number(row.dataset.h);
+    const a = Math.max((sel.start - mid) / 3.6e6, hr), b = Math.min((sel.end - mid) / 3.6e6, hr + 1);
+    if (b <= a) continue;
+    row.querySelector('.tl-track').append(h('i', { class: 'tl-seg sel', style: { left: `${(a - hr) * 100}%`, width: `${(b - a) * 100}%` } }));
+  }
+}
+function attachPick(ol, date) {
+  const key = dayKey(date);
+  let down = null;
+  ol.classList.add('editable');
+  ol.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || !e.target.closest('.tl-track')) return;
+    down = { x: e.clientX, y: e.clientY, t: timeAt(ol, e, date), type: e.pointerType, dragging: false };
+    if (e.pointerType === 'mouse') { e.preventDefault(); ol.setPointerCapture(e.pointerId); }
+  });
+  ol.addEventListener('pointermove', e => {
+    if (!down || down.type !== 'mouse') return;
+    if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) return;
+    down.dragging = true;
+    const t = timeAt(ol, e, date);
+    if (setSel(key, down.t, t === down.t ? t + SNAP : t)) paintSel(ol, date);
+  });
+  const finish = e => {
+    if (!down) return;
+    const d = down; down = null;
+    if (d.type !== 'mouse' && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;   // 폰에서 스크롤한 것
+    if (!d.dragging && !setSel(key, d.t, d.t + 30 * 60000)) return;
+    refreshSel();
+    const box = key === studyKey() && studyView() === 'today' ? el.addBox : el.recAddBox;
+    box.pick.button.focus({ preventScroll: true });
+  };
+  ol.addEventListener('pointerup', finish);
+  ol.addEventListener('pointercancel', () => { down = null; });
+}
+function refreshSel() {
+  if (studyView() === 'today') renderTimeline(); else renderRecDay();
+}
+
+function makeAddBox(id) {
+  const toInput = () => h('input', { type: 'time', step: 300, class: 'tl-time' });
+  const box = {
+    startIn: toInput(), endIn: toInput(),
+    len: h('span', { class: 'tl-len' }),
+    warn: h('p', { class: 'msg' }),
+    pick: subjectPicker({ id, options: studySubjects }),
+  };
+  const onTime = () => {
+    if (!sel) return;
+    const mid = dateOfKey(sel.key).getTime();
+    const at = v => {
+      const [hh, mm] = (v || '').split(':').map(Number);
+      if (Number.isNaN(hh)) return null;
+      return mid + ((hh < 5 ? hh + 24 : hh) * 60 + mm) * 60000;   // 새벽 0~4시는 다음 날
+    };
+    const a = at(box.startIn.value), b = at(box.endIn.value);
+    if (a == null || b == null) return;
+    if (b <= a) { box.warn.className = 'msg err'; box.warn.textContent = '끝나는 시각이 시작보다 빨라요'; return; }
+    if (setSel(sel.key, a, b)) refreshSel();
+  };
+  box.startIn.addEventListener('change', onTime);
+  box.endIn.addEventListener('change', onTime);
+  const save = () => {
+    if (!sel) return;
+    const sec = Math.round((sel.end - sel.start) / 1000);
+    addSession({
+      id: newId(), subject: box.pick.value, taskId: null, planId: null,
+      startedAt: new Date(sel.start).toISOString(), endedAt: new Date(sel.end).toISOString(), seconds: sec,
+    });
+    rememberSubject(box.pick.value);
+    ctx.toast(`${fmtClock(new Date(sel.start))}–${fmtClock(new Date(sel.end))} ${fmtSpent(sec)} 기록했어요`);
+    sel = null;
+    refreshSel();
+  };
+  box.form = h('div', { class: 'tl-add-form' },
+    h('div', { class: 'tl-add-times' }, box.startIn, h('span', { class: 'tl-dash' }, '–'), box.endIn, box.len),
+    h('div', { class: 'tl-add-row' }, box.pick.el,
+      h('button', { type: 'button', class: 'btn icon primary', title: '기록', 'aria-label': '이 시간 기록', onclick: save }, checkIcon()),
+      h('button', { type: 'button', class: 'btn icon ghost', title: '취소', 'aria-label': '취소', onclick: () => { sel = null; refreshSel(); } }, xIcon())),
+    box.warn);
+  box.hint = h('p', { class: 'tl-hint' }, matchMedia('(pointer: coarse)').matches
+    ? '타임라인을 누르면 그 시각부터 공부한 시간을 넣을 수 있어요'
+    : '타임라인의 빈 곳을 끌어서 공부한 시간을 넣을 수 있어요');
+  box.box = h('div', { class: 'tl-add' }, box.hint, box.form);
+  return box;
+}
+function renderAddBox(box, key) {
+  const on = !!sel && sel.key === key;
+  box.form.hidden = !on;
+  box.hint.hidden = on;
+  box.box.classList.toggle('open', on);
+  if (!on) return;
+  const fmt = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  box.startIn.value = fmt(sel.start);
+  box.endIn.value = fmt(sel.end);
+  box.len.textContent = fmtSpent(Math.round((sel.end - sel.start) / 1000));
+  const overlap = sessionsOn(key).some(s => new Date(s.startedAt) < sel.end && new Date(s.endedAt) > sel.start);
+  box.warn.className = 'msg';
+  box.warn.textContent = overlap ? '다른 기록과 겹치는 시간이에요' : '';
 }
 
 // 그날 막대들: 기록 + (오늘이면) 지금 돌고 있는 타이머
@@ -675,7 +793,7 @@ function segmentsOn(key, withLive) {
 }
 
 // 한 시간이 한 줄, 줄 안에서 0~60분 위치에 막대
-function timeline(date, segs, { showNow = false } = {}) {
+function timeline(date, segs, { showNow = false, editable = false } = {}) {
   const mid = date.getTime();
   const toH = t => (t.getTime() - mid) / 3.6e6;
   let lo = 8, hi = 26;                        // 기본 08시 ~ 다음 날 02시
@@ -698,11 +816,13 @@ function timeline(date, segs, { showNow = false } = {}) {
     }
     const now = showNow && nowH >= hr && nowH < hr + 1
       ? h('b', { class: 'tl-now', style: { left: `${(nowH - hr) * 100}%` } }) : null;
-    rows.push(h('li', { class: `tl-row${hr % 6 === 0 ? ' dash' : ''}` },
+    rows.push(h('li', { class: `tl-row${hr % 6 === 0 ? ' dash' : ''}`, dataset: { h: hr } },
       h('span', { class: 'tl-h' }, label(hr)),
       h('span', { class: 'tl-track' }, pieces, now)));
   }
-  return h('ol', { class: 'timeline', 'aria-label': `${fmtDay(date)} 공부 타임라인` }, rows);
+  const ol = h('ol', { class: 'timeline', 'aria-label': `${fmtDay(date)} 공부 타임라인` }, rows);
+  if (editable) { attachPick(ol, date); paintSel(ol, date); }
+  return ol;
 }
 
 /* ───── 기록 ───── */
@@ -848,6 +968,7 @@ function monthGrid({ start, end }, m, today) {
 function renderRecDay() {
   const date = new Date(`${rec.day}T00:00`);
   const isToday = rec.day === studyKey();
+  renderAddBox(el.recAddBox, rec.day);
   const segs = segmentsOn(rec.day, isToday);
   const list = sessionsOn(rec.day).slice().sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt));
   const sec = (dailyMap().get(rec.day) || 0);
@@ -861,7 +982,9 @@ function renderRecDay() {
       h('p', { class: 'today-total' }, fmtSpent(sec)),
       h('span', { class: 'rd-date' }, isToday ? `오늘 · ${fmtDay(date)}` : fmtDay(date))),
     h('div', { class: 'goal-bar' }, h('i', { style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
-    timeline(date, segs, { showNow: isToday }),
+    // 40일 안의 날짜는 타임라인에서 직접 기록 넣기 (서버가 그보다 오래된 기록은 받지 않음)
+    timeline(date, segs, { showNow: isToday, editable: date >= addDays(studyDate(), -39) }),
+    date >= addDays(studyDate(), -39) ? el.recAddBox.box : null,
     list.length ? h('ul', { class: 'record-list' }, list.map(s => {
       const what = titleOf(s);
       return h('li', { style: { '--c': subjectColor(s.subject) } },

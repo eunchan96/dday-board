@@ -138,13 +138,19 @@ export function groupOf(task, now = new Date()) {
 // 과목별 색 (인덱스 탭 색)
 // 보드에 있는 과목을 이름순으로 세워 차례로 색을 줘서, 과목끼리 색이 겹치지 않게 한다.
 const SUBJECT_COLORS = ['#3D6BE0', '#E0703D', '#2E9E74', '#9A5BD6', '#C99A12', '#D84C7E', '#1E8FA8', '#7A7F3A', '#B5523B', '#5A6FA8'];
+// 설정에서 고를 수 있는 색 (기본 색 + 몇 가지 더)
+export const SUBJECT_PALETTE = [...SUBJECT_COLORS, '#D64545', '#4E9A2E', '#8A6A4C', '#6B7280'];
 let subjectOrder = new Map();
+let subjectOverride = {};                       // 사용자가 바꾼 색 (보드에 저장)
+export function setSubjectColors(map) { subjectOverride = map && typeof map === 'object' ? map : {}; }
+export const customColorOf = name => subjectOverride[name] || null;
 export function setSubjects(names) {
   const sorted = [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   subjectOrder = new Map(sorted.map((n, i) => [n, i]));
 }
 export function subjectColor(name) {
   if (!name) return 'var(--pencil-2)';
+  if (subjectOverride[name]) return subjectOverride[name];
   if (subjectOrder.has(name)) return SUBJECT_COLORS[subjectOrder.get(name) % SUBJECT_COLORS.length];
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;

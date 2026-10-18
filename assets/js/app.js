@@ -2,7 +2,7 @@
 
 import {
   state, subscribe, setPref, pull, saveTask, toggleDone, toggleStar, removeTask, undoRemove,
-  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, importBackup, exportBackup, canvasImport,
+  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, importBackup, exportBackup, canvasImport, storage,
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
@@ -12,6 +12,7 @@ import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
+  setSubjectColors, customColorOf, SUBJECT_PALETTE,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
@@ -75,6 +76,57 @@ function renderSemester() {
   // 지금 학기는 굵게 (따로 "지금"이라고 적지 않음)
   sel.classList.toggle('is-current', value === 'current');
   sel.title = value === 'current' ? '지금 학기' : '';
+}
+
+/* ───── 과목 색 (보드에 저장, 기기마다 같게) ───── */
+const COLOR_KEY = 'ddayboard.colors';
+let colorMap = (() => { try { return JSON.parse(storage.get(COLOR_KEY) || '{}') || {}; } catch { return {}; } })();
+setSubjectColors(colorMap);
+function applyColors(map) {
+  colorMap = map && typeof map === 'object' ? map : {};
+  setSubjectColors(colorMap);
+  storage.set(COLOR_KEY, JSON.stringify(colorMap));
+}
+async function loadColors() {
+  if (!state.code) return;
+  try {
+    const map = (await api.subjectColors(state.code)) || {};
+    if (JSON.stringify(map) !== JSON.stringify(colorMap)) { applyColors(map); renderAll(); }
+  } catch { /* 다음에 다시 */ }
+}
+async function setColor(name, color) {
+  const prev = colorMap;
+  const next = { ...colorMap };
+  if (color) next[name] = color; else delete next[name];
+  applyColors(next); renderAll(); renderColors();
+  try { applyColors(await api.setSubjectColor(state.code, name, color)); }
+  catch (e) { applyColors(prev); renderAll(); renderColors(); toast(errText(e)); }
+}
+const RESET_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 9.5a5.5 5.5 0 1 1 1.6 4.4"/><path d="M4 5v4.5h4.5"/></svg>';
+let colorOpen = null;                           // 색 고르기를 펼친 과목 (한 번에 하나)
+function renderColors() {
+  const names = taskSubjects(currentSemesterKey(), taskSemesterKey);
+  fill($('#colorList'), names.length ? names.map(name => {
+    const cur = String(subjectColor(name)).toUpperCase();
+    const open = colorOpen === name;
+    const reset = customColorOf(name) ? h('button', {
+      type: 'button', class: 'btn icon ghost sm-icon', title: '기본 색으로', 'aria-label': `${name} 기본 색으로`,
+      onclick: () => setColor(name, null),
+    }) : null;
+    if (reset) reset.innerHTML = RESET_SVG;
+    return h('div', { class: `set-row stack color-row${open ? ' open' : ''}`, style: { '--c': cur } },
+      h('div', { class: 'cr-head' },
+        h('button', {
+          type: 'button', class: 'cr-name', 'aria-expanded': open ? 'true' : 'false',
+          onclick: () => { colorOpen = open ? null : name; renderColors(); },
+        }, h('i', { class: 'cr-dot' }), h('span', null, name)),
+        reset),
+      open ? h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': `${name} 색` },
+        SUBJECT_PALETTE.map(c => h('button', {
+          type: 'button', class: 'swatch', role: 'radio', 'aria-checked': cur === c.toUpperCase() ? 'true' : 'false',
+          style: { '--s': c }, 'aria-label': `${name} 색 ${c}`, onclick: () => setColor(name, c),
+        }))) : null);
+  }) : h('p', { class: 'help pad' }, '과목이 있는 과제나 공부 기록이 생기면 여기서 색을 바꿀 수 있어요.'));
 }
 
 /* ───── 검색 ───── */
@@ -382,7 +434,7 @@ function renderNoticeBtn() {
 }
 function openNotices() {
   const list = $('#noticeList');
-  fill(list, notices.list.length ? notices.list.map(n => h('li', { class: n.read ? 'notice' : 'notice unread' },
+  fill(list, notices.list.length ? notices.list.map(n => h('li', { class: n.read ? 'notice' : 'notice unread', style: { '--c': subjectColor(n.subject) } },
     h('div', { class: 'notice-meta' }, n.subject ? h('span', null, n.subject) : null, h('span', null, fmtAgo(new Date(n.postedAt)))),
     n.url ? h('a', { class: 'notice-title', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title) : h('b', { class: 'notice-title' }, n.title),
     n.preview ? h('p', { class: 'notice-preview' }, n.preview) : null,
@@ -706,7 +758,8 @@ const mask = c => `${c.slice(0, 5)}-•••••-•••••-${c.slice(-5
 
 // 설정은 탭으로 나눠 한 번에 한 묶음만
 function setSettingsTab(tab) {
-  if (!['lms', 'push', 'cal', 'device'].includes(tab)) tab = 'lms';
+  if (!['lms', 'push', 'cal', 'colors', 'device'].includes(tab)) tab = 'lms';
+  if (tab === 'colors') renderColors();
   $$('#setNav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
   $$('#settings .set-group').forEach(g => { g.hidden = g.dataset.tab !== tab; });
   $('#settings .settings-body').scrollTop = 0;
@@ -845,6 +898,7 @@ subscribe(what => {
   }
   if (what === 'status') { renderStatus(); return; }
   if (what === 'board' && state.code && pendingImport) setTimeout(() => showImport(pendingImport), 0);
+  if (what === 'board' && state.code) loadColors();
   if (what === 'lms') { renderLms(); renderNext(); loadNotices(); return; }
   if (what === 'prefs') { applyTheme(); renderSemester(); renderNext(); renderRail(); renderView(); return; }
   renderAll();
@@ -1146,7 +1200,7 @@ if (['list', 'calendar'].includes(hashView)) { state.prefs.view = hashView; stat
 else if (hashView === 'study' || hashView === 'records') { state.prefs.mode = 'study'; state.prefs.studyView = hashView === 'records' ? 'records' : 'today'; }
 initStudy({ toast, openTask: t => openPanel(t), onTimer });
 renderAll();
-if (state.code) { pull(); loadLms(); }
+if (state.code) { pull(); loadLms(); loadColors(); }
 openTaskFromHash();
 
 setInterval(() => {
