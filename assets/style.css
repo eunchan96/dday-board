@@ -1456,3 +1456,43 @@ svg.filled { fill: currentColor; stroke: none; }
 /* 직접 기록 칸: 시각 두 개 + 길이를 한 줄에 */
 .tl-add-times .tl-time { flex: 1; min-width: 0; }
 .tl-len { white-space: nowrap; font-size: 14px; }
+
+/* ═════ 타이머 버튼: 상단바 (친구 왼쪽) ═════ */
+.top-timer { display: none; align-items: center; gap: 4px; margin-right: 6px; }
+.study-mode .top-timer { display: flex; }
+.top-timer .tc-btn { width: 36px; height: 36px; }
+.top-timer .tc-btn svg { width: 15px; height: 15px; }
+.top-timer .tc-btn.main { width: 40px; height: 40px; }
+.top-timer .tc-btn.main svg { width: 17px; height: 17px; }
+.top-timer .tc-btn.rest { background: var(--green); border-color: var(--green); }
+
+/* ═════ 타이머 칸: 노션 callout처럼 (과목 색을 아주 옅게 깐 둥근 상자) ═════ */
+.timer-card {
+  box-shadow: none; border: 0; border-radius: 14px;
+  padding: 18px 22px 22px; margin-bottom: 26px; gap: 14px;
+  background: color-mix(in srgb, var(--c) 8%, var(--sheet));
+}
+.timer-card[data-phase="idle"] { background: color-mix(in srgb, var(--c) 6%, var(--sheet)); }
+.timer-top { display: flex; }
+.timer-modes, .timer-top .timer-modes { align-self: flex-start; }
+.timer-modes { background: color-mix(in srgb, var(--ink) 5%, transparent); border-color: transparent; }
+@media (max-width: 640px) {
+  .timer-card { padding: 14px 16px 18px; border-radius: 12px; }
+  .timer-top .timer-modes { align-self: auto; width: 100%; }
+  .timer-top .timer-modes button { flex: 1; }
+  .top-timer { margin-right: 2px; }
+  .top-timer .tc-btn { width: 34px; height: 34px; }
+  .top-timer .tc-btn.main { width: 36px; height: 36px; }
+}
+
+/* ═════ 좁은 화면: 왼쪽 필터 칸 아래 빈 간격 없애기 (캘린더 · 목록이 바로 붙게) ═════ */
+@media (max-width: 960px) { .rail { gap: 0; } }
+.cal-head { margin-bottom: 8px; }
+@media (max-width: 640px) {
+  /* 공부 모드도 폰에서는 [공부] … [▶ ■][친구][공지][설정] / [오늘|기록] 두 줄 */
+  .study-mode .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .study-mode .topbar .views { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .study-mode .topbar .views button { flex: 1; }
+  .study-mode .topbar .actions { grid-column: 2; grid-row: 1; }
+}
+.timer-card, .timer-card[data-phase="idle"] { background: color-mix(in srgb, var(--c) 9%, var(--sheet-2)); }

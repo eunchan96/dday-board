@@ -435,9 +435,8 @@ function build(root) {
   el.digits = h('div', { class: 'timer-digits', role: 'timer', 'aria-live': 'off' });
   el.bar = h('i');
   el.what = h('div', { class: 'timer-what' });
-  el.controls = h('div', { class: 'timer-controls' });
   el.timerCard = h('section', { class: 'timer-card', 'aria-label': '타이머' },
-    h('div', { class: 'timer-top' }, el.modes, el.controls),
+    h('div', { class: 'timer-top' }, el.modes),
     h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
     el.what);
 
@@ -496,8 +495,21 @@ function build(root) {
   builtFor = root;
 }
 
+// ▶ · ❚❚ · ■ 는 상단바(친구 버튼 왼쪽)에. 오늘 · 기록 어느 탭에서든 쓸 수 있게
+function renderTopTimer() {
+  const box = $('#topTimer');
+  if (!box) return;
+  const idle = timer.phase === 'idle';
+  const b = (icon, label, onclick, cls = '') => h('button', { type: 'button', class: `tc-btn ${cls}`, onclick, title: label, 'aria-label': label }, icon);
+  if (idle) box.replaceChildren(b(playIcon(), '시작 (Space)', start, 'main'));
+  else if (timer.phase === 'rest') box.replaceChildren(b(skipIcon(), '쉬는 시간 끝내기', toIdle, 'main rest'));
+  else if (timer.running) box.replaceChildren(b(pauseIcon(), '일시정지 (Space)', pause, 'main'), b(stopIcon(), '끝내기', stop));
+  else box.replaceChildren(b(playIcon(), '계속 (Space)', resume, 'main'), b(stopIcon(), '끝내기', stop));
+}
+
 export function render() {
   renderFriendsBtn();
+  renderTopTimer();
   const root = $('#viewStudy');
   if (!root || root.hidden) return;
   if (builtFor !== root) build(root);
@@ -533,11 +545,6 @@ function renderTimer() {
       onclick: () => selectWhat({ subject: '' }),
     }, xIcon()) : null) : null);
 
-  const b = (icon, label, onclick, cls = '') => h('button', { type: 'button', class: `tc-btn ${cls}`, onclick, title: label, 'aria-label': label }, icon);
-  if (idle) el.controls.replaceChildren(b(playIcon(), '시작 (Space)', start, 'main'));
-  else if (timer.phase === 'rest') el.controls.replaceChildren(b(skipIcon(), '쉬는 시간 끝내기', toIdle));
-  else if (timer.running) el.controls.replaceChildren(b(pauseIcon(), '일시정지 (Space)', pause, 'main'), b(stopIcon(), '끝내기', stop));
-  else el.controls.replaceChildren(b(playIcon(), '계속 (Space)', resume, 'main'), b(stopIcon(), '끝내기', stop));
   renderClock();
 }
 
