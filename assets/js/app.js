@@ -14,6 +14,7 @@ import {
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
+import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
 import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
@@ -207,7 +208,6 @@ function renderRail() {
       toggle('hideDone', '완료 숨기기')),
   );
 
-  $('#subjectList').replaceChildren(...subjects.filter(([n]) => n).map(([n]) => h('option', { value: n })));
 }
 
 /* ───── 본문 ───── */
@@ -499,6 +499,12 @@ function toast(text, action, onAction, ms = 5000) {
 function hideToast() { $('#toast').hidden = true; }
 
 /* ───── 과제 상세 패널 ───── */
+// 과목: 색 점 목록에서 고르거나 새로 추가
+const subjPick = subjectPicker({
+  id: 'fSubject', className: 'field-pick',
+  options: () => taskSubjects(activeSemesterKey() || currentSemesterKey(), taskSemesterKey),
+});
+$('#fSubjectSlot').replaceWith(subjPick.el);
 let lastFocus = null;
 
 const EXAM_NAMES = ['중간고사', '기말고사', '퀴즈', '실기시험'];
@@ -559,7 +565,7 @@ function openPanel(task, presetDay, kind) {
   $('#panelDelete').hidden = !task;
   $('#panelMsg').textContent = '';
   $('#fTitle').value = task ? task.title : '';
-  $('#fSubject').value = task ? task.subject || '' : (state.prefs.subject || '');
+  subjPick.set(task ? task.subject || '' : (state.prefs.subject || ''));
   const due = task ? new Date(task.due) : (presetDay ? new Date(presetDay) : addDays(startOfDay(new Date()), 7));
   $('#fDate').value = toDateInput(due);
   $('#fTime').value = task ? toTimeInput(due) : '23:59';
@@ -656,7 +662,7 @@ function savePanel() {
   const fields = {
     kind: exam ? 'exam' : 'assignment',
     title: title.slice(0, 200),
-    subject: $('#fSubject').value.trim().slice(0, 40),
+    subject: subjPick.value.slice(0, 40),
     due: due.toISOString(),
     endAt,
     location: exam ? $('#fLocation').value.trim().slice(0, 100) : '',
@@ -669,6 +675,7 @@ function savePanel() {
     if (prev && fields.done !== !!prev.done) fields.doneAt = fields.done ? new Date().toISOString() : null;
   }
   saveTask(fields, ui.editingId);
+  rememberSubject(fields.subject);
   // 매주 반복: 같은 요일 · 같은 시각으로 이어서 만든다
   let repeats = 0;
   if (isNew) {
@@ -929,7 +936,7 @@ function bind() {
   $('#timerChip').addEventListener('click', () => setView('study'));
   $('#panelSave').addEventListener('click', savePanel);
   $('#panelDelete').addEventListener('click', deleteFromPanel);
-  ['#fTitle', '#fSubject', '#fLocation'].forEach(s =>
+  ['#fTitle', '#fLocation'].forEach(s =>
     $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); savePanel(); } }));
 
   // 설정

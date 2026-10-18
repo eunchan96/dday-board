@@ -6,6 +6,7 @@
 
 import { state, storage, subscribe } from './store.js';
 import { api, errText } from './api.js';
+import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
   subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock,
@@ -420,11 +421,11 @@ const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
 const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
 const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 
-function subjectSelect(id, value) {
-  return h('select', { id, 'aria-label': '과목' },
-    h('option', { value: '' }, '과목 없음'),
-    currentSubjects().map(n => h('option', { value: n, selected: n === value }, n)));
-}
+// 공부 과목 목록: 이번 학기 과목 + 공부 기록·계획에 쓴 과목 + 이 기기에서 추가한 과목 + 예전 과목
+const studySubjects = () => [
+  ...currentSubjects(), ...study.plans.map(p => p.subject),
+  ...taskSubjects(semesterKey(semesterOf(new Date())), taskSemesterKey),
+];
 const fmtDay = d => `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
 
 function build(root) {
@@ -445,14 +446,17 @@ function build(root) {
   /* 오늘: 계획 */
   el.planList = h('ul', { class: 'plan-list' });
   el.planMemo = h('input', { type: 'text', maxlength: 100, placeholder: '메모 (안 적어도 돼요)', 'aria-label': '메모' });
-  el.planSubjectWrap = h('span', { class: 'plan-subject' });
+  el.planPick = subjectPicker({ id: 'planSubject', options: studySubjects, allowNone: false, placeholder: '과목 고르기' });
+  el.planSubjectWrap = h('span', { class: 'plan-subject' }, el.planPick.el);
   const addPlan = () => {
     const subject = $('#planSubject')?.value || '';
     const memo = el.planMemo.value.trim();
     if (!subject && !memo) { $('#planSubject')?.focus(); ctx.toast('과목을 골라 주세요'); return; }
     // 메모가 없으면 과목 이름을 제목으로 (서버는 제목이 꼭 있어야 함)
     savePlan({ id: newId(), day: studyKey(), title: (memo || subject).slice(0, 100), subject, minutes: null, done: false });
+    rememberSubject(subject);
     el.planMemo.value = '';
+    el.planPick.set('');
   };
   el.planMemo.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addPlan(); } });
   el.plans = h('section', { class: 's-plans' },
@@ -464,7 +468,8 @@ function build(root) {
   /* 오늘: 타임라인 */
   el.dayHead = h('div', { class: 'tl-head' });
   el.timeline = h('div', { class: 'tl-wrap' });
-  el.manualSubjectWrap = h('span', { class: 'plan-subject' });
+  el.manualPick = subjectPicker({ id: 'manualSubject', options: studySubjects });
+  el.manualSubjectWrap = h('span', { class: 'plan-subject' }, el.manualPick.el);
   el.manualMinutes = h('input', { type: 'number', min: 1, max: 600, step: 5, value: 30, 'aria-label': '공부한 시간(분)', inputmode: 'numeric' });
   el.manual = h('details', { class: 'more manual' },
     h('summary', { title: '타이머 없이 공부한 시간 넣기' }, '직접 기록'),
@@ -486,10 +491,13 @@ function build(root) {
   el.recPrev.addEventListener('click', () => shiftPeriod(-1));
   el.recNext.addEventListener('click', () => shiftPeriod(1));
   el.recTitle.addEventListener('click', () => { rec.anchor = studyDate(); rec.day = studyKey(); renderRecords(); });
+  // 오른쪽 날짜 칸은 오늘 탭의 타임라인 칸과 같은 자리 · 같은 모양 (탭을 오가도 타임라인이 그대로)
   el.recRoot = h('div', { class: 'st-records' },
-    h('div', { class: 'rec-bar' }, el.recModes, h('div', { class: 'rec-nav' }, el.recPrev, el.recTitle, el.recNext)),
-    el.recSummary,
-    h('div', { class: 'rec-grid' }, el.recMain, el.recDay));
+    h('div', { class: 'rec-left' },
+      h('div', { class: 'rec-bar' }, el.recModes, h('div', { class: 'rec-nav' }, el.recPrev, el.recTitle, el.recNext)),
+      el.recSummary,
+      el.recMain),
+    el.recDay);
 
   root.replaceChildren(el.todayRoot, el.recRoot);
   builtFor = root;
@@ -502,10 +510,11 @@ function addManual() {
   // 오늘(새벽 5시 이후)에 들어가도록, 너무 길면 시작 시각을 오늘 시작으로
   const start = Math.max(dayStart(studyDate()).getTime(), end - min * 60000);
   addSession({
-    id: newId(), subject: $('#manualSubject')?.value || '', taskId: null, planId: null,
+    id: newId(), subject: el.manualPick.value, taskId: null, planId: null,
     startedAt: new Date(start).toISOString(), endedAt: new Date(end).toISOString(),
     seconds: Math.min(min * 60, Math.round((end - start) / 1000) + 60),
   });
+  rememberSubject(el.manualPick.value);
   el.manual.open = false;
   ctx.toast(`${fmtSpent(min * 60)} 기록했어요`);
 }
@@ -582,7 +591,6 @@ function renderPlans() {
   const today = studyKey();
   const idle = timer.phase === 'idle';
   const plans = study.plans.filter(p => p.day === today);
-  el.planSubjectWrap.replaceChildren(subjectSelect('planSubject', $('#planSubject')?.value ?? ''));
   const playBtn = (label, w) => idle ? h('button', {
     type: 'button', class: 'btn icon ghost sm-icon play', title: '공부 시작', 'aria-label': `${label} 공부 시작`,
     onclick: () => { selectWhat(w); start(); },
@@ -641,7 +649,6 @@ function renderDay() {
     h('div', { class: 'today-head' }, h('p', { class: 'today-total', id: 'todayTotal' }, fmtSpent(sec)), goalSel),
     h('div', { class: 'goal-bar' }, h('i', { id: 'todayGoalBar', style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
     study.error ? h('p', { class: 'msg err' }, study.error) : null);
-  el.manualSubjectWrap.replaceChildren(subjectSelect('manualSubject', $('#manualSubject')?.value ?? timer.subject));
   renderTimeline();
 }
 function renderTimeline() {
@@ -850,7 +857,10 @@ function renderRecDay() {
     return null;
   };
   fill(el.recDay,
-    h('div', { class: 'rd-head' }, h('h3', null, isToday ? `오늘 · ${fmtDay(date)}` : fmtDay(date)), h('b', null, fmtSpent(sec))),
+    h('div', { class: 'today-head' },
+      h('p', { class: 'today-total' }, fmtSpent(sec)),
+      h('span', { class: 'rd-date' }, isToday ? `오늘 · ${fmtDay(date)}` : fmtDay(date))),
+    h('div', { class: 'goal-bar' }, h('i', { style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
     timeline(date, segs, { showNow: isToday }),
     list.length ? h('ul', { class: 'record-list' }, list.map(s => {
       const what = titleOf(s);
