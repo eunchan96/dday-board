@@ -53,8 +53,10 @@ export function message(t: Due, now = new Date()) {
   const exam = t.kind === "exam";
   const head = exam ? `시험 ${left} 전` : `마감 ${left} 전`;
   const where = exam && t.location ? ` · ${t.location}` : "";
+  // 시험은 "중간고사"만으로는 모르니 과목명을 앞에
+  const name = exam && t.subject && !t.title.includes(t.subject) ? `${t.subject} ${t.title}` : t.title;
   return {
-    title: `${head} · ${t.title}`,
+    title: `${head} · ${name}`,
     body: `${t.subject ? `${t.subject} · ` : ""}${day} ${time}${exam ? " 시작" : " 마감"}${where}`,
     tag: `task-${t.taskId}`,
     url: `${APP_URL}#task=${encodeURIComponent(t.taskId)}`,

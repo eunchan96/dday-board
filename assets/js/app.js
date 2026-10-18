@@ -11,7 +11,7 @@ import { errText, api, CALENDAR_FEED_URL } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
-  semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize,
+  semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 
@@ -121,7 +121,7 @@ function renderNext() {
     parts.push(h('p', { class: 'next-exam' },
       h('span', { class: 'exam-word' }, '시험'),
       h('button', { type: 'button', onclick: () => openPanel(nextExam) },
-        [nextExam.subject, nextExam.title].filter(Boolean).join(' ')),
+        displayTitle(nextExam)),
       ` ${fmtDate(d, false)} ${timeRange(nextExam)}`,
       ` · ${dday(nextExam, now).label}`));
   }

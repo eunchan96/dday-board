@@ -32,7 +32,7 @@ function fold(line: string) {
 export function toIcs(tasks: Task[], now = new Date()) {
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//dday-board//KO", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    "X-WR-CALNAME:과제 D-day", "X-WR-TIMEZONE:Asia/Seoul", "REFRESH-INTERVAL;VALUE=DURATION:PT3H",
+    "X-WR-CALNAME:S-DAY", "X-WR-TIMEZONE:Asia/Seoul", "REFRESH-INTERVAL;VALUE=DURATION:PT3H",
   ];
   for (const t of tasks) {
     const exam = t.kind === "exam";
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
   return new Response(toIcs(data as Task[]), {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'inline; filename="dday-board.ics"',
+      "Content-Disposition": 'inline; filename="s-day.ics"',
       "Cache-Control": "public, max-age=900",
     },
   });

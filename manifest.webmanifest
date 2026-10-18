@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "과제 D-day",
-  "short_name": "과제 D-day",
+  "name": "S-DAY",
+  "short_name": "S-DAY",
   "description": "스마트캠퍼스 과제와 시험을 마감 순으로 모아 보고, 마감 전에 알림을 받아요",
   "start_url": "./#list",
   "scope": "./",

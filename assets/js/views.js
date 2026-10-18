@@ -1,7 +1,7 @@
 // 목록 / 캘린더 보기
 
 import {
-  h, dday, fmtDate, fmtShort, fmtDuration, groupOf, GROUPS, subjectColor,
+  h, dday, fmtDate, fmtShort, fmtDuration, displayTitle, groupOf, GROUPS, subjectColor,
   startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange,
 } from './util.js';
 
@@ -48,7 +48,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   }, svg(ICON_STAR));
 
   const title = h('div', { class: 'title' },
-    h('span', { class: 'title-text' }, t.title),
+    h('span', { class: 'title-text' }, displayTitle(t)),
     t.link ? h('a', {
       class: 'lms-link', href: t.link, target: '_blank', rel: 'noopener noreferrer',
       title: '스마트캠퍼스에서 열기', 'aria-label': '스마트캠퍼스에서 열기', onclick: e => e.stopPropagation(),
@@ -57,7 +57,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   const meta = h('div', { class: 'meta' },
     exam ? h('span', { class: 'exam-word' }, '시험') : null,
-    !compact && t.subject ? h('span', { class: 'subj' }, t.subject) : null,
+    !compact && t.subject && displayTitle(t) === t.title ? h('span', { class: 'subj' }, t.subject) : null,
     exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, fmtShort(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', { class: 'remain' }, remain) : null,
@@ -172,7 +172,7 @@ export function renderCalendar(root, tasks, ctx) {
 
     list.slice(0, 3).forEach(t => {
       const lv = dday(t, ctx.now).level;
-      const label = isExam(t) ? `${timeRange(t).split('–')[0]} ${t.title}` : t.title;
+      const label = isExam(t) ? `${timeRange(t).split('–')[0]} ${displayTitle(t)}` : t.title;
       const tip = [t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
       cell.append(h('span', {
         class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''}`, title: tip,

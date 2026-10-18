@@ -1,7 +1,7 @@
 // 앱 화면 파일만 캐시해서 오프라인에서도 열리게 한다.
 // 과제 데이터(Supabase 호출)는 캐시하지 않는다. 항상 네트워크 우선.
 
-const CACHE = 'dday-shell-v13';
+const CACHE = 'dday-shell-v14';
 const SHELL = [
   './',
   'index.html',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { title: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || '과제 D-day', {
+  e.waitUntil(self.registration.showNotification(d.title || 'S-DAY', {
     body: d.body || '',
     tag: d.tag,
     renotify: !!d.tag,

@@ -22,6 +22,12 @@ export function fmtDate(d, withTime = true) {
   const base = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
   return withTime ? `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}` : base;
 }
+// 시험은 "중간고사"만으로는 무슨 과목인지 모르니 과목명을 앞에 붙인다
+export function displayTitle(t) {
+  if (t.kind === 'exam' && t.subject && !t.title.includes(t.subject)) return `${t.subject} ${t.title}`;
+  return t.title;
+}
+
 // 목록용 짧은 날짜: 10/20 (화) 23:59
 export function fmtShort(d, withTime = true) {
   const base = `${d.getMonth() + 1}/${d.getDate()} (${WEEK[d.getDay()]})`;
