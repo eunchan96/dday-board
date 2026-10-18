@@ -1,4 +1,4 @@
-// 목록 / 캘린더 / 과목별 보기
+// 목록 / 캘린더 보기
 
 import {
   h, dday, fmtDate, fmtDuration, groupOf, GROUPS, subjectColor,
@@ -60,7 +60,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   );
 
   const meta = h('div', { class: 'meta' },
-    !compact && t.subject ? h('span', null, t.subject) : null,
+    !compact && t.subject ? h('span', { class: 'subj', style: { '--c': subjectColor(t.subject) } }, t.subject) : null,
     exam ? h('span', null, `${fmtDate(due, false)} ${timeRange(t)}`) : h('span', null, fmtDate(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', { class: 'remain' }, remain) : null,
@@ -83,7 +83,6 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}`, dataset: { id: t.id } },
     check,
-    compact ? null : h('i', { class: 'tab', style: { background: subjectColor(t.subject) } }),
     main, star, badge);
 }
 
@@ -207,75 +206,9 @@ export function renderCalendar(root, tasks, ctx) {
       h('h3', null,
         `${sel.getMonth() + 1}월 ${sel.getDate()}일 (${WEEK[sel.getDay()]})`,
         h('span', { class: 'msg' }, list.length ? `${list.length}개` : '일정 없음'),
-        h('button', { class: 'btn', onclick: () => ctx.onNew(sel, 'exam') }, '시험 추가'),
-        h('button', { class: 'btn', onclick: () => ctx.onNew(sel, 'assignment') }, '과제 추가')),
+        h('button', { class: 'btn sm', onclick: () => ctx.onNew(sel, 'assignment') }, '이 날 추가')),
     );
     if (list.length) box.append(h('ul', { class: 'rows' }, list.map(t => taskRow(t, ctx))));
     root.append(box);
   }
-}
-
-/* ───── 과목별 ───── */
-export function renderSubjects(root, tasks, ctx) {
-  root.replaceChildren();
-  if (!ctx.total) {
-    root.append(emptyState(ctx, '아직 과제가 없어요', '과제가 생기면 과목별로 진행 상황을 보여 드려요.'));
-    return;
-  }
-  const groups = new Map();
-  for (const t of tasks) {
-    const k = t.subject || '';
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(t);
-  }
-  if (!groups.size) {
-    root.append(emptyState(ctx, '조건에 맞는 과제가 없어요', '검색어나 필터를 바꿔 보세요.', false));
-    return;
-  }
-
-  const now = ctx.now;
-  const cards = [...groups.entries()].map(([name, list]) => {
-    const pending = list.filter(t => groupOf(t, now) !== 'done').sort(byDue);
-    const done = list.length - pending.length;
-    const next = pending.find(t => new Date(t.due) >= now) || pending[0];
-    const exams = pending.filter(isExam);
-    return { name, list, pending, done, next, exams };
-  }).sort((a, b) => {
-    // 남은 과제가 있는 과목 먼저, 그 안에서 가까운 마감 순
-    if (!!a.next !== !!b.next) return a.next ? -1 : 1;
-    if (a.next && b.next) return byDue(a.next, b.next);
-    return a.name.localeCompare(b.name, 'ko');
-  });
-
-  const wrap = h('div', { class: 'subjects' });
-  for (const c of cards) {
-    const color = subjectColor(c.name);
-    const pct = c.list.length ? Math.round((c.done / c.list.length) * 100) : 0;
-    let sub;
-    if (!c.pending.length) sub = `일정 ${c.list.length}개 모두 끝냈어요`;
-    else {
-      const info = dday(c.next, now);
-      const tasksLeft = c.pending.length - c.exams.length;
-      const parts = [];
-      if (tasksLeft) parts.push(`남은 과제 ${tasksLeft}개`);
-      if (c.exams.length) parts.push(`다가오는 시험 ${c.exams.length}개`);
-      parts.push(`가장 가까운 일정 ${info.label}`);
-      sub = parts.join(' · ');
-    }
-    const shown = c.pending.slice(0, 4);
-    const card = h('article', { class: 'subject-card', style: { '--c': color } },
-      h('h3', null, c.name || '과목 없음'),
-      h('p', { class: 'sub' }, sub),
-      h('div', {
-        class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct),
-        'aria-label': `${c.name || '과목 없음'} 완료율 ${pct}%`,
-      }, h('i', { style: { width: `${pct}%` } })),
-      h('p', { class: 'sub' }, `끝낸 일정 ${c.done} / 전체 ${c.list.length}`),
-      shown.length ? h('ul', { class: 'rows' }, shown.map(t => taskRow(t, ctx, { compact: true }))) : null,
-      h('button', { class: 'more', onclick: () => ctx.onShowSubject(c.name) },
-        c.pending.length > shown.length ? `남은 일정 ${c.pending.length - shown.length}개 더 보기` : '이 과목만 목록으로 보기'),
-    );
-    wrap.append(card);
-  }
-  root.append(wrap);
 }

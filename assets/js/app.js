@@ -13,7 +13,7 @@ import {
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize,
 } from './util.js';
-import { renderList, renderCalendar, renderSubjects } from './views.js';
+import { renderList, renderCalendar } from './views.js';
 
 const SYNC_INTERVAL = 30000;
 
@@ -225,12 +225,11 @@ function renderView() {
   const root = $('#view');
   const tasks = visibleTasks();
   if (view === 'calendar') renderCalendar(root, tasks, ctx());
-  else if (view === 'subjects') renderSubjects(root, tasks, ctx());
   else renderList(root, tasks, ctx());
 }
 
 function setView(v) {
-  if (!['list', 'calendar', 'subjects'].includes(v)) v = 'list';
+  if (!['list', 'calendar'].includes(v)) v = 'list';
   setPref('view', v);
   if (location.hash !== `#${v}`) history.replaceState(null, '', `#${v}`);
 }
@@ -867,7 +866,6 @@ function bind() {
     else if (e.key === '/') { e.preventDefault(); $('#search').focus(); }
     else if (e.key === '1') setView('list');
     else if (e.key === '2') setView('calendar');
-    else if (e.key === '3') setView('subjects');
   });
 
   window.addEventListener('hashchange', () => { if (!openTaskFromHash()) setView(location.hash.slice(1)); });
@@ -918,7 +916,7 @@ bind();
 initPickers();
 applyTheme();
 const hashView = location.hash.slice(1);
-if (['list', 'calendar', 'subjects'].includes(hashView)) state.prefs.view = hashView;
+if (['list', 'calendar'].includes(hashView)) state.prefs.view = hashView;
 renderAll();
 if (state.code) { pull(); loadLms(); }
 openTaskFromHash();
