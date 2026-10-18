@@ -73,15 +73,15 @@
     </nav>
 
     <div class="actions">
-      <button class="btn ghost" id="btnLms" hidden title="스마트캠퍼스에서 지금 가져오기">가져오기</button>
-      <button class="btn icon ghost" id="btnSync" title="다른 기기 변경 사항 불러오기" aria-label="새로고침">
+      <button class="btn icon ghost" id="btnSync" title="새로 불러오기 (스마트캠퍼스 포함)" aria-label="새로 불러오기">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5V7h-3.5"/></svg>
       </button>
       <button class="btn icon ghost" id="btnSettings" title="설정" aria-label="설정">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 14h13"/><circle cx="7.5" cy="6" r="2" class="fill-sheet"/><circle cx="12.5" cy="14" r="2" class="fill-sheet"/></svg>
       </button>
-      <button class="btn" id="btnNewExam" title="새 시험 (E)">새 시험</button>
-      <button class="btn primary" id="btnNew" title="새 과제 (N)">새 과제</button>
+      <button class="btn primary" id="btnNew" title="추가 (N: 과제, E: 시험)">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"/></svg><span>추가</span>
+      </button>
     </div>
   </header>
 
@@ -90,15 +90,6 @@
   <div class="layout">
     <aside class="rail" id="rail" aria-label="필터"></aside>
     <main class="view-col">
-      <div class="quickadd" id="quickadd">
-        <label class="quickadd-box">
-          <span class="sr-only">빠르게 추가</span>
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
-          <input type="text" id="qaInput" autocomplete="off" enterkeyhint="done"
-                 placeholder="빠르게 추가: 데이터베이스 과제 금요일까지">
-        </label>
-        <p class="quickadd-preview" id="qaPreview" aria-live="polite"></p>
-      </div>
       <div class="view" id="view"></div>
     </main>
   </div>
@@ -187,128 +178,135 @@
     </button>
   </header>
   <div class="settings-body">
-    <section id="pushSection">
+    <section class="set-group">
+      <h3>스마트캠퍼스</h3>
+      <div class="set-card">
+        <div class="set-row">
+          <div class="set-text"><b>연동 상태</b><span class="set-sub" id="lmsState"></span></div>
+          <button class="btn sm" id="btnLmsNow" hidden>지금 가져오기</button>
+        </div>
+        <div class="set-row stack" id="tokenBlock">
+          <div class="set-head">
+            <div class="set-text"><b>액세스 토큰</b><span class="set-sub" id="tokenSub">과제와 제출 파일을 하루 3번 가져와요</span></div>
+            <div class="set-actions">
+              <button class="btn sm" id="btnTokenChange" hidden>바꾸기</button>
+              <button class="btn sm danger ghost" id="btnTokenClear" hidden>해제</button>
+            </div>
+          </div>
+          <div class="inline-form" id="tokenForm">
+            <input type="password" id="tokenInput" placeholder="토큰 붙여 넣기" autocomplete="off" spellcheck="false">
+            <button class="btn primary" id="btnTokenSave">연결</button>
+          </div>
+          <details class="more" id="tokenHelp">
+            <summary>토큰 만드는 법</summary>
+            <ol class="help steps" id="tokenSteps">
+              <li><a href="https://canvas.ssu.ac.kr/profile/settings" target="_blank" rel="noopener">스마트캠퍼스 설정</a>에서 <b>+ 새 액세스 토큰</b></li>
+              <li>목적 "D-day 보드", 만료일은 학기 끝나는 날</li>
+              <li>나온 토큰을 복사해 여기에 붙여 넣기</li>
+            </ol>
+            <p class="help fine">토큰은 서버에 암호화해서 보관하고, 과제와 제출 기록을 읽는 데만 써요.</p>
+          </details>
+          <p class="msg" id="tokenMsg" role="status"></p>
+        </div>
+        <details class="set-more" id="feedMore">
+          <summary>토큰 없이 연결하기</summary>
+          <div class="set-row stack">
+            <div class="set-text"><b>캘린더 피드</b><span class="set-sub">최근 30일 과제만, 제출 정보 없이 가져와요</span></div>
+            <div class="inline-form">
+              <input type="text" id="feedUrl" placeholder="…/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
+              <button class="btn" id="btnFeedSave">연동</button>
+            </div>
+            <div class="row-actions">
+              <span class="msg" id="feedMsg" role="status"></span>
+              <button class="btn sm danger ghost" id="btnFeedClear" hidden>피드 해제</button>
+            </div>
+          </div>
+          <div class="set-row stack" id="bookmarkletSection">
+            <div class="set-text"><b>북마클릿</b><span class="set-sub">북마크바에 끌어다 놓고 스마트캠퍼스에서 누르면 학기 전체를 한 번 가져와요</span></div>
+            <div class="row-actions start">
+              <a class="btn sm bookmarklet" id="bookmarklet" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">D-day로 가져오기</a>
+              <label class="btn sm ghost">플래너 파일 올리기<input type="file" id="canvasFile" hidden></label>
+            </div>
+            <p class="help fine">플래너 파일: 로그인한 브라우저에서 <code id="plannerUrl"></code> 를 열어 저장한 파일</p>
+            <p class="msg" id="canvasFileMsg" role="status"></p>
+          </div>
+        </details>
+        <p class="msg pad" id="lmsMsg" role="status"></p>
+      </div>
+    </section>
+
+    <section class="set-group" id="pushSection">
       <h3>마감 알림</h3>
-      <p class="help">마감 전에 이 기기로 알림을 보내요. 완료한 과제는 알리지 않고, 폰과 PC는 각각 켜야 해요.</p>
-      <p class="lms-state" id="pushState"></p>
-      <div class="quick-dates" id="pushLeads" role="group" aria-label="알림 받을 시점"></div>
-      <div class="row-actions">
-        <span class="msg" id="pushMsg" role="status"></span>
-        <a class="btn" id="pushOpen" href="./#list" target="_blank" rel="noopener" hidden>새 창에서 열기</a>
-        <button class="btn" id="btnPushTest" hidden>테스트 알림 보내기</button>
-        <button class="btn danger ghost" id="btnPushOff" hidden>알림 끄기</button>
-        <button class="btn primary" id="btnPushOn">알림 켜기</button>
-      </div>
-    </section>
-
-    <section>
-      <h3>스마트캠퍼스 연동</h3>
-      <p class="lms-state" id="lmsState"></p>
-      <div class="row-actions">
-        <span class="msg" id="lmsMsg" role="status"></span>
-        <button class="btn" id="btnLmsNow" hidden>지금 가져오기</button>
-      </div>
-
-      <h4 class="sub-head">액세스 토큰으로 연결 <span class="tag-rec">추천</span></h4>
-      <p class="help">학기 전체 과제와 제출한 파일 이름까지 하루 3번(7시, 13시, 21시) 자동으로 가져와요.</p>
-      <ol class="help steps" id="tokenSteps">
-        <li><a href="https://canvas.ssu.ac.kr/profile/settings" target="_blank" rel="noopener">스마트캠퍼스 설정 페이지</a>를 열어요. (왼쪽 메뉴 <b>계정 → 설정</b>과 같아요)</li>
-        <li><b>승인된 통합</b> 아래 <b>+ 새 액세스 토큰</b>을 눌러요.</li>
-        <li>목적에 "D-day 보드"라고 적고, 만료일은 학기가 끝나는 날로 정한 뒤 <b>토큰 생성</b>을 눌러요.</li>
-        <li>나온 토큰을 복사해 아래에 붙여 넣어요. 그 창을 닫으면 토큰을 다시 볼 수 없어요.</li>
-      </ol>
-      <div class="inline-form">
-        <input type="password" id="tokenInput" placeholder="스마트캠퍼스에서 복사한 토큰 붙여 넣기" autocomplete="off" spellcheck="false">
-        <button class="btn primary" id="btnTokenSave">연결하기</button>
-      </div>
-      <div class="row-actions">
-        <span class="msg" id="tokenMsg" role="status"></span>
-        <button class="btn danger ghost" id="btnTokenClear" hidden>토큰 해제</button>
-      </div>
-      <p class="help fine">토큰은 내 스마트캠퍼스 계정을 대신 쓸 수 있는 열쇠예요. 서버에 암호화해서 보관하고 화면에는 끝 4자리만 보여 줘요. 이 앱은 과제와 제출 기록을 읽기만 해요. 그만 쓸 때는 여기서 해제하고 스마트캠퍼스 설정에서도 토큰을 지워 주세요.</p>
-
-      <details class="more" id="feedMore">
-        <summary>토큰 대신 캘린더 피드로 연결하기</summary>
-        <p class="help">스마트캠퍼스 캘린더 화면 오른쪽 아래의 "캘린더 피드" 주소를 넣으면 최근 30일 과제를 하루 3번 가져와요. 제출 정보는 없어요. 토큰을 연결하면 피드 대신 토큰을 써요.</p>
-        <div class="inline-form">
-          <input type="text" id="feedUrl" placeholder="https://canvas.ssu.ac.kr/feeds/calendars/user_….ics" autocomplete="off" spellcheck="false">
-          <button class="btn" id="btnFeedSave">연동하기</button>
+      <div class="set-card">
+        <div class="set-row">
+          <div class="set-text"><b>이 기기로 알림 받기</b><span class="set-sub" id="pushState"></span></div>
+          <div class="set-actions">
+            <a class="btn sm" id="pushOpen" href="./#list" target="_blank" rel="noopener" hidden>새 창에서 열기</a>
+            <button class="btn sm primary" id="btnPushOn">켜기</button>
+            <button class="btn sm" id="btnPushOff" hidden>끄기</button>
+          </div>
         </div>
-        <div class="row-actions">
-          <span class="msg" id="feedMsg" role="status"></span>
-          <button class="btn danger ghost" id="btnFeedClear" hidden>피드 해제</button>
+        <div class="set-row" id="pushLeadsRow">
+          <div class="set-text"><b>알림 시점</b></div>
+          <div class="quick-dates" id="pushLeads" role="group" aria-label="알림 받을 시점"></div>
         </div>
-      </details>
-    </section>
-
-    <section id="bookmarkletSection">
-      <h3>토큰 없이 학기 전체 가져오기</h3>
-      <p class="help">캘린더 피드에는 최근 30일 일정만 있고 제출 정보가 없어요. 아래 버튼을 브라우저 북마크바로 끌어다 놓은 뒤, 스마트캠퍼스에 로그인한 화면에서 누르면 수강 과목의 학기 전체 과제, 제출 여부, 제출한 파일 이름을 가져와요.</p>
-      <div class="row-actions" style="justify-content:flex-start">
-        <a class="btn bookmarklet" id="bookmarklet" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">D-day로 가져오기</a>
-        <span class="help">← 북마크바로 끌어다 놓기</span>
-      </div>
-      <details class="more">
-        <summary>북마크바를 쓸 수 없다면 (파일로 가져오기)</summary>
-        <ol class="help steps">
-          <li>스마트캠퍼스에 로그인한 브라우저에서 아래 주소를 열어요.</li>
-          <li><code id="plannerUrl"></code></li>
-          <li>나온 화면을 Ctrl+S(⌘+S)로 저장하고, 그 파일을 올려 주세요. 이 방법으로는 제출 여부까지만 가져와요.</li>
-        </ol>
-        <div class="row-actions">
-          <span class="msg" id="canvasFileMsg" role="status"></span>
-          <label class="btn">파일 올리기<input type="file" id="canvasFile" hidden></label>
+        <div class="set-row slim" id="pushTestRow">
+          <span class="msg" id="pushMsg" role="status"></span>
+          <button class="btn sm ghost" id="btnPushTest" hidden>테스트 알림</button>
         </div>
-      </details>
-    </section>
-
-    <section>
-      <h3>보드 코드</h3>
-      <p class="help">다른 기기에서 이 코드를 입력하면 같은 보드가 열려요. 비밀번호처럼 다뤄 주세요.</p>
-      <div class="inline-form">
-        <input type="text" id="codeText" class="code-input" readonly>
-        <button class="btn" id="btnShowCode">보기</button>
-        <button class="btn" id="btnCopyCode">복사</button>
-      </div>
-      <p class="msg" id="copyMsg" role="status"></p>
-    </section>
-
-    <section>
-      <h3>화면</h3>
-      <div class="segmented" id="themePicker" role="radiogroup" aria-label="테마">
-        <button role="radio" data-theme="system">시스템 설정</button>
-        <button role="radio" data-theme="light">밝게</button>
-        <button role="radio" data-theme="dark">어둡게</button>
       </div>
     </section>
 
-    <section>
-      <h3>백업과 가져오기</h3>
-      <p class="help">이전 위젯의 "백업 / 불러오기" 텍스트를 붙여 넣으면 과제를 옮겨 와요. 이미 있는 과제는 건너뛰어요.</p>
-      <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
-      <div class="row-actions">
-        <span class="msg" id="importMsg" role="status"></span>
-        <button class="btn" id="btnExport">현재 과제 백업 복사</button>
-        <button class="btn primary" id="btnImport">가져오기</button>
-      </div>
-    </section>
-
-    <section>
-      <h3>단축키</h3>
-      <p class="help keys"><kbd>N</kbd> 새 과제 <kbd>E</kbd> 새 시험 <kbd>/</kbd> 검색 <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 목록 · 캘린더 · 과목별 <kbd>Esc</kbd> 닫기</p>
-    </section>
-
-    <section>
+    <section class="set-group">
       <h3>이 기기</h3>
-      <div class="row-actions" id="installRow" hidden>
-        <span class="help" id="installHelp">홈 화면이나 작업 표시줄에서 앱처럼 열 수 있어요.</span>
-        <button class="btn" id="btnInstall">앱으로 설치</button>
-      </div>
-      <div class="row-actions">
-        <span class="help">연결을 해제해도 서버의 과제는 그대로 남아요.</span>
-        <button class="btn danger ghost" id="btnDisconnect">이 기기 연결 해제</button>
+      <div class="set-card">
+        <div class="set-row">
+          <div class="set-text"><b>화면</b></div>
+          <div class="segmented" id="themePicker" role="radiogroup" aria-label="테마">
+            <button role="radio" data-theme="system">자동</button>
+            <button role="radio" data-theme="light">밝게</button>
+            <button role="radio" data-theme="dark">어둡게</button>
+          </div>
+        </div>
+        <div class="set-row stack">
+          <div class="set-head">
+            <div class="set-text"><b>보드 코드</b><span class="set-sub">다른 기기에서 입력하면 같은 보드가 열려요</span></div>
+          </div>
+          <div class="inline-form">
+            <input type="text" id="codeText" class="code-input" readonly>
+            <button class="btn" id="btnShowCode">보기</button>
+            <button class="btn" id="btnCopyCode">복사</button>
+          </div>
+          <p class="msg" id="copyMsg" role="status"></p>
+        </div>
+        <div class="set-row" id="installRow" hidden>
+          <div class="set-text"><b>앱으로 설치</b><span class="set-sub" id="installHelp">홈 화면에서 바로 열려요</span></div>
+          <button class="btn sm" id="btnInstall">설치</button>
+        </div>
+        <div class="set-row">
+          <div class="set-text"><b>연결 해제</b><span class="set-sub">서버의 과제는 그대로 남아요</span></div>
+          <button class="btn sm danger ghost" id="btnDisconnect">해제</button>
+        </div>
       </div>
     </section>
+
+    <details class="set-group set-more-group">
+      <summary>백업 · 단축키</summary>
+      <div class="set-card">
+        <div class="set-row stack">
+          <div class="set-text"><b>백업</b><span class="set-sub">예전 위젯 백업 텍스트를 붙여 넣으면 옮겨 와요</span></div>
+          <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
+          <div class="row-actions">
+            <span class="msg" id="importMsg" role="status"></span>
+            <button class="btn sm" id="btnExport">백업 복사</button>
+            <button class="btn sm primary" id="btnImport">가져오기</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 보기 전환 <kbd>Esc</kbd> 닫기</p>
+        </div>
+      </div>
+    </details>
   </div>
 </dialog>
 

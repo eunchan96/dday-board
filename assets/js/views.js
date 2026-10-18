@@ -7,6 +7,7 @@ import {
 
 const ICON_CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
 const ICON_STAR = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg>';
+const ICON_EXTERNAL = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7 9"/></svg>';
 
 function svg(markup) {
   const t = document.createElement('template');
@@ -33,10 +34,11 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const info = dday(t, now);
   const due = new Date(t.due);
   const exam = isExam(t);
+  // 남은 시간은 이틀 안일 때만 (그 밖에는 오른쪽 D-day로 충분)
   let remain = null;
   if (!t.done) {
     if (exam && info.ms < 0) remain = examOver(t, now) ? null : '지금 시험 중';
-    else remain = info.ms >= 0 ? `${fmtDuration(info.ms)} 남음` : `${fmtDuration(-info.ms)} 지남`;
+    else if (info.ms >= 0 && info.ms < 2 * 864e5) remain = `${fmtDuration(info.ms)} 남음`;
   }
 
   const check = h('button', {
@@ -52,18 +54,17 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     exam ? h('span', { class: 'kind-tag' }, '시험') : null,
     h('span', { class: 'title-text' }, t.title),
     t.link ? h('a', {
-      class: 'lms-tag', href: t.link, target: '_blank', rel: 'noopener noreferrer',
-      title: '스마트캠퍼스에서 열기', onclick: e => e.stopPropagation(),
-    }, 'LMS') : (t.source === 'canvas' ? h('span', { class: 'lms-tag' }, 'LMS') : null),
+      class: 'lms-link', href: t.link, target: '_blank', rel: 'noopener noreferrer',
+      title: '스마트캠퍼스에서 열기', 'aria-label': '스마트캠퍼스에서 열기', onclick: e => e.stopPropagation(),
+    }, svg(ICON_EXTERNAL)) : null,
   );
 
   const meta = h('div', { class: 'meta' },
     !compact && t.subject ? h('span', null, t.subject) : null,
     exam ? h('span', null, `${fmtDate(due, false)} ${timeRange(t)}`) : h('span', null, fmtDate(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
-    remain ? h('span', null, remain) : null,
-    !compact ? submissionLine(t) : null,
-    !compact && t.memo ? h('span', { class: 'memo' }, t.memo.split('\n')[0]) : null,
+    remain ? h('span', { class: 'remain' }, remain) : null,
+    !compact && t.done ? submissionLine(t) : null,
   );
 
   const main = h('div', {

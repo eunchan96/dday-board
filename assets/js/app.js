@@ -6,7 +6,6 @@ import {
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
-import { parseQuick } from './quickadd.js';
 import { pushSupport, pushStatus, enablePush, disablePush, setLeads, testPush, LEAD_OPTIONS, DEFAULT_LEADS } from './push.js';
 import { errText } from './api.js';
 import {
@@ -97,45 +96,34 @@ function renderNext() {
   const pending = assignments.filter(t => !t.done);
   const upcoming = pending.filter(t => new Date(t.due) >= now).sort(byDue);
   const over = pending.length - upcoming.length;
-  const weekEnd = addDays(startOfWeek(now), 7);
-  const thisWeek = upcoming.filter(t => new Date(t.due) < weekEnd).length;
-  const done = scoped.filter(t => groupOf(t, now) === 'done').length;
   const nextExam = scoped.filter(t => isExam(t) && !t.done && groupOf(t, now) !== 'done').sort(byDue)[0];
 
   const line = h('p', { class: 'next-line' });
   const next = upcoming[0];
   if (next) {
-    const left = new Date(next.due) - now;
-    add(line, 
+    add(line,
       '다음 마감은 ',
       h('button', { type: 'button', onclick: () => openPanel(next) }, next.title),
-      next.subject ? h('span', { class: 'muted' }, ` (${next.subject})`) : null,
-      `, ${fmtDuration(left)} 남았어요.`,
+      `, ${fmtDuration(new Date(next.due) - now)} 남았어요.`,
     );
   } else if (assignments.length) {
-    add(line, '다가오는 과제 마감이 없어요.', over ? h('span', { class: 'muted' }, ' 마감이 지난 과제만 남아 있어요.') : null);
+    add(line, over ? '마감이 지난 과제만 남아 있어요.' : '남은 과제가 없어요.');
   } else if (state.tasks.length && !scoped.length) {
     add(line, `${state.prefs.semester === 'all' ? '' : semesterLabel(parseSemesterKey(activeSemesterKey())) + '에는 '}일정이 없어요.`);
   } else {
     add(line, '과제를 추가하면 가장 가까운 마감을 여기에 알려 드려요.');
   }
 
-  const stats = h('div', { class: 'next-stats' },
-    h('span', null, '이번 주 과제 ', h('b', null, thisWeek)),
-    h('span', { class: over ? 'warn' : '' }, '마감 지남 ', h('b', null, over)),
-    h('span', null, '끝낸 일정 ', h('b', null, done), ` / ${scoped.length}`),
-  );
-  const parts = [line, stats];
-  if (nextExam) {
+  const parts = [line];
+  // 일주일 안의 시험만 한 줄로
+  if (nextExam && new Date(nextExam.due) - now < 7 * 864e5) {
     const d = new Date(nextExam.due);
-    const info = dday(nextExam, now);
     parts.push(h('p', { class: 'next-exam' },
       h('span', { class: 'kind-tag' }, '시험'),
-      '다음 시험은 ',
-      h('b', null, [nextExam.subject, nextExam.title].filter(Boolean).join(' ')),
-      `, ${fmtDate(d, false)} ${timeRange(nextExam)}`,
-      nextExam.location ? ` · ${nextExam.location}` : '',
-      ` (${info.label})`));
+      h('button', { type: 'button', onclick: () => openPanel(nextExam) },
+        [nextExam.subject, nextExam.title].filter(Boolean).join(' ')),
+      ` ${fmtDate(d, false)} ${timeRange(nextExam)}`,
+      ` · ${dday(nextExam, now).label}`));
   }
   fill($('#next'), parts);
 }
@@ -183,24 +171,20 @@ function renderRail() {
     chip('전체', cur === null, () => setPref('subject', null)),
     subjects.map(([name]) => chip(name || '과목 없음', cur === name,
       () => setPref('subject', cur === name ? null : name), subjectColor(name))),
-    chip('과제만', state.prefs.kind === 'assignment', () => setPref('kind', state.prefs.kind === 'assignment' ? null : 'assignment')),
     chip('시험만', state.prefs.kind === 'exam', () => setPref('kind', state.prefs.kind === 'exam' ? null : 'exam')),
-    chip('완료 숨기기', state.prefs.hideDone, () => setPref('hideDone', !state.prefs.hideDone)),
     chip('중요만', state.prefs.starredOnly, () => setPref('starredOnly', !state.prefs.starredOnly)),
+    chip('완료 숨기기', state.prefs.hideDone, () => setPref('hideDone', !state.prefs.hideDone)),
   );
 
   rail.replaceChildren(
     chips,
     h('div', null, h('h3', null, '과목'), list),
-    h('div', { class: 'kind-filter' }, h('h3', null, '종류'),
-      h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': '종류' },
-        [[null, '전체'], ['assignment', '과제'], ['exam', '시험']].map(([k, label]) => h('button', {
-          type: 'button', role: 'radio', 'aria-checked': state.prefs.kind === k ? 'true' : 'false',
-          onclick: () => setPref('kind', k),
-        }, label)))),
-    h('div', { class: 'toggles' }, h('h3', null, '보기 옵션'),
-      toggle('hideDone', '완료한 과제 숨기기'),
-      toggle('starredOnly', '중요한 과제만 보기')),
+    h('div', { class: 'toggles' }, h('h3', null, '보기'),
+      h('label', { class: 'check-row' },
+        h('input', { type: 'checkbox', checked: state.prefs.kind === 'exam', onchange: e => setPref('kind', e.target.checked ? 'exam' : null) }),
+        h('span', null, '시험만')),
+      toggle('starredOnly', '중요한 것만'),
+      toggle('hideDone', '완료 숨기기')),
   );
 
   $('#subjectList').replaceChildren(...subjects.filter(([n]) => n).map(([n]) => h('option', { value: n })));
@@ -263,26 +247,37 @@ function renderStatus() {
   else el.textContent = '불러오는 중…';
 }
 
+let tokenEditing = false;
 function renderLms() {
   const l = state.lms;
   const feed = l.feed ?? (l.connected && !l.token), token = !!l.token;
-  $('#btnLms').hidden = !l.connected;
   $('#btnLmsNow').hidden = !l.connected;
   $('#btnFeedClear').hidden = !feed;
-  $('#btnFeedSave').textContent = feed ? '주소 바꾸기' : '연동하기';
+  $('#btnFeedSave').textContent = feed ? '바꾸기' : '연동';
   $('#btnTokenClear').hidden = !token;
-  $('#btnTokenSave').textContent = token ? '토큰 바꾸기' : '연결하기';
-  $('#tokenSteps').hidden = token;
+  $('#btnTokenChange').hidden = !token || tokenEditing;
+  $('#tokenForm').hidden = token && !tokenEditing;
+  $('#tokenHelp').hidden = token && !tokenEditing;
+  $('#btnTokenSave').textContent = token ? '바꾸기' : '연결';
+  $('#tokenSub').textContent = token ? `…${l.tokenHint} 연결됨` : '과제와 제출 파일을 하루 3번 가져와요';
   $('#bookmarkletSection').hidden = token;          // 토큰이 있으면 북마클릿은 필요 없음
   const st = $('#lmsState');
-  st.className = 'lms-state';
-  const how = token ? `액세스 토큰(…${l.tokenHint})으로 연동됨` : feed ? '캘린더 피드로 연동됨' : '';
-  if (!l.connected) st.textContent = '아직 연동하지 않았어요.';
-  else if (l.error) { st.classList.add('err'); st.textContent = `${how} · 마지막 시도 실패: ${errText(new Error(l.error))}`; }
+  st.className = 'set-sub';
+  if (!l.connected) st.textContent = '연결 안 됨';
+  else if (l.error) { st.classList.add('err'); st.textContent = errText(new Error(l.error)); }
   else {
     st.classList.add('ok');
-    st.textContent = l.syncedAt ? `${how} · 마지막으로 가져온 시각 ${fmtDate(new Date(l.syncedAt))}` : `${how} · 아직 가져오기 전이에요`;
+    const how = token ? '토큰' : '캘린더 피드';
+    st.textContent = l.syncedAt ? `${how} · ${fmtAgo(new Date(l.syncedAt))} 가져옴` : `${how} · 아직 가져오기 전`;
   }
+}
+
+function fmtAgo(d) {
+  const min = Math.round((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
+  return fmtDate(d, false);
 }
 
 /* ───── 마감 알림 ───── */
@@ -290,22 +285,23 @@ const push = { subscribed: false, leads: DEFAULT_LEADS.slice(), busy: false };
 
 function renderPush() {
   const support = pushSupport();
-  const st = $('#pushState'), msgOpen = $('#pushOpen');
+  const st = $('#pushState');
   const on = support === 'ok' && push.subscribed;
-  st.className = 'lms-state';
-  msgOpen.hidden = support !== 'embedded';
+  st.className = 'set-sub';
+  $('#pushOpen').hidden = support !== 'embedded';
   $('#btnPushOn').hidden = support !== 'ok' || on;
   $('#btnPushOff').hidden = !on;
   $('#btnPushTest').hidden = !on;
   $('#btnPushOn').disabled = $('#btnPushOff').disabled = $('#btnPushTest').disabled = push.busy;
-  if (support === 'embedded') st.textContent = '노션 안에서는 알림 권한을 받을 수 없어요. 새 창에서 연 다음 켜 주세요.';
-  else if (support === 'ios-install') st.textContent = '아이폰은 Safari 공유 버튼 → "홈 화면에 추가"로 설치한 앱에서 알림을 켤 수 있어요.';
-  else if (support === 'unsupported') st.textContent = '이 브라우저는 알림을 지원하지 않아요.';
-  else if (support === 'denied') { st.classList.add('err'); st.textContent = '이 사이트 알림이 차단돼 있어요. 브라우저 사이트 설정에서 허용한 뒤 다시 열어 주세요.'; }
-  else if (on) { st.classList.add('ok'); st.textContent = `켜짐 · ${leadText(push.leads)}에 알려요`; }
-  else st.textContent = '이 기기에서는 꺼져 있어요.';
-  $('#pushLeads').hidden = support !== 'ok';
-  fill($('#pushLeads'), h('span', { class: 'dur-label' }, '알림 시점'),
+  if (support === 'embedded') st.textContent = '노션 안에서는 켤 수 없어요';
+  else if (support === 'ios-install') st.textContent = '아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요';
+  else if (support === 'unsupported') st.textContent = '이 브라우저는 알림을 지원하지 않아요';
+  else if (support === 'denied') { st.classList.add('err'); st.textContent = '브라우저에서 이 사이트 알림이 차단돼 있어요'; }
+  else if (on) { st.classList.add('ok'); st.textContent = `켜짐 · ${leadText(push.leads)}`; }
+  else st.textContent = '꺼짐';
+  $('#pushLeadsRow').hidden = support !== 'ok';
+  $('#pushTestRow').hidden = !on && !$('#pushMsg').textContent;
+  fill($('#pushLeads'),
     ...LEAD_OPTIONS.map(([min, label]) => h('button', {
       type: 'button', 'aria-pressed': push.leads.includes(min) ? 'true' : 'false',
       disabled: push.busy, onclick: () => toggleLead(min),
@@ -314,7 +310,7 @@ function renderPush() {
 
 function leadText(leads) {
   const names = LEAD_OPTIONS.filter(([m]) => leads.includes(m)).map(([, l]) => l.replace(' 전', ''));
-  return names.length ? `마감 ${names.join(', ')} 전` : '알림 시점을 골라 주세요';
+  return names.length ? `${names.join(', ')} 전` : '알림 시점을 골라 주세요';
 }
 
 async function pushTask(label, fn, okText) {
@@ -535,7 +531,7 @@ function openSettings() {
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
   ['#feedMsg', '#tokenMsg', '#lmsMsg', '#importMsg', '#copyMsg'].forEach(s => { $(s).textContent = ''; });
-  $('#pushMsg').textContent = '';
+  $('#pushMsg').textContent = ''; tokenEditing = false;
   renderLms(); renderPush(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
   loadLms(); loadPush();
@@ -561,18 +557,20 @@ function armTwice(btn, label, confirmLabel, action) {
   });
 }
 
-async function runLmsSync(button) {
-  if (button) button.disabled = true;
+async function runLmsSync(button, { quiet = false } = {}) {
+  if (button) { button.disabled = true; button.classList.add('spinning'); }
   try {
     const r = await lmsSync();
     const parts = [];
     if (r.added) parts.push(`새 과제 ${r.added}개`);
     if (r.updated) parts.push(`바뀐 과제 ${r.updated}개`);
-    toast(parts.length ? `스마트캠퍼스에서 ${parts.join(', ')}를 가져왔어요` : '스마트캠퍼스에 새로운 과제가 없어요');
+    if (parts.length) toast(`스마트캠퍼스에서 ${parts.join(', ')}를 가져왔어요`);
+    else if (!quiet) toast('스마트캠퍼스에 새로운 과제가 없어요');
+    else toast('최신 상태예요');
   } catch (e) {
     toast(errText(e));
   } finally {
-    if (button) button.disabled = false;
+    if (button) { button.disabled = false; button.classList.remove('spinning'); }
   }
 }
 
@@ -711,10 +709,12 @@ function bind() {
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
   const presetDay = () => (state.prefs.view === 'calendar' ? ui.selectedDay : null);
   $('#btnNew').addEventListener('click', () => openPanel(null, presetDay(), 'assignment'));
-  $('#btnNewExam').addEventListener('click', () => openPanel(null, presetDay(), 'exam'));
   $$('#kindPicker button').forEach(b => b.addEventListener('click', () => setKind(b.dataset.kind, { isNew: !ui.editingId })));
-  $('#btnSync').addEventListener('click', () => { pull(); loadLms(); });
-  $('#btnLms').addEventListener('click', e => runLmsSync(e.currentTarget));
+  // 새로 불러오기: 다른 기기 변경 + (연동돼 있으면) 스마트캠퍼스까지
+  $('#btnSync').addEventListener('click', e => {
+    if (state.lms.connected) runLmsSync(e.currentTarget, { quiet: true });
+    else { pull(); loadLms(); }
+  });
   $('#btnSettings').addEventListener('click', openSettings);
   $('#status').addEventListener('click', () => { if (state.syncError) pull(); });
 
@@ -756,7 +756,7 @@ function bind() {
     btn.disabled = true; msg.className = 'msg'; msg.textContent = '연결하고 과제를 불러오는 중…';
     try {
       await setToken(token);
-      input.value = '';
+      input.value = ''; tokenEditing = false; renderLms();
       const r = await lmsSync();
       const parts = [];
       if (r.added) parts.push(`새 과제 ${r.added}개`);
@@ -767,6 +767,7 @@ function bind() {
       msg.className = 'msg err'; msg.textContent = errText(e);
     } finally { btn.disabled = false; }
   });
+  $('#btnTokenChange').addEventListener('click', () => { tokenEditing = true; renderLms(); $('#tokenInput').focus(); });
   $('#tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#btnTokenSave').click(); });
   armTwice($('#btnTokenClear'), '토큰 해제', '한 번 더 누르면 해제돼요', async () => {
     const msg = $('#tokenMsg');
@@ -852,46 +853,6 @@ function bind() {
   $('#fEnd').addEventListener('change', () => {
     if (!ui.settingEnd) ui.endAuto = false;
     renderDurations();
-  });
-
-  // 빠른 입력
-  const qa = $('#qaInput');
-  const subjectNames = () => [...new Set(state.tasks.map(t => t.subject).filter(Boolean))];
-  const qaParse = () => parseQuick(qa.value, new Date(), subjectNames());
-  const qaPreview = () => {
-    const box = $('#qaPreview');
-    if (!qa.value.trim()) { box.replaceChildren(); return; }
-    const r = qaParse();
-    const when = r.date ? `${fmtDate(r.date, false)} ${timeLabel(r.time)}${r.endTime ? `~${timeLabel(r.endTime).replace(/^오[전후] /, '')}` : ''}` : '날짜는 다음 화면에서 골라요';
-    fill(box,
-      h('span', { class: `qa-kind ${r.kind}` }, r.kind === 'exam' ? '시험' : '과제'),
-      r.subject ? h('b', null, r.subject) : null,
-      h('span', null, r.title),
-      h('span', { class: 'qa-when' }, when),
-      h('span', { class: 'qa-hint' }, 'Enter로 추가'));
-  };
-  qa.addEventListener('input', qaPreview);
-  qa.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { qa.value = ''; qaPreview(); qa.blur(); return; }
-    if (e.key !== 'Enter' || e.isComposing || !qa.value.trim()) return;
-    e.preventDefault();
-    const r = qaParse();
-    qa.value = ''; qaPreview();
-    if (!r.date) {
-      openPanel(null, null, r.kind);
-      $('#fTitle').value = r.title; $('#fSubject').value = r.subject;
-      setField('fTime', r.time);
-      if (r.endTime) autoEnd(60);
-      setTimeout(() => $('#fDateBtn').click(), 80);   // 패널이 열린 뒤 달력 띄우기
-      return;
-    }
-    const due = new Date(`${toDateInput(r.date)}T${r.time}`);
-    const t = saveTask({
-      kind: r.kind, title: r.title, subject: r.subject, due: due.toISOString(),
-      endAt: r.endTime ? new Date(`${toDateInput(r.date)}T${r.endTime}`).toISOString() : null,
-      location: '', starred: false, memo: '',
-    });
-    toast(`"${r.title}" ${r.kind === 'exam' ? '시험을' : '과제를'} ${fmtDate(due, false)}에 추가했어요`, '수정', () => openPanel(state.tasks.find(x => x.id === t.id)));
   });
 
   // 단축키
