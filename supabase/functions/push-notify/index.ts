@@ -1,7 +1,7 @@
 // push-notify: 마감이 다가온 과제·시험을 Web Push로 알린다.
 //
 // 호출 방법
-//  - 예약 실행:   POST + 헤더 x-cron-secret      → 알림 시점이 지난 과제를 모두 보냄 (10분마다)
+//  - 예약 실행:   POST + 헤더 x-cron-secret      → 알림 시점이 지난 과제 + 쌓여 있는 한 번짜리 알림(토큰 만료, 새 공지) (10분마다)
 //  - 테스트 알림: POST { code, endpoint }        → 그 기기로 테스트 알림 한 번
 //
 // 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (자동 제공)
@@ -117,12 +117,26 @@ Deno.serve(async (req) => {
       else if (r === "gone") gone.add(t.subId);
       else failed.add(t.subId);
     }
+    // 한 번만 보내는 알림 (토큰 만료, 새 공지)
+    let extra = 0;
+    const { data: outbox } = await supa.rpc("dday_svc_outbox_take");
+    type Out = { title: string; body: string; url: string | null; tag: string | null; subs: Due[] };
+    for (const o of (outbox ?? []) as Out[]) {
+      for (const s of o.subs ?? []) {
+        if (gone.has(s.subId)) continue;
+        const r = await send(s, { title: o.title, body: o.body, tag: o.tag ?? undefined, url: o.url ?? APP_URL });
+        if (r === "ok") extra++;
+        else if (r === "gone") gone.add(s.subId);
+        else failed.add(s.subId);
+      }
+    }
+
     if (sent.length || gone.size || failed.size) {
       await supa.rpc("dday_svc_push_done", {
         p_sent: sent, p_gone: [...gone], p_failed: [...failed],
       });
     }
-    return json({ due: (data ?? []).length, sent: sent.length, gone: gone.size, failed: failed.size });
+    return json({ due: (data ?? []).length, sent: sent.length, extra, gone: gone.size, failed: failed.size });
   }
 
   // 테스트 알림

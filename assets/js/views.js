@@ -40,7 +40,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     else if (info.ms >= 0 && info.ms < 2 * 864e5) remain = `${fmtDuration(info.ms)} 남음`;
   }
 
-  // 왼쪽: 중요 표시 별 (완료는 제출하면 저절로, 시험은 시간이 지나면 저절로)
+  // D-day 왼쪽: 중요 표시 별 (완료는 제출하면 저절로, 시험은 시간이 지나면 저절로)
   const star = h('button', {
     class: 'star-btn', type: 'button', 'aria-label': t.starred ? '중요 표시 해제' : '중요 표시',
     'aria-pressed': t.starred ? 'true' : 'false', title: t.starred ? '중요 표시 해제' : '중요 표시',
@@ -74,7 +74,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const badge = h('div', { class: `dday ${info.level}` }, h('span', null, info.label));
 
   return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id } },
-    star, main, badge);
+    main, star, badge);
 }
 
 function emptyState(ctx, title, text, withButton = true) {

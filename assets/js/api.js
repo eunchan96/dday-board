@@ -27,6 +27,7 @@ async function post(url, body) {
 }
 
 export const rpc = (name, body) => post(RPC_URL + name, body);
+export const CALENDAR_FEED_URL = `${PROJECT}/functions/v1/calendar-feed`;
 
 export const api = {
   createBoard: () => rpc('dday_create_board'),
@@ -39,6 +40,10 @@ export const api = {
   setToken: (code, token) => rpc('dday_set_canvas_token', { p_code: code, p_token: token }),
   lmsSync: code => post(LMS_SYNC_URL, { code }),
   canvasImport: (code, items) => rpc('dday_canvas_import', { p_code: code, p_items: items }),
+  notices: code => rpc('dday_announcements', { p_code: code }),
+  noticesRead: code => rpc('dday_announcements_read', { p_code: code }),
+  calendarKey: code => rpc('dday_calendar_key', { p_code: code }),
+  calendarStatus: code => rpc('dday_calendar_status', { p_code: code }),
   pushSubscribe: (code, sub, leads) => rpc('dday_push_subscribe', { p_code: code, p_sub: sub, p_leads: leads }),
   pushUnsubscribe: (code, endpoint) => rpc('dday_push_unsubscribe', { p_code: code, p_endpoint: endpoint }),
   pushStatus: (code, endpoint) => rpc('dday_push_status', { p_code: code, p_endpoint: endpoint }),

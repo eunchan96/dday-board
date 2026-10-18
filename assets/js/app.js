@@ -7,13 +7,13 @@ import {
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
 import { pushSupport, pushStatus, enablePush, disablePush, setLeads, testPush, LEAD_OPTIONS, DEFAULT_LEADS } from './push.js';
-import { errText } from './api.js';
+import { errText, api, CALENDAR_FEED_URL } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize,
 } from './util.js';
-import { renderList, renderCalendar } from './views.js';
+import { renderList, renderCalendar, taskRow } from './views.js';
 
 const SYNC_INTERVAL = 30000;
 
@@ -229,8 +229,27 @@ function renderView() {
   $$('.views button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === view ? 'true' : 'false'));
   const root = $('#view');
   const tasks = visibleTasks();
-  if (view === 'calendar') renderCalendar(root, tasks, ctx());
+  if (isCompact) renderCompact(root, tasks);
+  else if (view === 'calendar') renderCalendar(root, tasks, ctx());
   else renderList(root, tasks, ctx());
+}
+
+/* ───── 노션 임베드용 간단 모드 (?compact) ───── */
+// 다가오는 일정 몇 개만 크게. 나머지는 "전체 보기"로 새 창에서.
+const isCompact = new URLSearchParams(location.search).has('compact');
+if (isCompact) document.body.classList.add('compact');
+const COMPACT_LIMIT = 6;
+function renderCompact(root, tasks) {
+  const now = new Date();
+  const open = tasks.filter(t => groupOf(t, now) !== 'done').sort((a, b) => new Date(a.due) - new Date(b.due));
+  const full = `${location.origin}${location.pathname}#list`;
+  fill(root,
+    open.length
+      ? h('ul', { class: 'rows compact-rows' }, open.slice(0, COMPACT_LIMIT).map(t => taskRow(t, ctx())))
+      : h('p', { class: 'compact-empty' }, '남은 일정이 없어요.'),
+    h('p', { class: 'compact-more' },
+      open.length > COMPACT_LIMIT ? `외 ${open.length - COMPACT_LIMIT}개 · ` : '',
+      h('a', { href: full, target: '_blank', rel: 'noopener' }, '전체 보기')));
 }
 
 function setView(v) {
@@ -282,6 +301,63 @@ function fmtAgo(d) {
   if (min < 60) return `${min}분 전`;
   if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
   return fmtDate(d, false);
+}
+
+/* ───── 스마트캠퍼스 공지 ───── */
+const notices = { list: [] };
+async function loadNotices() {
+  if (!state.code || !state.lms.token) { notices.list = []; renderNoticeBtn(); return; }
+  try { notices.list = (await api.notices(state.code)) || []; } catch { /* 다음에 다시 */ }
+  renderNoticeBtn();
+}
+function renderNoticeBtn() {
+  const unread = notices.list.filter(n => !n.read).length;
+  $('#btnNotices').hidden = !state.lms.token && !notices.list.length;
+  $('#noticeDot').hidden = !unread;
+  $('#btnNotices').title = unread ? `새 공지 ${unread}개` : '스마트캠퍼스 공지';
+}
+function openNotices() {
+  const list = $('#noticeList');
+  fill(list, notices.list.length ? notices.list.map(n => h('li', { class: n.read ? 'notice' : 'notice unread' },
+    h('div', { class: 'notice-meta' }, n.subject ? h('span', null, n.subject) : null, h('span', null, fmtAgo(new Date(n.postedAt)))),
+    n.url ? h('a', { class: 'notice-title', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title) : h('b', { class: 'notice-title' }, n.title),
+    n.preview ? h('p', { class: 'notice-preview' }, n.preview) : null,
+  )) : h('li', { class: 'notice-empty' }, '최근 30일 공지가 없어요.'));
+  $('#noticesDialog').showModal();
+  if (notices.list.some(n => !n.read)) {
+    api.noticesRead(state.code).catch(() => {});
+    notices.list = notices.list.map(n => ({ ...n, read: true }));
+    renderNoticeBtn();
+  }
+}
+
+/* ───── 내 캘린더로 보내기 ───── */
+let calExists = false, calArmed = false;
+async function loadCalendar() {
+  $('#calBox').hidden = true; $('#calMsg').textContent = ''; calArmed = false;
+  try { calExists = !!(await api.calendarStatus(state.code)); } catch { calExists = false; }
+  $('#calSub').textContent = calExists ? '만든 주소가 있어요. 주소를 잃어버렸다면 새로 만드세요' : '구글 · 아이폰 캘린더에 과제와 시험이 함께 떠요';
+  $('#btnCalKey').textContent = calExists ? '새로 만들기' : '주소 만들기';
+}
+async function makeCalendarKey() {
+  const btn = $('#btnCalKey'), msg = $('#calMsg');
+  if (calExists && !calArmed) {
+    calArmed = true; btn.textContent = '한 번 더 누르면 이전 주소는 막혀요'; return;
+  }
+  btn.disabled = true; msg.className = 'msg'; msg.textContent = '';
+  try {
+    const key = await api.calendarKey(state.code);
+    const url = `${CALENDAR_FEED_URL}?k=${key}`;
+    const webcal = url.replace(/^https:/, 'webcal:');
+    $('#calUrl').value = url;
+    $('#calGoogle').href = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`;
+    $('#calApple').href = webcal;
+    $('#calBox').hidden = false;
+    calExists = true; calArmed = false;
+    btn.textContent = '새로 만들기';
+    $('#calSub').textContent = '구독하면 몇 시간마다 저절로 새로 고쳐져요';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
+  finally { btn.disabled = false; }
 }
 
 /* ───── 마감 알림 ───── */
@@ -426,6 +502,8 @@ function openPanel(task, presetDay, kind) {
   ui.endAuto = !(task && task.endAt);
   $('#fStar').checked = !!(task && task.starred);
   $('#fDone').checked = !!(task && task.done);
+  $('#fRepeat').value = '0';
+  $('#repeatRow').hidden = !!task;
   renderStarBtn();
   $('#fMemo').value = task ? task.memo || '' : '';
   $('#fLocation').value = task ? task.location || '' : '';
@@ -490,7 +568,8 @@ function renderDoneBtn() {
   if (!show) return;
   const done = $('#fDone').checked;
   btn.classList.toggle('is-done', done);
-  btn.textContent = done ? '완료 취소' : '제출 완료';
+  const t = state.tasks.find(x => x.id === ui.editingId);
+  btn.textContent = done ? '완료 취소' : (t && t.missing ? '완료로 표시' : '제출 완료');
 }
 
 function savePanel() {
@@ -525,8 +604,21 @@ function savePanel() {
     if (prev && fields.done !== !!prev.done) fields.doneAt = fields.done ? new Date().toISOString() : null;
   }
   saveTask(fields, ui.editingId);
+  // 매주 반복: 같은 요일 · 같은 시각으로 이어서 만든다
+  let repeats = 0;
+  if (isNew) {
+    const r = $('#fRepeat').value;
+    const until = r === 'end' ? semesterRange(semesterOf(due)).end : null;
+    const count = r === 'end' ? 30 : Number(r) || 0;
+    for (let i = 1; i < count; i++) {
+      const d = new Date(due.getTime() + 7 * i * DAY);   // 시각 그대로 7일씩 (한국은 서머타임 없음)
+      if (until && d > until) break;
+      saveTask({ ...fields, due: d.toISOString(), endAt: endAt ? new Date(new Date(endAt).getTime() + 7 * i * DAY).toISOString() : null });
+      repeats++;
+    }
+  }
   closePanel();
-  if (isNew) toast(`"${title}" ${exam ? '시험을' : '과제를'} 추가했어요`);
+  if (isNew) toast(repeats ? `"${title}" ${exam ? '시험을' : '과제를'} 매주 ${repeats + 1}번 추가했어요` : `"${title}" ${exam ? '시험을' : '과제를'} 추가했어요`);
 }
 
 function deleteFromPanel() {
@@ -548,7 +640,7 @@ function openSettings() {
   $('#pushMsg').textContent = ''; tokenEditing = false;
   renderLms(); renderPush(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
-  loadLms(); loadPush();
+  loadLms(); loadPush(); loadCalendar();
 }
 
 async function copyText(text, input, msgEl) {
@@ -673,7 +765,7 @@ subscribe(what => {
   }
   if (what === 'status') { renderStatus(); return; }
   if (what === 'board' && state.code && pendingImport) setTimeout(() => showImport(pendingImport), 0);
-  if (what === 'lms') { renderLms(); renderNext(); return; }
+  if (what === 'lms') { renderLms(); renderNext(); loadNotices(); return; }
   if (what === 'prefs') { applyTheme(); renderSemester(); renderNext(); renderRail(); renderView(); return; }
   renderAll();
 });
@@ -734,6 +826,10 @@ function bind() {
 
   // 패널
   $('#panelClose').addEventListener('click', closePanel);
+  $('#btnNotices').addEventListener('click', openNotices);
+  $('#noticesClose').addEventListener('click', () => $('#noticesDialog').close());
+  $('#btnCalKey').addEventListener('click', makeCalendarKey);
+  $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg')));
   $('#fStarBtn').addEventListener('click', () => { $('#fStar').checked = !$('#fStar').checked; renderStarBtn(); });
   $('#fDoneBtn').addEventListener('click', () => {
     const done = !$('#fDone').checked;
@@ -899,6 +995,13 @@ function bind() {
 /* ───── 알림에서 과제 열기 (#task=<id>) ───── */
 let pendingTaskId = null;
 function openTaskFromHash() {
+  // 알림에서 연 경우: 설정 · 공지
+  if ((location.hash === '#settings' || location.hash === '#notices') && state.code) {
+    const which = location.hash;
+    history.replaceState(null, '', `#${state.prefs.view}`);
+    setTimeout(() => { if (which === '#settings') openSettings(); else loadNotices().then(openNotices); }, 0);
+    return true;
+  }
   // 앱 바로가기: 새 과제 / 새 시험
   if ((location.hash === '#new' || location.hash === '#new-exam') && state.code) {
     const kind = location.hash === '#new' ? 'assignment' : 'exam';

@@ -72,6 +72,10 @@
     </nav>
 
     <div class="actions">
+      <button class="btn icon ghost notice-btn" id="btnNotices" title="스마트캠퍼스 공지" aria-label="스마트캠퍼스 공지" hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8a4.5 4.5 0 0 1 9 0c0 4 1.8 5.5 1.8 5.5H3.7S5.5 12 5.5 8z"/><path d="M8.3 16a1.8 1.8 0 0 0 3.4 0"/></svg>
+        <span class="dot" id="noticeDot" hidden></span>
+      </button>
       <button class="btn icon ghost" id="btnSync" title="새로 불러오기 (스마트캠퍼스 포함)" aria-label="새로 불러오기">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.5V7h-3.5"/></svg>
       </button>
@@ -118,7 +122,6 @@
   </header>
   <div class="panel-body">
     <p class="panel-note" id="panelNote" hidden></p>
-    <div class="submission" id="panelSubmission" hidden></div>
     <input type="text" class="title-input" id="fTitle" maxlength="200" autocomplete="off" placeholder="과제 이름" aria-label="이름">
     <div class="quick-dates exam-only" id="examNames" aria-label="시험 이름 빠른 선택"></div>
     <input type="text" id="fSubject" maxlength="40" list="subjectList" autocomplete="off" placeholder="과목" aria-label="과목">
@@ -133,8 +136,18 @@
       <input type="hidden" id="fEnd">
     </div>
     <div class="quick-dates exam-only" id="durations" aria-label="시험 시간 길이"></div>
+    <label class="repeat-row" id="repeatRow">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 9a6 6 0 0 1 10.4-4M16 11a6 6 0 0 1-10.4 4"/><path d="M14.6 2.5v2.8h-2.8M5.4 17.5v-2.8h2.8"/></svg>
+      <select id="fRepeat" aria-label="반복">
+        <option value="0">반복 안 함</option>
+        <option value="4">매주 · 4번</option>
+        <option value="8">매주 · 8번</option>
+        <option value="end">매주 · 학기 끝까지</option>
+      </select>
+    </label>
     <input type="text" class="exam-only" id="fLocation" maxlength="100" autocomplete="off" placeholder="장소" aria-label="장소">
     <textarea id="fMemo" rows="5" maxlength="2000" placeholder="메모" aria-label="메모"></textarea>
+    <div class="submission" id="panelSubmission" hidden></div>
     <input type="checkbox" id="fStar" hidden>
     <input type="checkbox" id="fDone" hidden>
     <p class="panel-meta" id="panelMeta"></p>
@@ -236,6 +249,30 @@
     </section>
 
     <section class="set-group">
+      <h3>내 캘린더로 보내기</h3>
+      <div class="set-card">
+        <div class="set-row stack">
+          <div class="set-head">
+            <div class="set-text"><b>캘린더 구독</b><span class="set-sub" id="calSub">구글 · 아이폰 캘린더에 과제와 시험이 함께 떠요</span></div>
+            <button class="btn sm" id="btnCalKey">주소 만들기</button>
+          </div>
+          <div id="calBox" hidden>
+            <div class="inline-form">
+              <input type="text" id="calUrl" readonly>
+              <button class="btn" id="btnCalCopy">복사</button>
+            </div>
+            <div class="row-actions start cal-links">
+              <a class="btn sm" id="calGoogle" target="_blank" rel="noopener">구글 캘린더에 추가</a>
+              <a class="btn sm" id="calApple">아이폰 · 맥 캘린더에 추가</a>
+            </div>
+            <p class="help fine">이 주소를 아는 사람은 일정을 볼 수 있어요. 새로 만들면 이전 주소는 막혀요.</p>
+          </div>
+          <p class="msg" id="calMsg" role="status"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-group">
       <h3>이 기기</h3>
       <div class="set-card">
         <div class="set-row">
@@ -286,6 +323,17 @@
       </div>
     </details>
   </div>
+</dialog>
+
+<!-- 스마트캠퍼스 공지 -->
+<dialog class="settings" id="noticesDialog" aria-labelledby="noticesTitle">
+  <header class="panel-head">
+    <h2 id="noticesTitle">공지</h2>
+    <button class="btn icon ghost" id="noticesClose" aria-label="닫기">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </header>
+  <div class="settings-body"><ul class="notice-list" id="noticeList"></ul></div>
 </dialog>
 
 <!-- 새 보드 코드 안내 -->

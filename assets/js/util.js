@@ -89,7 +89,7 @@ export function dday(task, now = new Date()) {
   if (isExam(task) && ms < 0) {
     return examOver(task, now) ? { label: '끝남', level: 'done', ms } : { label: '시험 중', level: 'urgent', ms };
   }
-  if (ms < 0) return { label: '지남', level: 'over', ms };
+  if (ms < 0) return { label: task.missing ? '미제출' : '지남', level: 'over', ms };
   const diff = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
   return {
     label: diff === 0 ? 'D-DAY' : `D-${diff}`,

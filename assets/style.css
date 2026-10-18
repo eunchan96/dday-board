@@ -731,14 +731,14 @@ body { background-image: none; }
 .cal-grid { border-top: 1px solid var(--rule); border-radius: var(--radius-m); overflow: hidden; }
 
 /* ───── 체크 대신 별 · 라벨 없는 편집 화면 ───── */
-.row { grid-template-columns: 26px minmax(0, 1fr) auto; }
-.row .star-btn { opacity: 1; padding: 3px; color: var(--rule); justify-self: start; }
+.row { grid-template-columns: minmax(0, 1fr) auto auto; }
+.row .star-btn { opacity: 1; padding: 3px; color: var(--rule); }
 .row .star-btn svg { width: 19px; height: 19px; }
 .row:hover .star-btn { color: var(--pencil-2); }
 .row .star-btn[aria-pressed="true"] { color: var(--ink); }
 .row.done .main { opacity: 0.6; }
 @media (max-width: 640px) {
-  .row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; }
   .row .star-btn { color: var(--pencil-2); }
 }
 .rail .toggles { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
@@ -781,3 +781,46 @@ body { background-image: none; }
 .panel-foot .done-btn + .btn.primary { min-width: 72px; }
 .panel.is-exam .when .pick-date { flex-basis: 100%; }
 .panel.is-exam .when .pick-time { flex: 1 1 0; }
+
+/* ───── 공지 ───── */
+.notice-btn { position: relative; }
+.notice-btn .dot { position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--paper); }
+.notice-list { list-style: none; display: flex; flex-direction: column; }
+.notice { padding: 14px 2px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
+.notice:last-child { border-bottom: 0; }
+.notice-meta { display: flex; gap: 8px; font-size: 12px; color: var(--pencil); }
+.notice-title { font-size: 15px; font-weight: 650; color: var(--ink); text-decoration: none; }
+a.notice-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.notice.unread .notice-title::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-right: 7px; vertical-align: 2px; }
+.notice-preview { font-size: 13px; color: var(--pencil); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.notice-empty { padding: 24px 0; text-align: center; color: var(--pencil); font-size: 14px; }
+
+/* ───── 반복 ───── */
+.repeat-row { display: flex; align-items: center; gap: 8px; color: var(--pencil); }
+.repeat-row[hidden] { display: none; }
+.repeat-row svg { width: 16px; height: 16px; flex-shrink: 0; }
+.repeat-row select {
+  height: 36px; padding: 0 30px 0 10px; font: 600 14px var(--font); color: var(--ink);
+  background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%239AA1B5' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px;
+  border: 1px solid var(--rule); border-radius: var(--radius-s); appearance: none; cursor: pointer;
+}
+
+/* ───── 캘린더 구독 ───── */
+#calBox { display: flex; flex-direction: column; gap: 8px; }
+#calBox[hidden] { display: none; }
+#calUrl { font-size: 12.5px; color: var(--pencil); }
+.cal-links a { text-decoration: none; }
+
+/* ───── 노션 임베드용 간단 모드 ───── */
+.compact .rail, .compact .search, .compact .views, .compact .statusbar, .compact #btnNotices { display: none !important; }
+.compact .layout { grid-template-columns: minmax(0, 1fr); padding-top: 4px; }
+.compact .topbar { grid-template-columns: auto 1fr auto; padding: 10px 0 6px; }
+.compact .next { padding: 6px 0 4px; }
+.compact .next-line { font-size: 18px; }
+.compact .app { padding-bottom: 8px; }
+.compact-rows .row { padding: 9px 4px; }
+.compact-more { margin-top: 8px; font-size: 13px; color: var(--pencil); text-align: right; }
+.compact-more a { color: var(--pen); font-weight: 650; text-decoration: none; }
+.compact-empty { padding: 20px 0; color: var(--pencil); }
+.compact .semester { display: none !important; }
+.compact .topbar { grid-template-columns: 1fr auto; }

@@ -13,7 +13,7 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { parseCanvasFeed } from "./ics.ts";
-import { CanvasApiError, fetchCanvasApi } from "./canvas-api.ts";
+import { CanvasApiError, fetchAnnouncements, fetchCanvasApi } from "./canvas-api.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -42,8 +42,22 @@ async function readFeed(url: string) {
 async function syncOne(supa: SupabaseClient, t: Target) {
   const via = t.token ? "token" : "feed";
   let items;
+  let notices = 0;
   try {
-    items = t.token ? await fetchCanvasApi(t.api_origin, t.token) : await readFeed(t.feed_url!);
+    if (t.token) {
+      const r = await fetchCanvasApi(t.api_origin, t.token);
+      items = r.items;
+      // 공지는 실패해도 과제 동기화는 계속
+      try {
+        const list = await fetchAnnouncements(t.api_origin, t.token, r.active);
+        const { data } = await supa.rpc("dday_svc_announcements_merge", { p_board: t.board_id, p_items: list });
+        notices = typeof data === "number" ? data : 0;
+      } catch (e) {
+        console.error("announcements failed", e instanceof Error ? e.message : e);
+      }
+    } else {
+      items = await readFeed(t.feed_url!);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const code = e instanceof CanvasApiError || msg.startsWith("feed_")
@@ -58,7 +72,7 @@ async function syncOne(supa: SupabaseClient, t: Target) {
     p_items: items,
   });
   if (error) return { via, error: "merge_failed" };
-  return { via, ...data, total: items.length };
+  return { via, ...data, total: items.length, notices };
 }
 
 Deno.serve(async (req) => {
