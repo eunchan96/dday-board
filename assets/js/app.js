@@ -51,8 +51,8 @@ function applyTheme() {
   $$('#themePicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.theme === t ? 'true' : 'false'));
 }
 
-/* ───── 묶음 (학기 · 기간 · 넓은 의미의 과목) ───── */
-// 묶음만 적용한 과제 (통계, 과목 수, 다음 마감에 사용)
+/* ───── 분류 (학기 · 기간 · 넓은 의미의 과목) ───── */
+// 분류만 적용한 과제 (통계, 과목 수, 다음 마감에 사용)
 function scopedTasks() {
   const v = scopeValue();
   return v === 'all' ? state.tasks : state.tasks.filter(t => inScope(t, v));
@@ -1087,7 +1087,7 @@ function savePanel() {
   let repeats = 0;
   if (isNew) {
     const r = $('#fRepeat').value;
-    // '학기 끝까지': 지금 보는 묶음(없으면 마감이 든 학기)의 끝 날까지
+    // '학기 끝까지': 지금 보는 분류(없으면 마감이 든 학기)의 끝 날까지
     const g = groupById(activeGroupId() || currentGroupId());
     const until = r === 'end' ? (g && g.end ? new Date(`${g.end}T23:59:59`) : semesterRange(semesterOf(due)).end) : null;
     const count = r === 'end' ? 30 : Number(r) || 0;
@@ -1257,13 +1257,13 @@ subscribe(what => {
   if (what === 'status') { renderStatus(); return; }
   if (what === 'board' && state.code && pendingImport) setTimeout(() => showImport(pendingImport), 0);
   if (what === 'board' && state.code) loadColors();
-  if (what === 'tasks' || what === 'board') ensureTerms();      // 새 학기 일정이 들어오면 그 학기 묶음을 만든다
+  if (what === 'tasks' || what === 'board') ensureTerms();      // 새 학기 일정이 들어오면 그 학기 분류을 만든다
   if (what === 'lms') { renderLms(); renderNext(); loadNotices(); return; }
   if (what === 'prefs') { applyTheme(); renderSemester(); renderNext(); renderRail(); renderView(); return; }
   renderAll();
 });
 
-// 묶음이 바뀌면 (다른 곳에서 고친 것 포함) 한 번만 다시 그림
+// 분류가 바뀌면 (다른 곳에서 고친 것 포함) 한 번만 다시 그림
 let groupsRaf = 0;
 onGroupsChange(err => {
   if (err) { toast(errText(err)); return; }

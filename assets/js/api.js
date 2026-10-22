@@ -105,7 +105,7 @@ export function errText(e) {
     case 'too_many_friends': return '친구는 50명까지 추가할 수 있어요';
     case 'invalid_order': return '과목 순서를 저장하지 못했어요';
     case 'invalid_subjects': return '과목을 저장하지 못했어요';
-    case 'invalid_groups': return '묶음을 저장하지 못했어요';
+    case 'invalid_groups': return '분류를 저장하지 못했어요';
     case 'invalid_color': return '고를 수 있는 색이 아니에요';
     case 'invalid_range': return '불러올 기간이 너무 길어요';
     case 'no_profile': return '먼저 닉네임을 정해 주세요';
