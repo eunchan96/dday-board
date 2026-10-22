@@ -640,22 +640,21 @@ function renderPlans() {
       h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '지우기', 'aria-label': `${p.subject || memo} 지우기`, onclick: () => removePlan(p) }, xIcon()));
   });
 
-  // 7일 안의 과제 · 시험 (최근 2주 그 과목 공부 시간)
+  // 7일 안의 과제 · 시험: 과목 | 과제 · 시험 이름 | D-day | ▶ (내가 넣은 줄과 같은 칸에 맞춤)
   const now = new Date();
-  const since = dayStart(addDays(studyDate(), -13));
   const soon = state.tasks
     .filter(t => !t.done && new Date(t.due) > now && Math.round((startOfDay(new Date(t.due)) - startOfDay(now)) / DAY) <= 7)
     .sort((a, b) => new Date(a.due) - new Date(b.due));
   const upcoming = soon.map(t => {
-    let sec = t.subject ? allSessions().filter(s => s.subject === t.subject && new Date(s.startedAt) >= since).reduce((a, s) => a + s.seconds, 0) : 0;
-    if (timer.phase === 'focus' && t.subject && timer.subject === t.subject) sec += runningFocusSec();
     const nowT = !idle && timer.taskId === t.id;
+    const name = t.title || displayTitle(t);
     return h('li', { class: `plan soon${isExam(t) ? ' exam' : ''}${nowT ? ' now' : ''}`, style: { '--c': subjectColor(t.subject) } },
       h('span', { class: 'plan-name' },
-        h('button', { type: 'button', class: 'plan-subj link', onclick: () => ctx.openTask(t) }, displayTitle(t))),
+        t.subject ? h('span', { class: 'plan-subj' }, t.subject) : null,
+        h('button', { type: 'button', class: `plan-task link${t.subject ? '' : ' solo'}`, title: '눌러서 자세히 보기', onclick: () => ctx.openTask(t) }, name)),
       h('span', { class: 'plan-dday' }, dday(t, now).label),
-      h('span', { class: 'plan-time', title: '최근 2주 이 과목 공부' }, sec ? fmtSpent(sec) : ''),
-      playBtn(displayTitle(t), { subject: t.subject, taskId: t.id, label: displayTitle(t) }),
+      h('span', { class: 'plan-time' }),
+      playBtn(name, { subject: t.subject, taskId: t.id, label: displayTitle(t) }),
       h('span', { class: 'sm-icon' }));
   });
 

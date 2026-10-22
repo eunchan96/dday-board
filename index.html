@@ -55,11 +55,11 @@
 <div class="app" id="viewApp" hidden>
   <header class="topbar">
     <div class="semester lead">
-      <button type="button" class="mode-switch" id="modeBtn" role="switch" aria-checked="false" title="일정 · 공부 바꾸기 (S)">
-        <span class="sr-only">지금: </span><span class="sr-only" id="modeLabel">일정</span>
-        <span class="ms-opt" data-m="plan" aria-hidden="true">일정</span>
-        <span class="ms-opt" data-m="study" aria-hidden="true">공부</span>
-      </button>
+      <div class="mode-tabs" id="modeBtn" role="tablist" aria-label="일정 · 공부 (S로 바꾸기)">
+        <span class="sr-only" id="modeLabel">일정</span>
+        <button type="button" role="tab" class="ms-opt" data-m="plan" title="일정 (S)">일정</button>
+        <button type="button" role="tab" class="ms-opt" data-m="study" title="공부 (S)">공부</button>
+      </div>
       <label class="sem-select">
         <span class="sr-only">학기</span>
         <select id="semester"></select>
@@ -103,7 +103,7 @@
       <button class="btn icon ghost" id="btnSettings" title="설정" aria-label="설정">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 14h13"/><circle cx="7.5" cy="6" r="2" class="fill-sheet"/><circle cx="12.5" cy="14" r="2" class="fill-sheet"/></svg>
       </button>
-      <button class="btn primary" id="btnNew" title="추가 (N: 과제, E: 시험)">
+      <button class="btn primary" id="btnNew" title="추가 (N: 과제, E: 시험, T: 할 일)">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"/></svg><span class="new-label">추가</span>
       </button>
     </div>
@@ -136,6 +136,7 @@
     <div class="segmented kind-picker" id="kindPicker" role="radiogroup" aria-label="종류">
       <button type="button" role="radio" data-kind="assignment">과제</button>
       <button type="button" role="radio" data-kind="exam">시험</button>
+      <button type="button" role="radio" data-kind="todo">할 일</button>
     </div>
     <div class="panel-tools">
       <button type="button" class="btn icon ghost study-start" id="fStudyBtn" title="이걸로 공부 시작" aria-label="이걸로 공부 시작" hidden>
@@ -375,7 +376,7 @@
           </div>
         </div>
         <div class="set-row">
-          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
+          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>T</kbd> 할 일 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
         </div>
       </div>
     </details>

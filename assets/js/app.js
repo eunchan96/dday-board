@@ -237,10 +237,11 @@ function renderNext() {
 /* ───── 왼쪽 필터 ───── */
 function subjectsWithCounts() {
   const map = new Map();
+  const now = new Date();
   for (const t of scopedTasks()) {
     const k = t.subject || '';
     const v = map.get(k) || { total: 0, pending: 0 };
-    v.total++; if (!t.done) v.pending++;
+    v.total++; if (groupOf(t, now) !== 'done') v.pending++;   // 끝난 시험은 남은 일로 세지 않음
     map.set(k, v);
   }
   const sorted = [...map.entries()].sort((a, b) => (b[1].pending - a[1].pending) || a[0].localeCompare(b[0], 'ko'));
@@ -254,7 +255,8 @@ function renderRail() {
   const rail = $('#rail');
   const cur = state.prefs.subject;
   const subjects = subjectsWithCounts();
-  const pendingAll = scopedTasks().filter(t => !t.done).length;
+  const now = new Date();
+  const pendingAll = scopedTasks().filter(t => groupOf(t, now) !== 'done').length;
 
   const item = (label, value, count, color) => h('li', null,
     h('button', {
@@ -401,9 +403,12 @@ function renderView() {
   document.body.classList.toggle('study-mode', studying);
   if (studying) document.body.classList.remove('search-open');
   $('#modeLabel').textContent = studying ? '공부' : '일정';
-  $('#modeBtn').setAttribute('aria-checked', studying ? 'true' : 'false');
-  $('#modeBtn').setAttribute('aria-label', studying ? '공부 모드 · 눌러서 일정으로' : '일정 모드 · 눌러서 공부로');
-  $$('#modeBtn .ms-opt').forEach(o => o.classList.toggle('on', o.dataset.m === (studying ? 'study' : 'plan')));
+  $('#modeBtn').dataset.mode = studying ? 'study' : 'plan';
+  $$('#modeBtn .ms-opt').forEach(o => {
+    const on = o.dataset.m === (studying ? 'study' : 'plan');
+    o.classList.toggle('on', on);
+    o.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
   $('#planViews').hidden = studying;
   $('#studyViews').hidden = !studying;
   $('#btnFriends').hidden = !studying;
@@ -695,9 +700,9 @@ function setKind(kind, { isNew }) {
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);
   $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
-  const editing = !isNew && state.tasks.find(x => x.id === ui.editingId);
-  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 수정' : editing && editing.kind === 'todo' ? '할 일' : '과제 수정');
-  $('#fTitle').placeholder = exam ? '시험 이름' : '과제 이름';
+  const name = exam ? '시험' : kind === 'todo' ? '할 일' : '과제';
+  $('#panelTitle').textContent = isNew ? `새 ${name}` : `${name} 수정`;
+  $('#fTitle').placeholder = exam ? '시험 이름' : kind === 'todo' ? '할 일 (예: 3주차 강의 듣기)' : '과제 이름';
   $('#fMemo').placeholder = exam ? '시험 범위, 준비물' : '메모';
   renderDoneBtn();
   // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
@@ -732,7 +737,7 @@ function openPanel(task, presetDay, kind) {
   $('#fLocation').value = task ? task.location || '' : '';
   $('#fEnd').value = task && task.endAt ? toTimeInput(new Date(task.endAt)) : '';
   refreshPickLabels();
-  setKind(task ? (isExam(task) ? 'exam' : 'assignment') : (kind || 'assignment'), { isNew: !task });
+  setKind(task ? (isExam(task) ? 'exam' : task.kind === 'todo' ? 'todo' : 'assignment') : (kind || 'assignment'), { isNew: !task });
   $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
   $('#fStudyBtn').hidden = !task || !!task.done || groupOf(task) === 'done';
   $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
@@ -793,14 +798,14 @@ function renderDoneBtn() {
   const done = $('#fDone').checked;
   btn.classList.toggle('is-done', done);
   const t = state.tasks.find(x => x.id === ui.editingId);
-  btn.textContent = done ? '완료 취소' : (t && (t.missing || t.kind === 'todo') ? '완료로 표시' : '제출 완료');
+  btn.textContent = done ? '완료 취소' : ((t && t.missing) || ui.kind === 'todo' ? '완료로 표시' : '제출 완료');
 }
 
 function savePanel() {
   const title = $('#fTitle').value.trim();
   const msg = $('#panelMsg');
   msg.className = 'msg err';
-  if (!title) { msg.textContent = '과제명을 적어 주세요'; $('#fTitle').focus(); return; }
+  if (!title) { msg.textContent = ui.kind === 'exam' ? '시험 이름을 적어 주세요' : ui.kind === 'todo' ? '할 일을 적어 주세요' : '과제명을 적어 주세요'; $('#fTitle').focus(); return; }
   if (!$('#fDate').value) { msg.textContent = '날짜를 골라 주세요'; $('#fDateBtn').focus(); return; }
   const due = new Date(`${$('#fDate').value}T${$('#fTime').value || '23:59'}`);
   if (isNaN(due)) { msg.textContent = '마감 날짜를 다시 확인해 주세요'; return; }
@@ -813,7 +818,7 @@ function savePanel() {
     endAt = end.toISOString();
   }
   const fields = {
-    kind: exam ? 'exam' : (state.tasks.find(t => t.id === ui.editingId)?.kind === 'todo' ? 'todo' : 'assignment'),
+    kind: exam ? 'exam' : ui.kind === 'todo' ? 'todo' : 'assignment',
     title: title.slice(0, 200),
     subject: subjPick.value.slice(0, 40),
     due: due.toISOString(),
@@ -1047,7 +1052,7 @@ function bind() {
     renderView();
   });
   $$('.views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
-  $('#modeBtn').addEventListener('click', toggleMode);
+  $$('#modeBtn .ms-opt').forEach(o => o.addEventListener('click', () => { if ((o.dataset.m === 'study') !== (state.prefs.mode === 'study')) toggleMode(); }));
   $('#btnFriends').addEventListener('click', openFriends);
   $('#friendsClose').addEventListener('click', () => $('#friendsDialog').close());
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
@@ -1233,6 +1238,7 @@ function bind() {
     if (isStudying() && studyKey(e)) return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openPanel(null, null, 'assignment'); }
     else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); openPanel(null, null, 'exam'); }
+    else if (e.key === 't' || e.key === 'T') { e.preventDefault(); openPanel(null, null, 'todo'); }
     else if (e.key === '/' && !isStudying()) { e.preventDefault(); openSearch(); }
     else if (e.key === 's' || e.key === 'S') toggleMode();
     else if (e.key === '1') setView(isStudying() ? 'today' : 'list');

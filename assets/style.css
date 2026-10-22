@@ -1592,24 +1592,24 @@ svg.filled { fill: currentColor; stroke: none; }
 .cr-move svg { width: 16px; height: 16px; }
 
 /* ═════ 일정 / 공부 전환: 두 칸 스위치, 지금 모드가 색으로 칠해짐 ═════ */
-.mode-switch {
-  position: relative; flex-shrink: 0; display: inline-grid; grid-template-columns: 1fr 1fr; align-items: center;
-  height: 38px; padding: 3px; border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet-2);
-  cursor: pointer; font: 750 14px var(--font);
+/* 일정 · 공부: 보기 탭(목록 · 캘린더)과 겹쳐 보이지 않게 큰 글자 두 개로 (지금 모드만 진하게 + 밑줄) */
+.mode-tabs { display: inline-flex; align-items: center; gap: 2px; }
+.ms-opt {
+  position: relative; border: 0; background: none; cursor: pointer; font: inherit;
+  padding: 4px 8px 6px; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;
+  color: var(--pencil-2); border-radius: 8px; transition: color 150ms;
 }
-.mode-switch::before {
-  content: ''; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 7px;
-  background: var(--pen); box-shadow: 0 1px 3px rgba(28, 37, 64, 0.18); transition: transform 180ms ease, background-color 180ms;
+.ms-opt:hover { color: var(--pencil); }
+.ms-opt.on { color: var(--ink); cursor: default; }
+.ms-opt::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 2px;
+  background: var(--pen); transform: scaleX(0); transition: transform 180ms;
 }
-.mode-switch[aria-checked="true"]::before { transform: translateX(100%); background: var(--green); }
-.ms-opt { position: relative; z-index: 1; padding: 0 13px; text-align: center; line-height: 30px; color: var(--pencil); transition: color 180ms; }
-.ms-opt.on { color: #fff; }
-:root[data-theme="dark"] .ms-opt.on { color: #10141F; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ms-opt.on { color: #10141F; } }
-.mode-switch:hover .ms-opt:not(.on) { color: var(--ink); }
-.mode-switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }
-@media (max-width: 640px) { .ms-opt { padding: 0 10px; font-size: 13.5px; } }
-@media (max-width: 380px) { .ms-opt { padding: 0 8px; } }
+.ms-opt[data-m="study"]::after { background: var(--green); }
+.ms-opt.on::after { transform: scaleX(1); }
+.ms-opt:focus-visible { outline: 2px solid var(--pen); outline-offset: 1px; }
+@media (max-width: 640px) { .ms-opt { font-size: 16.5px; padding: 4px 6px 6px; } .ms-opt::after { left: 6px; right: 6px; } }
+@media (prefers-reduced-motion: reduce) { .ms-opt::after { transition: none; } }
 /* 폰: 학기 고르기는 필터 안으로 */
 .flt-sem { display: none; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--rule); font-size: 14px; font-weight: 600; }
 .flt-sem select { height: 34px; padding: 0 26px 0 10px; border: 1px solid var(--rule); border-radius: 8px; appearance: none; font: 650 14px var(--font); color: var(--ink);
@@ -1652,3 +1652,22 @@ svg.filled { fill: currentColor; stroke: none; }
   .amb-btn span { display: none; }
   .amb-btn { padding: 0 10px; min-height: 40px; }
 }
+
+/* ═════ 별: 테두리 없이 채운 별만 (꺼짐은 옅은 회색, 켜짐은 노랑) ═════ */
+:root { --star: #FFC83D; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --star: #E8C440; } }
+:root[data-theme="dark"] { --star: #E8C440; }
+.star-btn svg, .row .star-btn svg, .star-toggle svg { fill: currentColor; stroke: none; }
+.star-btn, .row .star-btn, .star-toggle { color: var(--rule); }
+.star-btn:hover, .row:hover .star-btn, .star-toggle:hover { color: var(--pencil-2); }
+.star-btn[aria-pressed="true"], .row .star-btn[aria-pressed="true"], .star-toggle[aria-pressed="true"],
+.row:hover .star-btn[aria-pressed="true"] { color: var(--star); }
+.star-btn[aria-pressed="true"] svg, .row .star-btn[aria-pressed="true"] svg, .star-toggle[aria-pressed="true"] svg { fill: var(--star); stroke: none; }
+.star-mark { color: var(--star); filter: none; }
+/* 설정 본문은 세로 flex라 펼친 칸이 줄어들며 잘렸음 → 줄어들지 않게 두고 본문이 스크롤 */
+#settings .settings-body > * { flex-shrink: 0; }
+/* 오늘 공부: D-7 안의 과제 · 시험도 과목 | 이름 | D-day | ▶ */
+.plan-task.link { all: unset; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pencil); font-size: 14px; cursor: pointer; }
+.plan-task.link.solo { color: var(--ink); font-size: inherit; font-weight: 650; }
+.plan-task.link:hover { text-decoration: underline; color: var(--ink); }
+.plan-task.link:focus-visible { outline: 2px solid var(--pen); border-radius: 3px; }
