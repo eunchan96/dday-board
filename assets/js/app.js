@@ -12,7 +12,7 @@ import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
-  setSubjectColors, customColorOf, SUBJECT_PALETTE,
+  setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
@@ -87,12 +87,35 @@ function applyColors(map) {
   setSubjectColors(colorMap);
   storage.set(COLOR_KEY, JSON.stringify(colorMap));
 }
+// 과목 순서 (보드에 저장)
+const ORDER_KEY = 'ddayboard.subjectOrder';
+let subjectOrder = (() => { try { return JSON.parse(storage.get(ORDER_KEY) || '[]') || []; } catch { return []; } })();
+setSubjectOrder(subjectOrder);
+function applyOrder(list) {
+  subjectOrder = Array.isArray(list) ? list : [];
+  setSubjectOrder(subjectOrder);
+  storage.set(ORDER_KEY, JSON.stringify(subjectOrder));
+}
 async function loadColors() {
   if (!state.code) return;
   try {
-    const map = (await api.subjectColors(state.code)) || {};
-    if (JSON.stringify(map) !== JSON.stringify(colorMap)) { applyColors(map); renderAll(); }
+    const prefs = (await api.subjectPrefs(state.code)) || {};
+    const map = prefs.colors || {}, order = prefs.order || [];
+    const changedAny = JSON.stringify(map) !== JSON.stringify(colorMap) || JSON.stringify(order) !== JSON.stringify(subjectOrder);
+    applyColors(map); applyOrder(order);
+    if (changedAny) renderAll();
   } catch { /* 다음에 다시 */ }
+}
+async function moveSubject(name, dir) {
+  const names = orderSubjects(taskSubjects(currentSemesterKey(), taskSemesterKey));
+  const i = names.indexOf(name), j = i + dir;
+  if (i < 0 || j < 0 || j >= names.length) return;
+  [names[i], names[j]] = [names[j], names[i]];
+  const prev = subjectOrder;
+  applyOrder(names); renderAll(); renderColors();
+  requestAnimationFrame(() => $(`#colorList [data-name="${CSS.escape(name)}"] .cr-move[data-dir="${dir}"]`)?.focus());
+  try { applyOrder(await api.setSubjectOrder(state.code, names)); }
+  catch (e) { applyOrder(prev); renderAll(); renderColors(); toast(errText(e)); }
 }
 async function setColor(name, color) {
   const prev = colorMap;
@@ -105,8 +128,8 @@ async function setColor(name, color) {
 const RESET_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 9.5a5.5 5.5 0 1 1 1.6 4.4"/><path d="M4 5v4.5h4.5"/></svg>';
 let colorOpen = null;                           // 색 고르기를 펼친 과목 (한 번에 하나)
 function renderColors() {
-  const names = taskSubjects(currentSemesterKey(), taskSemesterKey);
-  fill($('#colorList'), names.length ? names.map(name => {
+  const names = orderSubjects(taskSubjects(currentSemesterKey(), taskSemesterKey));
+  fill($('#colorList'), names.length ? names.map((name, idx) => {
     const cur = String(subjectColor(name)).toUpperCase();
     const open = colorOpen === name;
     const reset = customColorOf(name) ? h('button', {
@@ -114,13 +137,23 @@ function renderColors() {
       onclick: () => setColor(name, null),
     }) : null;
     if (reset) reset.innerHTML = RESET_SVG;
-    return h('div', { class: `set-row stack color-row${open ? ' open' : ''}`, style: { '--c': cur } },
+    const move = (dir, label, path) => {
+      const b = h('button', {
+        type: 'button', class: 'btn icon ghost sm-icon cr-move', title: label, 'aria-label': `${name} ${label}`, dataset: { dir },
+        disabled: dir < 0 ? idx === 0 : idx === names.length - 1, onclick: () => moveSubject(name, dir),
+      });
+      b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
+      return b;
+    };
+    return h('div', { class: `set-row stack color-row${open ? ' open' : ''}`, style: { '--c': cur }, dataset: { name } },
       h('div', { class: 'cr-head' },
         h('button', {
           type: 'button', class: 'cr-name', 'aria-expanded': open ? 'true' : 'false',
           onclick: () => { colorOpen = open ? null : name; renderColors(); },
         }, h('i', { class: 'cr-dot' }), h('span', null, name)),
-        reset),
+        reset,
+        move(-1, '위로', 'M10 15.5v-11M5.5 9l4.5-4.5L14.5 9'),
+        move(1, '아래로', 'M10 4.5v11M5.5 11l4.5 4.5 4.5-4.5')),
       open ? h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': `${name} 색` },
         SUBJECT_PALETTE.map(c => h('button', {
           type: 'button', class: 'swatch', role: 'radio', 'aria-checked': cur === c.toUpperCase() ? 'true' : 'false',
@@ -210,7 +243,11 @@ function subjectsWithCounts() {
     v.total++; if (!t.done) v.pending++;
     map.set(k, v);
   }
-  return [...map.entries()].sort((a, b) => (b[1].pending - a[1].pending) || a[0].localeCompare(b[0], 'ko'));
+  const sorted = [...map.entries()].sort((a, b) => (b[1].pending - a[1].pending) || a[0].localeCompare(b[0], 'ko'));
+  // 설정에서 정한 과목 순서가 있으면 그 순서로 ('과목 없음'은 맨 뒤)
+  const order = orderSubjects(sorted.map(([n]) => n).filter(Boolean));
+  const byName = new Map(sorted);
+  return [...order.map(n => [n, byName.get(n)]), ...(byName.has('') ? [['', byName.get('')]] : [])];
 }
 
 function renderRail() {
@@ -261,9 +298,13 @@ function buildFilter(subjects, pendingAll) {
     state.prefs.starredOnly ? '중요만' : null,
     state.prefs.hideDone ? '완료 숨김' : null,
   ].filter(Boolean);
-  const label = cur === null ? '전체 과목' : (cur || '과목 없음');
+  // 폰에서는 학기 고르기도 이 필터 안에 (상단바가 좁아서)
+  const semSel = $('#semester');
+  const otherSem = semSel.value !== 'current';
+  const semText = otherSem ? semSel.selectedOptions[0]?.textContent : null;
+  const label = [semText, cur === null ? '전체 과목' : (cur || '과목 없음')].filter(Boolean).join(' · ');
   const btn = h('button', {
-    type: 'button', class: `flt-btn${cur !== null || opts.length ? ' on' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
+    type: 'button', class: `flt-btn${cur !== null || opts.length || otherSem ? ' on' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
     'aria-haspopup': 'dialog', style: { '--c': cur === null ? 'var(--ink)' : subjectColor(cur) },
     onclick: () => { fltOpen = !fltOpen; renderRail(); },
   },
@@ -288,7 +329,20 @@ function buildFilter(subjects, pendingAll) {
   };
   const toggle = (label, on, onchange) => h('label', { class: 'flt-toggle' },
     h('span', null, label), h('input', { type: 'checkbox', role: 'switch', checked: on, onchange: e => onchange(e.target.checked) }));
+  let semClone = null;
+  if (fltOpen) {
+    semClone = semSel.cloneNode(true);
+    semClone.removeAttribute('id');
+    semClone.value = semSel.value;
+    semClone.setAttribute('aria-label', '학기');
+    semClone.addEventListener('change', e => {
+      fltOpen = false;
+      semSel.value = e.target.value;
+      semSel.dispatchEvent(new Event('change'));
+    });
+  }
   const pop = fltOpen ? h('div', { class: 'flt-pop', role: 'dialog', 'aria-label': '필터' },
+    h('label', { class: 'flt-sem' }, h('span', null, '학기'), semClone),
     h('ul', { class: 'flt-list', role: 'radiogroup', 'aria-label': '과목' },
       subjRow('전체 과목', null, pendingAll, 'var(--ink)'),
       subjects.map(([name, c]) => subjRow(name || '과목 없음', name, c.pending, subjectColor(name)))),
@@ -347,7 +401,9 @@ function renderView() {
   document.body.classList.toggle('study-mode', studying);
   if (studying) document.body.classList.remove('search-open');
   $('#modeLabel').textContent = studying ? '공부' : '일정';
+  $('#modeBtn').setAttribute('aria-checked', studying ? 'true' : 'false');
   $('#modeBtn').setAttribute('aria-label', studying ? '공부 모드 · 눌러서 일정으로' : '일정 모드 · 눌러서 공부로');
+  $$('#modeBtn .ms-opt').forEach(o => o.classList.toggle('on', o.dataset.m === (studying ? 'study' : 'plan')));
   $('#planViews').hidden = studying;
   $('#studyViews').hidden = !studying;
   $('#btnFriends').hidden = !studying;
@@ -393,7 +449,8 @@ function renderTimerChip() {
   chip.hidden = !show;
   if (!show) return;
   chip.className = `timer-chip${t.rest ? ' rest' : ''}${t.paused ? ' paused' : ''}`;
-  chip.replaceChildren(h('i'), h('span', { class: 'tc-time' }, t.text), t.label ? h('span', { class: 'tc-label' }, t.label) : null);
+  // 일정 화면에서는 시간만 (무슨 공부인지는 공부 화면에서)
+  chip.replaceChildren(h('i'), h('span', { class: 'tc-time' }, t.text));
   chip.title = t.rest ? '쉬는 시간 · 공부 화면으로' : t.paused ? '멈춤 · 공부 화면으로' : '공부 중 · 공부 화면으로';
 }
 function onTimer() {
@@ -638,7 +695,8 @@ function setKind(kind, { isNew }) {
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);
   $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
-  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 수정' : '과제 수정');
+  const editing = !isNew && state.tasks.find(x => x.id === ui.editingId);
+  $('#panelTitle').textContent = isNew ? (exam ? '새 시험' : '새 과제') : (exam ? '시험 수정' : editing && editing.kind === 'todo' ? '할 일' : '과제 수정');
   $('#fTitle').placeholder = exam ? '시험 이름' : '과제 이름';
   $('#fMemo').placeholder = exam ? '시험 범위, 준비물' : '메모';
   renderDoneBtn();
@@ -684,7 +742,7 @@ function openPanel(task, presetDay, kind) {
   const note = $('#panelNote');
   if (task && task.source === 'canvas') {
     note.hidden = false;
-    fill(note, '스마트캠퍼스 과제',
+    fill(note, task.kind === 'todo' ? '스마트캠퍼스 강의' : '스마트캠퍼스 과제',
       task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '열기') : null);
   } else note.hidden = true;
 
@@ -735,7 +793,7 @@ function renderDoneBtn() {
   const done = $('#fDone').checked;
   btn.classList.toggle('is-done', done);
   const t = state.tasks.find(x => x.id === ui.editingId);
-  btn.textContent = done ? '완료 취소' : (t && t.missing ? '완료로 표시' : '제출 완료');
+  btn.textContent = done ? '완료 취소' : (t && (t.missing || t.kind === 'todo') ? '완료로 표시' : '제출 완료');
 }
 
 function savePanel() {
@@ -755,7 +813,7 @@ function savePanel() {
     endAt = end.toISOString();
   }
   const fields = {
-    kind: exam ? 'exam' : 'assignment',
+    kind: exam ? 'exam' : (state.tasks.find(t => t.id === ui.editingId)?.kind === 'todo' ? 'todo' : 'assignment'),
     title: title.slice(0, 200),
     subject: subjPick.value.slice(0, 40),
     due: due.toISOString(),

@@ -49,10 +49,14 @@ export const api = {
   pushStatus: (code, endpoint) => rpc('dday_push_status', { p_code: code, p_endpoint: endpoint }),
   pushTest: (code, endpoint) => post(PUSH_URL, { code, endpoint }),
   subjectColors: code => rpc('dday_subject_colors', { p_code: code }),
+  subjectPrefs: code => rpc('dday_subject_prefs', { p_code: code }),
+  setSubjectOrder: (code, order) => rpc('dday_set_subject_order', { p_code: code, p_order: order }),
   setSubjectColor: (code, subject, color) => rpc('dday_set_subject_color', { p_code: code, p_subject: subject, p_color: color }),
   // 공부 모드
   study: (code, from) => rpc('dday_study', { p_code: code, p_from: from }),
   studyAdd: (code, session) => rpc('dday_study_add', { p_code: code, p_session: session }),
+  timer: code => rpc('dday_timer', { p_code: code }),
+  timerSet: (code, st) => rpc('dday_timer_set', { p_code: code, p_state: st }),
   studyRange: (code, from, to) => rpc('dday_study_range', { p_code: code, p_from: from, p_to: to }),
   studyRemove: (code, id, removed = true) => rpc('dday_study_remove', { p_code: code, p_id: id, p_removed: removed }),
   studyGoal: (code, minutes) => rpc('dday_study_goal', { p_code: code, p_minutes: minutes }),
@@ -97,6 +101,7 @@ export function errText(e) {
     case 'friend_not_found': return '그 친구 코드를 찾지 못했어요. 코드를 다시 확인해 주세요';
     case 'friend_self': return '내 친구 코드예요';
     case 'too_many_friends': return '친구는 50명까지 추가할 수 있어요';
+    case 'invalid_order': return '과목 순서를 저장하지 못했어요';
     case 'invalid_color': return '고를 수 있는 색이 아니에요';
     case 'invalid_range': return '불러올 기간이 너무 길어요';
     case 'no_profile': return '먼저 닉네임을 정해 주세요';

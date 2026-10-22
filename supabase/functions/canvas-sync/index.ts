@@ -72,7 +72,8 @@ async function syncOne(supa: SupabaseClient, t: Target) {
     p_items: items,
   });
   if (error) return { via, error: "merge_failed" };
-  return { via, ...data, total: items.length, notices };
+  const lectures = items.filter((i: { kind?: string }) => i.kind === "todo").length;
+  return { via, ...data, total: items.length, lectures, notices };
 }
 
 Deno.serve(async (req) => {

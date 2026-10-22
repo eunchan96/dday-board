@@ -7,9 +7,10 @@
 import { state, storage, subscribe } from './store.js';
 import { api, errText } from './api.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
+import { ambientControl } from './ambient.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
-  subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock,
+  subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects,
 } from './util.js';
 
 const KEYS = { timer: 'ddayboard.timer', queue: 'ddayboard.studyQueue' };
@@ -180,17 +181,21 @@ function currentSubjects() {
     count.set(t.subject, (count.get(t.subject) || 0) + (t.done ? 0 : 1));
   }
   for (const s of study.sessions) if (s.subject && !count.has(s.subject)) count.set(s.subject, 0);
-  return [...count.entries()].sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0], 'ko')).map(([n]) => n);
+  return orderSubjects([...count.entries()].sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0], 'ko')).map(([n]) => n));
 }
 
 /* ───── 타이머 ───── */
+// 일시정지는 없음: 시작 → 끝내기. 다른 과목으로 바꾸려면 끝내고 다시 시작 (기록은 과목별로 합쳐서 보여 줌)
+// 타이머 상태는 기기에 저장하고 서버에도 올려서, 다른 기기에서 열어도 같은 타이머가 이어진다
 const timer = Object.assign({
   mode: 'p25', phase: 'idle', running: false, segStart: null, acc: 0, sessStart: null,
-  subject: '', taskId: null, planId: null, label: '',
+  subject: '', taskId: null, planId: null, label: '', updatedAt: 0,
 }, readJSON(KEYS.timer, {}));
 const saveTimer = () => storage.set(KEYS.timer, JSON.stringify(timer));
 const modeOf = () => MODES.find(m => m.key === timer.mode) || MODES[1];
 const isPomo = () => timer.mode !== 'watch';
+const TIMER_FIELDS = ['mode', 'phase', 'running', 'segStart', 'acc', 'sessStart', 'subject', 'taskId', 'planId', 'label', 'updatedAt'];
+const sessionIdOf = startMs => `tm-${Math.round(startMs).toString(36)}`;   // 같은 공부는 어느 기기에서 저장해도 같은 id
 
 function elapsed(now = Date.now()) {
   return timer.acc + (timer.running && timer.segStart ? now - timer.segStart : 0);
@@ -203,6 +208,35 @@ function phaseLength() {
 
 export const timerActive = () => timer.phase !== 'idle';
 
+/* ───── 기기끼리 맞추기 ───── */
+let pushTimerT = null;
+function changed() {
+  timer.updatedAt = Date.now();
+  saveTimer();
+  clearTimeout(pushTimerT);
+  pushTimerT = setTimeout(pushTimer, 300);
+}
+async function pushTimer() {
+  if (!state.code) return;
+  const snap = Object.fromEntries(TIMER_FIELDS.map(k => [k, timer[k]]));
+  try { await api.timerSet(state.code, snap); } catch { /* 다음 변경 때 다시 */ }
+}
+export async function pullTimer() {
+  if (!state.code) return;
+  let remote;
+  try { remote = await api.timer(state.code); } catch { return; }
+  if (!remote || typeof remote !== 'object' || !(Number(remote.updatedAt) > (timer.updatedAt || 0))) {
+    // 이 기기 쪽이 더 새로우면 올려 둔다 (처음 쓰는 기기 포함)
+    if (timer.updatedAt && (!remote || Number(remote.updatedAt) < timer.updatedAt)) pushTimer();
+    return;
+  }
+  const wasFocus = timer.phase === 'focus';
+  for (const k of TIMER_FIELDS) if (k in remote) timer[k] = remote[k];
+  saveTimer();
+  if (wasFocus && timer.phase !== 'focus') loadStudy();          // 다른 기기에서 끝낸 공부 기록 받아 오기
+  tick(); render(); ctx.onTimer();
+}
+
 let lastLive = 0;
 function live(on) {
   if (!state.code || !study.profile || !study.profile.visible) return;
@@ -214,26 +248,19 @@ function start() {
   if (timer.phase !== 'idle') return;
   timer.phase = 'focus'; timer.running = true; timer.acc = 0;
   timer.segStart = Date.now(); timer.sessStart = timer.segStart;
-  saveTimer(); live(true); render(); ctx.onTimer();
-}
-function pause() {
-  if (!timer.running) return;
-  timer.acc = elapsed(); timer.running = false; timer.segStart = null;
-  saveTimer(); if (timer.phase === 'focus') live(false); render(); ctx.onTimer();
-}
-function resume() {
-  if (timer.running || timer.phase === 'idle') return;
-  timer.running = true; timer.segStart = Date.now();
-  saveTimer(); if (timer.phase === 'focus') live(true); render(); ctx.onTimer();
+  changed(); live(true); render(); ctx.onTimer();
 }
 function finishFocus(endMs, focusMs) {
   const sec = Math.round(focusMs / 1000);
   if (sec >= MIN_SAVE) {
-    addSession({
-      id: newId(), subject: timer.subject || '', taskId: timer.taskId || null, planId: timer.planId || null,
-      startedAt: new Date(timer.sessStart || endMs - focusMs).toISOString(),
-      endedAt: new Date(endMs).toISOString(), seconds: sec,
-    });
+    const startMs = timer.sessStart || endMs - focusMs;
+    const id = sessionIdOf(startMs);
+    if (!study.sessions.some(s => s.id === id)) {
+      addSession({
+        id, subject: timer.subject || '', taskId: timer.taskId || null, planId: timer.planId || null,
+        startedAt: new Date(startMs).toISOString(), endedAt: new Date(endMs).toISOString(), seconds: sec,
+      });
+    }
   }
   return sec;
 }
@@ -248,21 +275,26 @@ function stop() {
 }
 function toIdle() {
   Object.assign(timer, { phase: 'idle', running: false, segStart: null, acc: 0, sessStart: null });
-  saveTimer(); render(); ctx.onTimer();
+  changed(); render(); ctx.onTimer();
+}
+// 예전 버전에서 일시정지해 둔 타이머: 그때까지를 기록하고 끝냄
+if (timer.phase !== 'idle' && !timer.running) {
+  if (timer.phase === 'focus' && timer.acc >= MIN_SAVE * 1000) queueMicrotask(() => { finishFocus((timer.sessStart || Date.now()) + timer.acc, timer.acc); toIdle(); });
+  else Object.assign(timer, { phase: 'idle', running: false, segStart: null, acc: 0, sessStart: null });
 }
 
 // 1초마다: 시간이 다 된 단계를 넘기고 화면 숫자만 바꾼다
 function tick() {
   if (timer.phase === 'idle') return;
   const now = Date.now();
-  let changed = false;
+  let moved = false;
   // 창을 닫아 둔 사이 여러 단계가 지났을 수도 있어서 반복
   for (let guard = 0; guard < 4 && timer.running; guard++) {
     const len = phaseLength();
     const el = elapsed(now);
     if (el < len) break;
     const endMs = timer.segStart + (len - timer.acc);
-    changed = true;
+    moved = true;
     if (timer.phase === 'focus' && isPomo()) {
       finishFocus(endMs, len);
       live(false);
@@ -278,7 +310,8 @@ function tick() {
       alertUser('쉬는 시간 끝', '다음 집중을 시작해요');
     }
   }
-  if (changed) { saveTimer(); render(); ctx.onTimer(); return; }
+  // 단계가 넘어간 건 어느 기기에서 계산해도 같으므로 시각을 그 끝 시각으로 (서로 덮어써도 같은 결과)
+  if (moved) { changed(); render(); ctx.onTimer(); return; }
   if (timer.phase === 'focus' && timer.running && Date.now() - lastLive > LIVE_EVERY) live(true);
   renderClock();
   ctx.onTimer();
@@ -339,7 +372,7 @@ export function startFor(task) {
 }
 function selectWhat(w) {
   Object.assign(timer, { subject: w.subject || '', taskId: w.taskId || null, planId: w.planId || null, label: w.label || '' });
-  saveTimer(); render();
+  changed(); render();
 }
 
 /* ───── 계획 ───── */
@@ -371,6 +404,20 @@ function adjustDaily(s, sign) {
   if (study.windowStart && new Date(s.startedAt) >= study.windowStart) return;
   const k = studyKey(s.startedAt);
   study.daily.set(k, Math.max(0, (study.daily.get(k) || 0) + sign * s.seconds));
+}
+// 기록 고치기 (같은 id로 다시 저장 → 서버는 덮어씀)
+function updateSession(old, fields) {
+  const next = { ...old, ...fields };
+  const inMain = study.sessions.findIndex(x => x.id === old.id);
+  if (inMain >= 0) study.sessions[inMain] = next;
+  if (study.extra.has(old.id)) {
+    study.extra.set(old.id, next);
+    if (inMain < 0) { adjustDaily(old, -1); adjustDaily(next, 1); }
+  }
+  queue = queue.filter(x => x.id !== old.id);
+  queue.push(next); saveQueue();
+  render();
+  flushQueue().then(render);
 }
 function removeSession(s) {
   const wasMain = study.sessions.some(x => x.id === s.id);
@@ -415,6 +462,7 @@ const copyIcon = () => svgIcon(['M7 7h9v9H7zM4 13V4h9']);
 const userPlusIcon = () => svgIcon(['M8 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 16.5c.6-3 2.6-4.6 5.2-4.6s4.1 1 4.9 3M15.5 10v5M13 12.5h5']);
 const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
 const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
+const trashIcon = () => svgIcon(['M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6M8.5 9v4M11.5 9v4']);
 const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
 const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 
@@ -433,7 +481,7 @@ function build(root) {
   el.bar = h('i');
   el.what = h('div', { class: 'timer-what' });
   el.timerCard = h('section', { class: 'timer-card', 'aria-label': '타이머' },
-    h('div', { class: 'timer-top' }, el.modes),
+    h('div', { class: 'timer-top' }, el.modes, ambientControl()),
     h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
     el.what);
 
@@ -463,10 +511,11 @@ function build(root) {
   el.dayHead = h('div', { class: 'tl-head' });
   el.timeline = h('div', { class: 'tl-wrap' });
   el.addBox = makeAddBox('manualSubject');
+  el.todaySubj = h('div', { class: 'day-subjects' });
 
   el.todayRoot = h('div', { class: 'st-today' },
     h('div', { class: 'st-left' }, el.timerCard, el.plans),
-    h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.addBox.box));
+    h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.addBox.box, el.todaySubj));
 
   /* 기록 */
   el.recModes = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': '기간' });
@@ -501,8 +550,7 @@ function renderTopTimer() {
   const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
   if (idle) box.replaceChildren(b('시작', '타이머 시작 (Space)', start, 'primary'));
   else if (timer.phase === 'rest') box.replaceChildren(b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest'));
-  else if (timer.running) box.replaceChildren(b('일시정지', '일시정지 (Space)', pause, 'primary'), b('끝내기', '끝내고 기록', stop));
-  else box.replaceChildren(b('계속', '이어서 (Space)', resume, 'primary'), b('끝내기', '끝내고 기록', stop));
+  else box.replaceChildren(b('끝내기', '끝내고 기록 (Space)', stop, 'primary'));
 }
 
 export function render() {
@@ -528,7 +576,7 @@ function renderTimer() {
   el.modes.replaceChildren(...MODES.map(m => h('button', {
     type: 'button', role: 'radio', 'aria-checked': m.key === timer.mode ? 'true' : 'false', disabled: !idle,
     title: m.title, 'aria-label': m.title,
-    onclick: () => { timer.mode = m.key; saveTimer(); render(); },
+    onclick: () => { timer.mode = m.key; changed(); render(); },
   }, m.key === 'watch' ? watchIcon() : m.label)));
 
   // 지금 고른 공부 (고르지 않았으면 과목 없이)
@@ -638,6 +686,7 @@ function renderTimeline() {
   const today = studyDate();
   el.timeline.replaceChildren(timeline(today, segmentsOn(dayKey(today), true), { showNow: true, editable: true }));
   renderAddBox(el.addBox, dayKey(today));
+  fill(el.todaySubj, daySubjects(dayKey(today), true));
 }
 
 /* ───── 타임라인에서 직접 기록 넣기 ─────
@@ -663,7 +712,7 @@ function setSel(key, a, b) {
   }
   if (end <= start) { ctx.toast('아직 오지 않은 시간이에요'); return false; }
   if (end - start > 12 * 3.6e6) start = end - 12 * 3.6e6;
-  sel = { key, start, end };
+  sel = { key, start, end, editId: sel && sel.key === key ? sel.editId : null };
   return true;
 }
 function timeAt(ol, e, date) {
@@ -692,12 +741,15 @@ function attachPick(ol, date) {
   ol.classList.add('editable');
   ol.addEventListener('pointerdown', e => {
     if (e.button !== 0 || !e.target.closest('.tl-track')) return;
-    down = { x: e.clientX, y: e.clientY, t: timeAt(ol, e, date), type: e.pointerType, dragging: false };
+    const recSeg = e.target.closest('.tl-seg.rec');
+    down = { x: e.clientX, y: e.clientY, t: timeAt(ol, e, date), type: e.pointerType, dragging: false, editId: recSeg ? recSeg.dataset.id : null };
     if (e.pointerType === 'mouse') { e.preventDefault(); ol.setPointerCapture(e.pointerId); }
   });
   ol.addEventListener('pointermove', e => {
     if (!down || down.type !== 'mouse') return;
+    if (down.editId) return;                    // 기록 막대에서 시작한 건 끌기 대신 고치기
     if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) return;
+    if (!down.dragging && sel && sel.editId) { sel = null; refreshSel(); }
     down.dragging = true;
     const t = timeAt(ol, e, date);
     if (setSel(key, down.t, t === down.t ? t + SNAP : t)) paintSel(ol, date);
@@ -706,13 +758,21 @@ function attachPick(ol, date) {
     if (!down) return;
     const d = down; down = null;
     if (d.type !== 'mouse' && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;   // 폰에서 스크롤한 것
-    if (!d.dragging && !setSel(key, d.t, d.t + 30 * 60000)) return;
+    if (d.editId) { openEdit(d.editId); return; }
+    if (!d.dragging) { sel = null; if (!setSel(key, d.t, d.t + 30 * 60000)) { refreshSel(); return; } }
     refreshSel();
     const box = key === studyKey() && studyView() === 'today' ? el.addBox : el.recAddBox;
     box.pick.button.focus({ preventScroll: true });
   };
   ol.addEventListener('pointerup', finish);
   ol.addEventListener('pointercancel', () => { down = null; });
+}
+// 기록 고치기: 그 기록의 시각 · 과목으로 아래 칸을 채움
+function openEdit(id) {
+  const s = allSessions().find(x => x.id === id);
+  if (!s) return;
+  sel = { key: studyKey(s.startedAt), start: new Date(s.startedAt).getTime(), end: new Date(s.endedAt).getTime(), editId: id, fresh: true };
+  refreshSel();
 }
 function refreshSel() {
   if (studyView() === 'today') renderTimeline(); else renderRecDay();
@@ -744,19 +804,39 @@ function makeAddBox(id) {
   const save = () => {
     if (!sel) return;
     const sec = Math.round((sel.end - sel.start) / 1000);
-    addSession({
-      id: newId(), subject: box.pick.value, taskId: null, planId: null,
-      startedAt: new Date(sel.start).toISOString(), endedAt: new Date(sel.end).toISOString(), seconds: sec,
-    });
+    const range = `${fmtClock(new Date(sel.start))}–${fmtClock(new Date(sel.end))}`;
+    if (sel.editId) {
+      const old = allSessions().find(x => x.id === sel.editId);
+      if (old) {
+        updateSession(old, {
+          subject: box.pick.value, startedAt: new Date(sel.start).toISOString(), endedAt: new Date(sel.end).toISOString(), seconds: sec,
+        });
+        ctx.toast(`${range} ${fmtSpent(sec)}로 고쳤어요`);
+      }
+    } else {
+      addSession({
+        id: newId(), subject: box.pick.value, taskId: null, planId: null,
+        startedAt: new Date(sel.start).toISOString(), endedAt: new Date(sel.end).toISOString(), seconds: sec,
+      });
+      ctx.toast(`${range} ${fmtSpent(sec)} 기록했어요`);
+    }
     rememberSubject(box.pick.value);
-    ctx.toast(`${fmtClock(new Date(sel.start))}–${fmtClock(new Date(sel.end))} ${fmtSpent(sec)} 기록했어요`);
     sel = null;
     refreshSel();
   };
+  const del = () => {
+    const old = sel && sel.editId && allSessions().find(x => x.id === sel.editId);
+    sel = null;
+    if (old) removeSession(old); else refreshSel();
+  };
+  box.title = h('p', { class: 'tl-add-title' });
+  box.delBtn = h('button', { type: 'button', class: 'btn icon ghost danger', title: '이 기록 지우기', 'aria-label': '이 기록 지우기', onclick: del }, trashIcon());
   box.form = h('div', { class: 'tl-add-form' },
-    h('div', { class: 'tl-add-times' }, box.startIn, h('span', { class: 'tl-dash' }, '–'), box.endIn, box.len),
+    h('div', { class: 'tl-add-head' }, box.title, box.len),
+    h('div', { class: 'tl-add-times' }, box.startIn, h('span', { class: 'tl-dash' }, '–'), box.endIn),
     h('div', { class: 'tl-add-row' }, box.pick.el,
-      h('button', { type: 'button', class: 'btn icon primary', title: '기록', 'aria-label': '이 시간 기록', onclick: save }, checkIcon()),
+      h('button', { type: 'button', class: 'btn icon primary', title: '저장', 'aria-label': '이 시간 저장', onclick: save }, checkIcon()),
+      box.delBtn,
       h('button', { type: 'button', class: 'btn icon ghost', title: '취소', 'aria-label': '취소', onclick: () => { sel = null; refreshSel(); } }, xIcon())),
     box.warn);
   box.hint = h('p', { class: 'tl-hint' }, matchMedia('(pointer: coarse)').matches
@@ -775,7 +855,14 @@ function renderAddBox(box, key) {
   box.startIn.value = fmt(sel.start);
   box.endIn.value = fmt(sel.end);
   box.len.textContent = fmtSpent(Math.round((sel.end - sel.start) / 1000));
-  const overlap = sessionsOn(key).some(s => new Date(s.startedAt) < sel.end && new Date(s.endedAt) > sel.start);
+  box.title.textContent = sel.editId ? '기록 고치기' : '공부한 시간 넣기';
+  box.delBtn.hidden = !sel.editId;
+  if (sel.fresh) {                              // 고치기를 처음 열 때만 과목을 채움 (고르는 중엔 그대로)
+    const s = allSessions().find(x => x.id === sel.editId);
+    box.pick.set(s ? s.subject : '');
+    sel.fresh = false;
+  }
+  const overlap = sessionsOn(key).some(s => s.id !== sel.editId && new Date(s.startedAt) < sel.end && new Date(s.endedAt) > sel.start);
   box.warn.className = 'msg';
   box.warn.textContent = overlap ? '다른 기록과 겹치는 시간이에요' : '';
 }
@@ -787,8 +874,8 @@ function segmentsOn(key, withLive) {
     if (s.taskId) { const t = state.tasks.find(x => x.id === s.taskId); if (t) return displayTitle(t); }
     return s.subject || '과목 없음';
   };
-  const segs = sessionsOn(key).map(s => ({
-    start: new Date(s.startedAt), end: new Date(s.endedAt), subject: s.subject, title: titleOf(s), seconds: s.seconds,
+  const segs = sessionsOn(key).filter(s => !(sel && sel.editId === s.id)).map(s => ({
+    id: s.id, start: new Date(s.startedAt), end: new Date(s.endedAt), subject: s.subject, title: titleOf(s), seconds: s.seconds,
   }));
   if (withLive && timer.phase === 'focus' && timer.sessStart) {
     const end = timer.running ? Date.now() : timer.sessStart + timer.acc;
@@ -814,9 +901,9 @@ function timeline(date, segs, { showNow = false, editable = false } = {}) {
       const a = Math.max(toH(s.start), hr), b = Math.min(toH(s.end), hr + 1);
       if (b <= a || (b - a < 1 / 60 && !s.live)) continue;   // 1분도 안 걸친 조각은 점처럼 보여서 생략 (지금 공부 중은 표시)
       pieces.push(h('i', {
-        class: `tl-seg${s.live ? ' live' : ''}`,
+        class: `tl-seg${s.live ? ' live' : ''}${s.id ? ' rec' : ''}`, dataset: s.id ? { id: s.id } : null,
         style: { '--c': subjectColor(s.subject), left: `${(a - hr) * 100}%`, width: `${Math.max(2.5, (b - a) * 100)}%` },
-        title: `${s.title} · ${fmtClock(s.start)}–${fmtClock(s.end)}`,
+        title: `${s.title} · ${fmtClock(s.start)}–${fmtClock(s.end)}${s.id && editable ? ' · 눌러서 고치기' : ''}`,
       }));
     }
     const now = showNow && nowH >= hr && nowH < hr + 1
@@ -828,6 +915,21 @@ function timeline(date, segs, { showNow = false, editable = false } = {}) {
   const ol = h('ol', { class: 'timeline', 'aria-label': `${fmtDay(date)} 공부 타임라인` }, rows);
   if (editable) { attachPick(ol, date); paintSel(ol, date); }
   return ol;
+}
+
+// 그날 과목별로 모두 몇 시간 했는지 (기록을 과목별로 합쳐서)
+function daySubjects(key, withLive = false) {
+  const list = sessionsOn(key);
+  const map = new Map();
+  for (const x of list) map.set(x.subject || '', (map.get(x.subject || '') || 0) + x.seconds);
+  if (withLive && timer.phase === 'focus') map.set(timer.subject || '', (map.get(timer.subject || '') || 0) + runningFocusSec());
+  const rows = [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map(([, v]) => v));
+  return h('ul', { class: 'subject-bars day-sum', 'aria-label': '과목별 공부 시간' }, rows.map(([name, v]) => h('li', { style: { '--c': subjectColor(name) } },
+    h('span', { class: 'sb-name' }, name || '과목 없음'),
+    h('span', { class: 'sb-bar' }, h('i', { style: { width: `${(v / max) * 100}%` } })),
+    h('span', { class: 'sb-time' }, fmtSpent(v)))));
 }
 
 /* ───── 기록 ───── */
@@ -990,9 +1092,15 @@ function renderRecDay() {
     // 40일 안의 날짜는 타임라인에서 직접 기록 넣기 (서버가 그보다 오래된 기록은 받지 않음)
     timeline(date, segs, { showNow: isToday, editable: date >= addDays(studyDate(), -39) }),
     date >= addDays(studyDate(), -39) ? el.recAddBox.box : null,
+    daySubjects(rec.day, isToday),
     list.length ? h('ul', { class: 'record-list' }, list.map(s => {
       const what = titleOf(s);
-      return h('li', { style: { '--c': subjectColor(s.subject) } },
+      const editable = date >= addDays(studyDate(), -39);
+      return h('li', {
+        style: { '--c': subjectColor(s.subject) }, class: editable ? 'editable' : null,
+        title: editable ? '눌러서 고치기' : null,
+        onclick: editable ? e => { if (!e.target.closest('button')) openEdit(s.id); } : null,
+      },
         h('span', { class: 'rec-time' }, `${fmtClock(new Date(s.startedAt))}–${fmtClock(new Date(s.endedAt))}`),
         h('span', { class: 'rec-what' }, what || s.subject || '과목 없음', what && s.subject ? h('span', { class: 'chip-sub' }, s.subject) : null),
         h('span', { class: 'rec-len' }, fmtSpent(s.seconds)),
@@ -1136,6 +1244,10 @@ export function initStudy(options) {
     if (!document.hidden && (!$('#viewStudy')?.hidden || $('#friendsDialog')?.open)) loadFriends();
   }, 60000);
   tick();
+  // 다른 기기에서 시작·끝낸 타이머 받아 오기: 처음, 창으로 돌아올 때, 보는 동안 20초마다
+  pullTimer();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pullTimer(); });
+  setInterval(() => { if (!document.hidden) pullTimer(); }, 20000);
 }
 
 export function onShowStudy() {
@@ -1149,8 +1261,7 @@ export function handleKey(e) {
     e.preventDefault();
     if (timer.phase === 'idle') start();
     else if (timer.phase === 'rest') toIdle();
-    else if (timer.running) pause();
-    else resume();
+    else stop();
     return true;
   }
   return false;

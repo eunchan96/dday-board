@@ -57,6 +57,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
 
   const meta = h('div', { class: 'meta' },
     exam ? h('span', { class: 'exam-word' }, '시험') : null,
+    t.kind === 'todo' ? h('span', { class: 'todo-word' }, '할 일') : null,
     !compact && t.subject && displayTitle(t) === t.title ? h('span', { class: 'subj' }, t.subject) : null,
     exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, fmtShort(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
@@ -74,7 +75,9 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const badge = h('div', { class: `dday ${info.level}` }, h('span', null, info.label));
 
   // 왼쪽 얇은 막대 = 과목 색
-  return h('li', { class: `row${t.done ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id },
+  // 끝난 시험도 완료한 과제처럼 줄 긋기
+  const finished = t.done || (exam && groupOf(t, now) === 'done');
+  return h('li', { class: `row${finished ? ' done' : ''}${exam ? ' exam' : ''}${t.starred ? ' starred' : ''}`, dataset: { id: t.id },
     style: { '--c': subjectColor(t.subject) } },
     main, star, badge);
 }

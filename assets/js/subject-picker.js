@@ -5,7 +5,7 @@
 // - 숨은 input(id)에 값이 들어가므로 $('#fSubject').value로도 읽을 수 있다
 // - 새로 추가한 과목은 이 기기에 기억해 두고 다음에도 목록에 보여 준다
 
-import { h, subjectColor } from './util.js';
+import { h, subjectColor, orderSubjects } from './util.js';
 import { state, storage } from './store.js';
 
 const KEY = 'ddayboard.subjects';
@@ -169,7 +169,7 @@ export function subjectPicker({ id, value = '', options, allowNone = true, noneL
   const picker = {
     el: h('span', { class: 'sp-wrap' }, hidden, button),
     button, allowNone, noneLabel, onChange,
-    options: () => unique(options()),
+    options: () => orderSubjects(unique(options())),
     get value() { return hidden.value; },
     set(v) {
       hidden.value = String(v || '').trim();

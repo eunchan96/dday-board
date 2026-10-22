@@ -144,6 +144,15 @@ let subjectOrder = new Map();
 let subjectOverride = {};                       // 사용자가 바꾼 색 (보드에 저장)
 export function setSubjectColors(map) { subjectOverride = map && typeof map === 'object' ? map : {}; }
 export const customColorOf = name => subjectOverride[name] || null;
+// 사용자가 정한 과목 순서 (설정 → 과목). 정하지 않은 과목은 원래 순서대로 뒤에
+let subjectRank = new Map();
+export function setSubjectOrder(list) { subjectRank = new Map((Array.isArray(list) ? list : []).map((n, i) => [n, i])); }
+export function orderSubjects(names) {
+  if (!subjectRank.size) return names;
+  const idx = new Map(names.map((n, i) => [n, i]));
+  const rank = n => (subjectRank.has(n) ? subjectRank.get(n) : 1e6 + idx.get(n));
+  return names.slice().sort((a, b) => rank(a) - rank(b));
+}
 export function setSubjects(names) {
   const sorted = [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   subjectOrder = new Map(sorted.map((n, i) => [n, i]));

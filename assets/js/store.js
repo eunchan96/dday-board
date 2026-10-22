@@ -88,7 +88,7 @@ async function push(fn) {
 }
 
 const payload = t => ({
-  id: t.id, kind: t.kind === 'exam' ? 'exam' : 'assignment',
+  id: t.id, kind: t.kind === 'exam' ? 'exam' : t.kind === 'todo' ? 'todo' : 'assignment',
   subject: t.subject || '', title: t.title, due: t.due, endAt: t.endAt || null,
   location: t.location || '', done: !!t.done, memo: t.memo || '', starred: !!t.starred,
 });
