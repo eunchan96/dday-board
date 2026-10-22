@@ -1702,3 +1702,40 @@ svg.filled { fill: currentColor; stroke: none; }
 @media (prefers-reduced-motion: reduce) { .cr-current.sorting .color-row { transition: none; } }
 .cr-tag { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--pencil-2); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 7px; }
 .cr-del:hover { color: var(--red); }
+/* 타이머 버튼: 공부 모드에서 일정 모드의 '추가' 버튼과 같은 맨 오른쪽 자리 */
+.top-timer { margin-right: 0; margin-left: 2px; }
+@media (max-width: 640px) { .top-timer { margin-right: 0; } }
+
+/* ═════ 설정 → 과목 · 묶음 ═════ */
+.set-sub-head { font-size: 14px; font-weight: 750; color: var(--ink); margin: 6px 0 6px; }
+.set-sub-head + .set-lead { margin-top: 0; }
+#groupList { margin-bottom: 26px; }
+.grp-row { display: flex; align-items: center; gap: 8px; }
+.grp-row .set-text { flex: 1; min-width: 0; }
+.grp-now { margin-left: 8px; font-size: 11.5px; font-weight: 650; color: var(--pen); background: var(--pen-soft); border-radius: 999px; padding: 1px 8px; vertical-align: 1px; }
+.danger-text { color: var(--red); }
+.grp-edit { gap: 10px; }
+.grp-edit input[type=text] { width: 100%; }
+.grp-dates { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.grp-dates input { flex: 1; min-width: 140px; }
+.grp-dates span { color: var(--pencil-2); }
+.grp-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.scope-row { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 13px; color: var(--pencil); }
+.scope-row select { min-height: 34px; padding: 4px 30px 4px 10px; font-size: 13.5px; }
+.cr-name .cr-title { flex-shrink: 1; }
+.cr-groups { margin-left: auto; flex-shrink: 1; min-width: 0; font-size: 12px; font-weight: 550; color: var(--pencil); max-width: 55%; text-align: right; }
+.cr-groups.auto { color: var(--pencil-2); }
+.cr-edit { display: flex; flex-direction: column; gap: 14px; padding: 0 18px 16px 50px; }
+.cr-edit .swatches { padding: 0; }
+.cr-member { display: flex; flex-direction: column; gap: 6px; }
+.cr-member-head { font-size: 13px; font-weight: 700; color: var(--ink); }
+.cr-member-head span { font-weight: 500; color: var(--pencil-2); }
+.cr-check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; padding: 3px 0; }
+.cr-check input { width: 17px; height: 17px; accent-color: var(--pen); flex-shrink: 0; }
+.cr-check small { margin-left: auto; color: var(--pencil-2); font-size: 12px; }
+.cr-check.always { padding-bottom: 8px; border-bottom: 1px dashed var(--rule); margin-bottom: 2px; }
+.cr-check input:disabled + span { color: var(--pencil); }
+@media (max-width: 640px) {
+  .cr-edit { padding: 0 14px 14px 14px; }
+  .cr-groups { max-width: 45%; }
+}

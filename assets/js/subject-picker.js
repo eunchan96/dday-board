@@ -8,6 +8,7 @@
 import { h, subjectColor, orderSubjects } from './util.js';
 import { state, storage } from './store.js';
 import { api } from './api.js';
+import { subjectInGroup, assignNewSubject } from './groups.js';
 
 const KEY = 'ddayboard.subjects';
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -38,6 +39,7 @@ export function rememberSubject(name) {
   const list = [...cur, n].slice(-100);
   setCustomSubjects(list);
   pushCustom(list);
+  assignNewSubject(n);      // 지금 보고 있는 묶음에 넣어 둠
 }
 export function forgetSubject(name) {
   const list = customSubjects().filter(x => x !== name);
@@ -45,16 +47,18 @@ export function forgetSubject(name) {
   pushCustom(list);
 }
 
-// 기본 목록: 이번 학기 과목(남은 일이 많은 순) → 이 기기에서 추가한 과목 → 예전 학기 과목
-export function taskSubjects(currentKey, semesterKeyOf) {
+// 기본 목록: 고른 묶음의 과목(남은 일이 많은 순) → 직접 추가한 과목 → 나머지 과목
+// gid가 null이면 전체
+export function taskSubjects(gid) {
   const now = new Map(), old = new Set();
   for (const t of state.tasks) {
     if (!t.subject) continue;
-    if (!currentKey || semesterKeyOf(t) === currentKey) now.set(t.subject, (now.get(t.subject) || 0) + (t.done ? 0 : 1));
+    if (subjectInGroup(t.subject, gid)) now.set(t.subject, (now.get(t.subject) || 0) + (t.done ? 0 : 1));
     else old.add(t.subject);
   }
   const cur = [...now.entries()].sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0], 'ko')).map(([n]) => n);
-  return unique([...cur, ...customSubjects(), ...[...old].sort((a, b) => a.localeCompare(b, 'ko'))]);
+  const custom = customSubjects().filter(n => subjectInGroup(n, gid));
+  return unique([...cur, ...custom, ...[...old].filter(n => !now.has(n)).sort((a, b) => a.localeCompare(b, 'ko'))]);
 }
 const unique = list => [...new Set(list.filter(Boolean))];
 
