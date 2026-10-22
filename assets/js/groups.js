@@ -1,8 +1,8 @@
 // 분류: 학기 · 기간 · 넓은 의미의 과목(자격증, 운동 …)을 사용자가 직접 만들고 고친다
 //
 // 보드에 저장 (dday_subject_prefs.groups / dday_set_groups):
-//   groups   [{ id, name, start: 'YYYY-MM-DD'|null, end: 'YYYY-MM-DD'|null, auto, off }]
-//            auto = 마감 날짜로 저절로 만든 학기 (id는 '2026-2' 꼴), off = '지금' 보기에서 빼기
+//   groups   [{ id, name, start: 'YYYY-MM-DD'|null, end: 'YYYY-MM-DD'|null, auto }]
+//            auto = 마감 날짜로 저절로 만든 학기 (id는 '2026-2' 꼴)
 //   members  { 과목: [분류 id …] | ['*'] }   '*' = 모든 분류에 항상 (예: 운동하기)
 //   inactive [과목 …]                         쓰지 않는 과목 ('지금' 보기와 과목 고르기에서 숨김)
 //   removed  ['2026-1' …]                     지운 자동 학기는 다시 만들지 않음
@@ -10,7 +10,7 @@
 // 일정이 어느 분류에 보이는지
 //   1) 과목이 분류에 들어 있으면 그 분류들 (여러 개 가능, '*'면 전부)
 //   2) 아니면 마감 날짜가 기간 안에 드는 분류들
-// 위쪽 '지금' = 오늘이 기간 안에 드는 분류 + 기간 없는 분류 (꺼 둔 분류 빼고) 를 모두 합쳐서
+// 위쪽 '지금' = 오늘이 기간 안에 드는 분류 + 기간 없는 분류를 모두 합쳐서, '미분류' = 어느 분류에도 없는 것
 
 import { state, storage } from './store.js';
 import { api } from './api.js';
@@ -27,7 +27,7 @@ function normalize(d) {
   const o = d && typeof d === 'object' ? d : {};
   const groups = (Array.isArray(o.groups) ? o.groups : [])
     .filter(g => g && typeof g.id === 'string' && typeof g.name === 'string')
-    .map(g => ({ id: g.id, name: g.name, start: g.start || null, end: g.end || null, auto: !!g.auto, off: !!g.off }));
+    .map(g => ({ id: g.id, name: g.name, start: g.start || null, end: g.end || null, auto: !!g.auto }));
   const members = {};
   for (const [k, v] of Object.entries(o.members && typeof o.members === 'object' ? o.members : {})) {
     if (Array.isArray(v) && v.length) members[k] = v.filter(x => typeof x === 'string');
@@ -116,32 +116,33 @@ export function groupsSorted() {
 }
 export const groupById = id => data.groups.find(g => g.id === id) || null;
 
-// '지금'에 드는 분류들: 켜 둔 분류 중 오늘이 기간 안이거나 기간이 없는 것
+// '지금'에 드는 분류들: 오늘이 기간 안이거나 기간이 없는 것
 export function currentIds(now = new Date()) {
-  return data.groups.filter(g => !g.off && (!isDated(g) || contains(g, now))).map(g => g.id);
+  return data.groups.filter(g => !isDated(g) || contains(g, now)).map(g => g.id);
 }
 // 오늘이 든 대표 분류 하나 (새 과목을 넣을 곳): 자동 학기 → 짧은 기간 순
 export function currentGroupId(now = new Date()) {
-  const hits = data.groups.filter(g => !g.off && contains(g, now));
+  const hits = data.groups.filter(g => contains(g, now));
   if (!hits.length) return null;
   const len = g => (groupEndExclusive(g) || new Date(8.64e15)) - (groupStart(g) || new Date(-8.64e15));
   hits.sort((a, b) => (b.auto - a.auto) || (len(a) - len(b)));
   return hits[0].id;
 }
 
-// 위에서 고른 보기: 'current'(지금) · 분류 id · 'all'(전체)
+// 위에서 고른 보기: 'current'(지금) · 분류 id · 'none'(미분류) · 'all'(전체)
+export const NONE = 'none';
 export function scopeValue(v = state.prefs.semester) {
-  if (v === 'all') return 'all';
+  if (v === 'all' || v === NONE) return v;
   if (v && v !== 'current' && groupById(v)) return v;
   return 'current';
 }
 // 하나만 고른 분류 (지금 · 전체면 null)
 export function activeGroupId() {
   const v = scopeValue();
-  return v === 'all' || v === 'current' ? null : v;
+  return v === 'all' || v === 'current' || v === NONE ? null : v;
 }
 export function scopeIds(v = scopeValue()) {
-  if (v === 'all') return null;
+  if (v === 'all' || v === NONE) return null;
   if (v !== 'current') return [v];
   const ids = currentIds();
   return ids.length ? ids : null;                // 지금에 드는 분류가 하나도 없으면 전체
@@ -149,6 +150,7 @@ export function scopeIds(v = scopeValue()) {
 export const isInactive = name => data.inactive.includes(name);
 export function inScope(t, v = scopeValue()) {
   if (v === 'current' && t.subject && isInactive(t.subject)) return false;
+  if (v === NONE) return !taskGroupIds(t).length;
   const ids = scopeIds(v);
   if (!ids) return true;
   const own = taskGroupIds(t);
@@ -156,17 +158,20 @@ export function inScope(t, v = scopeValue()) {
 }
 export function subjectInScope(name, v = scopeValue()) {
   if (v === 'current' && isInactive(name)) return false;
+  if (v === NONE) return isUnsorted(name);
   const ids = scopeIds(v);
   if (!ids) return true;
   return ids.some(id => subjectInGroup(name, id));
 }
 export function scopeLabel(v = scopeValue()) {
   if (v === 'all') return '전체';
+  if (v === NONE) return '미분류';
   if (v !== 'current') return groupById(v)?.name || '지금';
   return '지금';
 }
 export function scopeSub(v = scopeValue()) {
   if (v === 'all') return '모든 일정';
+  if (v === NONE) return '어느 분류에도 없는 것';
   if (v !== 'current') return periodText(groupById(v));
   const names = currentIds().map(id => groupById(id).name);
   return names.length ? names.join(' · ') : '모든 일정';
@@ -188,13 +193,13 @@ export function inGroup(t, gid) {
   return ids.includes(ALL) || ids.includes(gid);
 }
 // 과목이 이 분류에 속하는지: 직접 넣었거나, 소속을 안 정했으면 그 과목 일정이 기간 안에 있을 때
-// (일정도 소속도 없는 과목 = 직접 추가만 한 과목은 어디서나 보임)
+// (일정도 소속도 없는 과목은 미분류)
 export function subjectInGroup(name, gid) {
   if (!gid) return true;
   const m = memberIds(name);
   if (m.length) return m.includes(ALL) || m.includes(gid);
   const tasks = state.tasks.filter(t => t.subject === name);
-  if (!tasks.length) return true;
+  if (!tasks.length) return false;
   const g = groupById(gid);
   return !!g && tasks.some(t => contains(g, t.due));
 }
@@ -204,6 +209,8 @@ export function implicitGroupIds(name) {
   for (const t of state.tasks) if (t.subject === name) for (const g of data.groups) if (contains(g, t.due)) ids.add(g.id);
   return [...ids];
 }
+// 어느 분류에도 안 보이는 과목 (직접 넣은 분류도 없고, 마감 날짜로 들어가는 분류도 없음)
+export const isUnsorted = name => !memberIds(name).length && !implicitGroupIds(name).length;
 // 과목이 어디 속하는지 짧게 (설정 화면용)
 export function membershipText(name) {
   const m = memberIds(name);
@@ -211,7 +218,7 @@ export function membershipText(name) {
   if (m.length) return m.map(id => groupById(id)?.name).filter(Boolean).join(' · ');
   const ids = new Set();
   for (const t of state.tasks) if (t.subject === name) for (const g of data.groups) if (contains(g, t.due)) ids.add(g.id);
-  return ids.size ? [...ids].map(id => groupById(id).name).join(' · ') : '분류 없음';
+  return ids.size ? [...ids].map(id => groupById(id).name).join(' · ') : '미분류';
 }
 
 /* ───── 고치기 ───── */
@@ -225,16 +232,13 @@ export function setMembers(name, ids) {
 }
 // 새 과목을 만들면 지금 보고 있는 분류에 넣어 둔다 ('지금'이면 오늘이 든 학기). 나중에 설정에서 바꿀 수 있음
 export function assignNewSubject(name) {
+  if (scopeValue() === NONE) return;
   const gid = activeGroupId() || currentGroupId();
   if (gid && !membersOf(name).length) setMembers(name, [gid]);
 }
 export function setInactive(name, off) {
   const rest = data.inactive.filter(x => x !== name);
   data.inactive = off ? [...rest, name] : rest;
-  save();
-}
-export function setGroupOff(id, off) {
-  data.groups = data.groups.map(g => (g.id === id ? { ...g, off: !!off } : g));
   save();
 }
 

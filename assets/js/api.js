@@ -53,6 +53,7 @@ export const api = {
   setSubjectOrder: (code, order) => rpc('dday_set_subject_order', { p_code: code, p_order: order }),
   setCustomSubjects: (code, list) => rpc('dday_set_custom_subjects', { p_code: code, p_list: list }),
   setGroups: (code, data) => rpc('dday_set_groups', { p_code: code, p_data: data }),
+  renameSubject: (code, from, to) => rpc('dday_rename_subject', { p_code: code, p_from: from, p_to: to }),
   setSubjectColor: (code, subject, color) => rpc('dday_set_subject_color', { p_code: code, p_subject: subject, p_color: color }),
   // 공부 모드
   study: (code, from) => rpc('dday_study', { p_code: code, p_from: from }),
@@ -106,6 +107,7 @@ export function errText(e) {
     case 'invalid_order': return '과목 순서를 저장하지 못했어요';
     case 'invalid_subjects': return '과목을 저장하지 못했어요';
     case 'invalid_groups': return '분류를 저장하지 못했어요';
+    case 'invalid_subject': return '과목 이름은 1~40자로 적어 주세요';
     case 'invalid_color': return '고를 수 있는 색이 아니에요';
     case 'invalid_range': return '불러올 기간이 너무 길어요';
     case 'no_profile': return '먼저 닉네임을 정해 주세요';

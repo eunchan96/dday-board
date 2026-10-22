@@ -18,9 +18,9 @@ import { renderList, renderCalendar, taskRow } from './views.js';
 import {
   groupsSorted, groupById, currentGroupId, currentIds, activeGroupId, inScope, subjectInGroup, membersOf, membershipText, setMembers,
   addGroup, updateGroup, removeGroup, forgetMembers, applyServerGroups, ensureTerms, onGroupsChange, periodText, groupStart, ALL,
-  implicitGroupIds, scopeValue, scopeIds, scopeLabel, scopeSub, isInactive, setInactive, setGroupOff,
+  implicitGroupIds, scopeValue, scopeIds, scopeLabel, scopeSub, isInactive, setInactive, isUnsorted, NONE,
 } from './groups.js';
-import { subjectPicker, taskSubjects, rememberSubject, customSubjects, setCustomSubjects, forgetSubject } from './subject-picker.js';
+import { subjectPicker, taskSubjects, rememberSubject, customSubjects, setCustomSubjects, forgetSubject, addCustomSubject } from './subject-picker.js';
 import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
@@ -125,7 +125,7 @@ function settingsSubjects() {
   const v = settingsScope();
   // 설정에서는 쓰지 않는 과목도 보여 줌 (다시 켤 수 있게)
   const ids = scopeIds(v);
-  const names = allSubjectNames().filter(n => !ids || ids.some(id => subjectInGroup(n, id)));
+  const names = allSubjectNames().filter(n => v === NONE ? isUnsorted(n) : !ids || ids.some(id => subjectInGroup(n, id)));
   return { current: names, old: [] };
 }
 async function saveOrder(visible, focusName) {
@@ -235,6 +235,7 @@ function renderColors() {
     scopeSel.replaceChildren(
       h('option', { value: 'current' }, '지금'),
       ...groupsSorted().map(g => h('option', { value: g.id }, g.name)),
+      h('option', { value: NONE }, '미분류'),
       h('option', { value: 'all' }, '전체'));
     scopeSel.value = settingsScope();
   }
@@ -260,39 +261,91 @@ function renderColors() {
         h('button', { type: 'button', class: 'cr-name', title: '과목 수정', onclick: () => openSubjectEditor(name) },
           h('i', { class: 'cr-dot' }),
           h('span', { class: 'cr-title' }, name),
-          h('span', { class: `cr-groups${membersOf(name).length ? '' : ' auto'}` }, off ? '쓰지 않음' : membershipText(name))),
-        iconBtn(EDIT_SVG, `${name} 수정`, () => openSubjectEditor(name))));
+          h('span', { class: `cr-groups${membersOf(name).length ? '' : ' auto'}` }, off ? '쓰지 않음' : membershipText(name)))));
   };
   fill($('#colorList'),
     current.length ? h('div', { class: 'cr-current' }, current.map(row))
-      : h('p', { class: 'help pad' }, '아직 과목이 없어요.'));
+      : h('p', { class: 'help pad' }, settingsScope() === NONE ? '미분류 과목이 없어요.' : '이 분류에는 아직 과목이 없어요.'),
+    h('div', { class: 'set-row grp-add-row' }, h('button', { type: 'button', class: 'btn sm ghost grp-add', onclick: () => openSubjectEditor(null) }, '+ 과목 추가')));
   if ($('#subjectDialog')?.open) renderSubjectEditor();
 }
 
 /* ───── 과목 편집 창: 색 · 분류 · 쓰기/안 쓰기 · 삭제 ───── */
+// name이 null이면 새 과목 만들기
+let newSubject = null;                            // { members: [...] } 새로 만들 때 고른 분류
 function openSubjectEditor(name) {
   colorOpen = name;
+  if (name == null) {
+    const v = settingsScope();
+    const g = groupById(v) ? v : v === 'current' ? currentGroupId() : null;
+    newSubject = { members: g ? [g] : [] };
+  } else newSubject = null;
   renderSubjectEditor();
   const d = $('#subjectDialog');
   if (!d.open) d.showModal();
+  if (name == null) requestAnimationFrame(() => $('#sdName')?.focus());
+}
+async function renameSubject(from, to) {
+  try {
+    await api.renameSubject(state.code, from, to);
+    colorOpen = to;
+    if (state.prefs.subject === from) state.prefs.subject = to;
+    await Promise.all([pull(), loadColors()]);
+    loadStudy();
+    renderAll(); renderColors();
+    toast(`"${from}" → "${to}"로 바꿨어요`);
+  } catch (e) { toast(errText(e)); renderSubjectEditor(); }
 }
 function renderSubjectEditor() {
-  const name = colorOpen;
-  if (!name) return;
-  const cur = String(subjectColor(name)).toUpperCase();
-  const members = membersOf(name);
+  const isNew = colorOpen == null;
+  const name = colorOpen || '';
+  const known = allSubjectNames();
+  const cur = isNew ? 'var(--pencil-2)' : String(subjectColor(name)).toUpperCase();
+  const members = isNew ? newSubject.members : membersOf(name);
   const always = members.includes(ALL);
-  const implicit = members.length ? [] : implicitGroupIds(name);
-  const toggleMember = (id, on) => {
-    const base = (membersOf(name).length ? membersOf(name) : implicit).filter(x => x !== ALL);
-    setMembers(name, on ? [...base, id] : base.filter(x => x !== id));
+  const implicit = isNew || members.length ? [] : implicitGroupIds(name);
+  const setM = ids => {
+    if (!isNew) { setMembers(name, ids); return; }
+    newSubject.name = $('#sdName')?.value || '';
+    newSubject.members = ids.includes(ALL) ? [ALL] : ids;
+    renderSubjectEditor();
   };
-  const removable = !state.tasks.some(t => t.subject === name) && customSubjects().includes(name);
+  const toggleMember = (id, on) => {
+    const base = (members.length ? members : implicit).filter(x => x !== ALL);
+    setM(on ? [...base, id] : base.filter(x => x !== id));
+  };
+  const removable = !isNew && !state.tasks.some(t => t.subject === name) && customSubjects().includes(name);
   const d = $('#subjectDialog');
   d.style.setProperty('--c', cur);
-  $('#sdTitle').textContent = name;
+
+  // 이름: 새 과목은 적고 '추가', 있는 과목은 바꾸고 Enter/칸 밖으로 나가면 이름 바꾸기
+  const nameIn = h('input', { type: 'text', id: 'sdName', class: 'sd-name', maxlength: 40, value: isNew ? (newSubject.name || '') : name, placeholder: '과목 이름', 'aria-label': '과목 이름', autocomplete: 'off' });
+  const msg = h('p', { class: 'msg err sd-msg', role: 'status' });
+  const commitName = () => {
+    const to = nameIn.value.trim();
+    if (isNew || !to || to === name) { if (!to) nameIn.value = name; return; }
+    renameSubject(name, to);
+  };
+  const create = () => {
+    const n = nameIn.value.trim();
+    if (!n) { msg.textContent = '과목 이름을 적어 주세요'; nameIn.focus(); return; }
+    if (known.includes(n)) { msg.textContent = '이미 있는 과목이에요'; nameIn.select(); return; }
+    const ms = newSubject.members;
+    addCustomSubject(n);
+    if (ms.length) setMembers(n, ms); else forgetMembers(n);
+    colorOpen = n; newSubject = null;
+    renderAll(); renderColors();
+    toast(`"${n}" 과목을 추가했어요`);
+  };
+  nameIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (isNew) create(); else nameIn.blur(); }
+  });
+  if (!isNew) nameIn.addEventListener('change', commitName);
+  fill($('#sdTitleWrap'), h('i', { class: 'sd-dot' }), nameIn);
+
   fill($('#sdBody'),
-    h('section', { class: 'sd-sec' },
+    msg,
+    isNew ? null : h('section', { class: 'sd-sec' },
       h('h4', null, '색', customColorOf(name) ? iconBtn(RESET_SVG, '기본 색으로', () => setColor(name, null)) : null),
       h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': `${name} 색` },
         SUBJECT_PALETTE.map(c => h('button', {
@@ -300,15 +353,15 @@ function renderSubjectEditor() {
           style: { '--s': c }, 'aria-label': `색 ${c}`, onclick: () => setColor(name, c),
         })))),
     h('section', { class: 'sd-sec' },
-      h('h4', null, '분류', h('span', { class: 'sd-note' }, members.length ? '' : '날짜로 정해짐')),
+      h('h4', null, '분류', h('span', { class: 'sd-note' }, !isNew && !members.length ? (implicit.length ? '마감 날짜로 정해짐' : '미분류') : '')),
       h('div', { class: 'sd-groups' },
         groupsSorted().map(g => h('label', { class: 'sd-check' },
           h('input', { type: 'checkbox', checked: always || members.includes(g.id) || implicit.includes(g.id), disabled: always, onchange: e => toggleMember(g.id, e.target.checked) }),
           h('span', null, g.name), h('small', null, periodText(g)))),
         h('label', { class: 'sd-check always' },
-          h('input', { type: 'checkbox', checked: always, onchange: e => setMembers(name, e.target.checked ? [ALL] : []) }),
+          h('input', { type: 'checkbox', checked: always, onchange: e => setM(e.target.checked ? [ALL] : []) }),
           h('span', null, '모든 분류에 항상')))),
-    h('section', { class: 'sd-sec sd-row' },
+    isNew ? null : h('section', { class: 'sd-sec sd-row' },
       h('div', null, h('h4', null, '쓰는 중'), h('p', { class: 'sd-note' }, '끄면 "지금" 보기와 과목 고르기에서 숨겨요')),
       h('input', { type: 'checkbox', role: 'switch', class: 'switch', checked: !isInactive(name), 'aria-label': '쓰는 중', onchange: e => setInactive(name, !e.target.checked) })));
   const del = $('#sdDelete');
@@ -317,6 +370,9 @@ function renderSubjectEditor() {
     forgetSubject(name); forgetMembers(name); applyOrder(subjectOrder.filter(n => n !== name));
     d.close(); renderAll(); renderColors(); toast(`"${name}" 과목을 삭제했어요`);
   };
+  const add = $('#sdAdd');
+  add.hidden = !isNew;
+  add.onclick = create;
 }
 
 /* ───── 설정 → 과목: 분류 만들기 · 수정 · 삭제 ───── */
@@ -324,8 +380,7 @@ let groupEdit = null;                              // { id|null, name, start, en
 function renderGroupsEditor() {
   const box = $('#groupList');
   if (!box) return;
-  // '지금'에 들어갈 수 있는 분류(기간이 없거나 오늘이 기간 안)만 켜고 끌 수 있게
-  const applicable = g => !g.start && !g.end ? true : (() => { const t = new Date(); return groupStart(g) <= t && t < new Date(new Date(`${g.end}T00:00`).getTime() + 864e5); })();
+  const now = new Set(currentIds());
   const editor = g => {
     const name = h('input', { type: 'text', maxlength: 30, value: g.name || '', placeholder: '이름 (예: 2026년 2학기, ADsP)', 'aria-label': '분류 이름' });
     const start = h('input', { type: 'date', value: g.start || '', 'aria-label': '시작 날짜' });
@@ -351,13 +406,10 @@ function renderGroupsEditor() {
         h('button', { type: 'button', class: 'btn sm', onclick: () => { groupEdit = null; renderColors(); } }, '취소'),
         h('button', { type: 'button', class: 'btn sm primary', onclick: save }, g.id ? '저장' : '추가')));
   };
-  const rows = groupsSorted().map(g => groupEdit && groupEdit.id === g.id ? editor(groupEdit) : h('div', { class: `set-row grp-row${g.off ? ' off' : ''}` },
+  const rows = groupsSorted().map(g => groupEdit && groupEdit.id === g.id ? editor(groupEdit) : h('div', { class: 'set-row grp-row' },
     h('div', { class: 'set-text' },
-      h('b', null, g.name),
+      h('b', null, g.name, now.has(g.id) ? h('span', { class: 'grp-now', title: '"지금" 보기에 들어 있어요' }, '지금') : null),
       h('span', { class: 'set-sub' }, periodText(g))),
-    applicable(g) ? h('label', { class: 'grp-switch', title: '"지금" 보기에 넣기' },
-      h('span', null, '지금'),
-      h('input', { type: 'checkbox', role: 'switch', class: 'switch', checked: !g.off, 'aria-label': `${g.name} "지금" 보기에 넣기`, onchange: e => setGroupOff(g.id, !e.target.checked) })) : null,
     iconBtn(EDIT_SVG, `${g.name} 수정`, () => { groupEdit = { ...g }; renderColors(); }),
     iconBtn(TRASH_SVG, `${g.name} 삭제`, () => {
       if (!confirmRemove(g)) return;
@@ -383,6 +435,7 @@ function scopeOptions() {
   return [
     { value: 'current', label: '지금', sub: scopeSub('current') },
     ...groupsSorted().map(g => ({ value: g.id, label: g.name, sub: periodText(g), now: now.has(g.id) })),
+    { value: NONE, label: '미분류', sub: scopeSub(NONE), special: true },
     { value: 'all', label: '전체', sub: '모든 일정' },
   ];
 }
@@ -391,7 +444,7 @@ function setScope(v) {
   setPref('subject', null);
   setPref('semester', v);
   // 캘린더를 그 분류의 첫 달로 (지금이거나 기간이 없으면 이번 달)
-  const g = v === 'current' || v === 'all' ? null : groupById(v);
+  const g = groupById(v);
   const s = g && groupStart(g);
   const base = s || new Date();
   ui.calMonth = new Date(base.getFullYear(), base.getMonth(), 1);
@@ -403,7 +456,7 @@ function scopeItems(onPick) {
   const cur = scopeValue();
   return scopeOptions().map(o => {
     const b = h('button', {
-      type: 'button', role: 'option', class: `scope-item${o.value === 'current' || o.value === 'all' ? ' special' : ''}`,
+      type: 'button', role: 'option', class: `scope-item${o.value === 'current' || o.value === 'all' || o.special ? ' special' : ''}`,
       'aria-selected': o.value === cur ? 'true' : 'false', onclick: () => onPick(o.value),
     }, h('span', { class: 'si-text' }, h('b', null, o.label), h('small', null, o.sub)), h('span', { class: 'flt-check' }));
     if (o.value === cur) b.querySelector('.flt-check').innerHTML = CHECK_SVG;
@@ -491,7 +544,7 @@ function renderNext() {
   // 토큰이 만료되면 자동 가져오기가 멈추므로 눈에 띄게
   if (state.lms.error === 'token_invalid') {
     parts.push(h('p', { class: 'next-alert' }, '스마트캠퍼스 토큰이 만료돼서 과제를 못 가져오고 있어요. ',
-      h('button', { type: 'button', onclick: () => openSettings() }, '새 토큰 넣기')));
+      h('button', { type: 'button', onclick: () => openSettings('lms') }, '새 토큰 넣기')));
   }
   fill($('#next'), parts);
 }
@@ -1115,15 +1168,15 @@ const mask = c => `${c.slice(0, 5)}-•••••-•••••-${c.slice(-5
 
 // 설정은 탭으로 나눠 한 번에 한 묶음만
 function setSettingsTab(tab) {
-  if (!['lms', 'push', 'cal', 'colors', 'device'].includes(tab)) tab = 'lms';
+  if (!['lms', 'push', 'cal', 'colors', 'device'].includes(tab)) tab = 'colors';
   if (tab === 'colors') renderColors();
   $$('#setNav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
   $$('#settings .set-group').forEach(g => { g.hidden = g.dataset.tab !== tab; });
   $('#settings .settings-body').scrollTop = 0;
 }
-function openSettings(tab = 'lms') {
+function openSettings(tab = 'colors') {
   colorScope = undefined; groupEdit = null; colorOpen = null;
-  setSettingsTab(typeof tab === 'string' ? tab : 'lms');
+  setSettingsTab(typeof tab === 'string' ? tab : 'colors');
   codeShown = false;
   $('#codeText').value = mask(state.code);
   $('#btnShowCode').textContent = '보기';
@@ -1521,7 +1574,7 @@ function openTaskFromHash() {
   if ((location.hash === '#settings' || location.hash === '#notices') && state.code) {
     const which = location.hash;
     history.replaceState(null, '', `#${curHash()}`);
-    setTimeout(() => { if (which === '#settings') openSettings(); else loadNotices().then(openNotices); }, 0);
+    setTimeout(() => { if (which === '#settings') openSettings('lms'); else loadNotices().then(openNotices); }, 0);
     return true;
   }
   // 앱 바로가기: 새 과제 / 새 시험

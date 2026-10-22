@@ -41,6 +41,14 @@ export function rememberSubject(name) {
   pushCustom(list);
   assignNewSubject(n);      // 지금 보고 있는 분류에 넣어 둠
 }
+// 설정 → 과목 추가 (분류는 따로 정함)
+export function addCustomSubject(name) {
+  const n = String(name || '').trim().slice(0, 40);
+  if (!n || customSubjects().includes(n)) return;
+  const list = [...customSubjects(), n].slice(-100);
+  setCustomSubjects(list);
+  pushCustom(list);
+}
 export function forgetSubject(name) {
   const list = customSubjects().filter(x => x !== name);
   setCustomSubjects(list);

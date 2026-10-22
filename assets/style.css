@@ -1850,10 +1850,23 @@ input.switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px;
 .sd-check.always { border-top: 1px dashed var(--rule); margin-top: 4px; padding-top: 10px; }
 .sd-check input:disabled + span { color: var(--pencil); }
 .sd-foot { justify-content: flex-start; }
-.sd-foot:has(#sdDelete[hidden]) { display: none; }
+
 @media (max-width: 640px) {
   .scope-label small { display: none; }
 }
 .scope-chip-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
 .scope-chip-row .scope-chips { flex: 1; min-width: 0; }
 .scope-gear { margin-left: 0; }
+/* 과목 수정 창: 이름 칸이 제목 */
+.sd-title { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.sd-name {
+  flex: 1; min-width: 0; height: 38px; padding: 0 10px; margin-left: -4px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; font: 750 17px var(--font); color: var(--ink);
+}
+.sd-name:hover { border-color: var(--rule); }
+.sd-name:focus { outline: none; border-color: var(--pen); background: var(--sheet); box-shadow: 0 0 0 3px var(--pen-soft); }
+.sd-msg:empty { display: none; }
+.sd-msg { padding-top: 10px; }
+.sd-foot { justify-content: space-between; }
+.sd-foot:has(#sdDelete[hidden]):has(#sdAdd[hidden]) { display: none; }
+.sd-foot #sdAdd { margin-left: auto; }
