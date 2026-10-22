@@ -1700,3 +1700,5 @@ svg.filled { fill: currentColor; stroke: none; }
 .cr-old > summary:hover { color: var(--ink); background: var(--sheet-2); }
 .cr-old .cr-name { padding-left: 18px; }
 @media (prefers-reduced-motion: reduce) { .cr-current.sorting .color-row { transition: none; } }
+.cr-tag { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--pencil-2); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 7px; }
+.cr-del:hover { color: var(--red); }

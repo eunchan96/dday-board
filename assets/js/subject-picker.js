@@ -7,6 +7,7 @@
 
 import { h, subjectColor, orderSubjects } from './util.js';
 import { state, storage } from './store.js';
+import { api } from './api.js';
 
 const KEY = 'ddayboard.subjects';
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -21,11 +22,27 @@ export function customSubjects() {
   try { const v = JSON.parse(storage.get(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
   catch { return []; }
 }
+// 직접 추가한 과목은 보드에 저장해서 모든 기기에서 같게 (과제 · 시험에 이미 있는 과목은 따로 기억하지 않음)
+export function setCustomSubjects(list) {
+  storage.set(KEY, JSON.stringify((Array.isArray(list) ? list : []).filter(x => typeof x === 'string' && x.trim()).slice(0, 100)));
+}
+function pushCustom(list) {
+  if (!state.code) return;
+  api.setCustomSubjects(state.code, list).catch(() => { /* 다음에 불러올 때 다시 맞춤 */ });
+}
 export function rememberSubject(name) {
-  const n = String(name || '').trim();
+  const n = String(name || '').trim().slice(0, 40);
   if (!n) return;
-  const list = [n, ...customSubjects().filter(x => x !== n)].slice(0, 40);
-  storage.set(KEY, JSON.stringify(list));
+  const cur = customSubjects();
+  if (cur.includes(n) || state.tasks.some(t => t.subject === n)) return;
+  const list = [...cur, n].slice(-100);
+  setCustomSubjects(list);
+  pushCustom(list);
+}
+export function forgetSubject(name) {
+  const list = customSubjects().filter(x => x !== name);
+  setCustomSubjects(list);
+  pushCustom(list);
 }
 
 // 기본 목록: 이번 학기 과목(남은 일이 많은 순) → 이 기기에서 추가한 과목 → 예전 학기 과목

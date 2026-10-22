@@ -17,7 +17,7 @@
 
 **과제**
 - 과제명, 과목, 마감 일시, 메모. 목록 왼쪽 별로 중요 표시
-- 과목은 색 점이 붙은 목록에서 고르고, 찾기 칸에 없는 이름을 적으면 새 과목으로 추가 (공부 화면과 같은 목록)
+- 과목은 색 점이 붙은 목록에서 고르고, 찾기 칸에 없는 이름을 적으면 새 과목으로 추가 (공부 화면과 같은 목록). 새로 추가한 과목은 보드에 저장돼 다른 기기에서도 보이고, 아직 어디에도 안 쓴 과목은 설정 → 과목에서 지울 수 있어요
 - 과목 색은 기본으로 과목 이름 순서대로 정해지고, 설정 → 과목에서 색과 순서(왼쪽 손잡이를 끌어서, 키보드는 손잡이에서 ↑ ↓)를 바꿀 수 있어요. 이 목록에는 이번 학기 과제 · 시험의 과목과 직접 추가한 과목이 나오고, 지난 학기에만 있던 과목은 아래 "지난 학기 과목"에 접혀 있어요 (보드에 저장돼 모든 기기에서 같게). 과목 목록 · 필터 · 공부 화면이 이 순서를 따라요
 - 체크 상자 없음: 스마트캠퍼스 과제는 제출하면 저절로 완료, 직접 넣은 과제는 편집 화면의 "제출 완료" 버튼, 시험은 시간이 지나면 저절로 끝난 일정(완료처럼 줄을 그어 표시)
 - 날짜는 작은 달력, 시간은 시계 다이얼로 고르고, 자주 쓰는 날짜·시간은 한 번에 선택
@@ -204,7 +204,8 @@ Supabase 보안 어드바이저는 "로그인 없이 실행 가능한 SECURITY D
 | `dday_push_status` | `p_code`, `p_endpoint` | `jsonb` | 이 기기 알림 상태와 알림 시점 |
 | `dday_study` | `p_code`, `p_from` | `jsonb` | 공부 기록(`p_from` 이후, 최대 40일), 날짜별 합계(400일), 최근 계획, 하루 목표, 프로필 |
 | `dday_subject_colors` / `dday_set_subject_color` | `p_code`, `p_subject`, `p_color` | `jsonb` | 바꾼 과목 색 목록 · 색 바꾸기(`#RRGGBB`, null이면 기본 색) |
-| `dday_subject_prefs` / `dday_set_subject_order` | `p_code`, `p_order` | `jsonb` | 과목 색과 순서 함께 읽기 · 순서 저장(과목 이름 배열, 최대 200개) |
+| `dday_subject_prefs` / `dday_set_subject_order` | `p_code`, `p_order` | `jsonb` | 과목 색 · 순서 · 직접 추가한 과목 함께 읽기 · 순서 저장(과목 이름 배열, 최대 200개) |
+| `dday_set_custom_subjects` | `p_code`, `p_list` | `jsonb` | 직접 추가한 과목 목록 저장 (최대 100개, 모든 기기에서 같게) |
 | `dday_timer` / `dday_timer_set` | `p_code`, `p_state` | `jsonb` | 기기 사이 타이머 상태 읽기 · 저장 (`updatedAt`이 더 새로울 때만 덮어씀) |
 | `dday_study_range` | `p_code`, `p_from`, `p_to` | `jsonb` 배열 | 기간 안의 공부 기록 (최대 45일, 기록 탭에서 예전 주 · 달) |
 | `dday_study_add` / `dday_study_remove` | `p_code`, 기록 / `p_id` | `jsonb` / 없음 | 공부 기록 저장(같은 id면 덮어씀) · 지우기(`p_removed=false`면 되돌리기) |

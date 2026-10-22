@@ -15,7 +15,7 @@ import {
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
-import { subjectPicker, taskSubjects, rememberSubject, customSubjects } from './subject-picker.js';
+import { subjectPicker, taskSubjects, rememberSubject, customSubjects, setCustomSubjects, forgetSubject } from './subject-picker.js';
 import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
@@ -101,7 +101,16 @@ async function loadColors() {
   try {
     const prefs = (await api.subjectPrefs(state.code)) || {};
     const map = prefs.colors || {}, order = prefs.order || [];
-    const changedAny = JSON.stringify(map) !== JSON.stringify(colorMap) || JSON.stringify(order) !== JSON.stringify(subjectOrder);
+    // 직접 추가한 과목: 보드 것 + 이 기기에만 있던 것(보드에 저장하기 전 버전에서 추가한 과목)을 합친다
+    const server = Array.isArray(prefs.custom) ? prefs.custom : [];
+    const local = customSubjects();
+    const known = new Set(state.tasks.map(t => t.subject).filter(Boolean));
+    const extra = local.filter(n => !server.includes(n) && !known.has(n));
+    const custom = [...server, ...extra].slice(-100);
+    const changedAny = JSON.stringify(map) !== JSON.stringify(colorMap) || JSON.stringify(order) !== JSON.stringify(subjectOrder)
+      || JSON.stringify(custom) !== JSON.stringify(local);
+    setCustomSubjects(custom);
+    if (extra.length && state.tasks.length) api.setCustomSubjects(state.code, custom).catch(() => {});
     applyColors(map); applyOrder(order);
     if (changedAny) renderAll();
   } catch { /* 다음에 다시 */ }
@@ -212,6 +221,13 @@ function renderColors() {
       onclick: () => setColor(name, null),
     }) : null;
     if (reset) reset.innerHTML = RESET_SVG;
+    // 직접 추가했고 아직 어떤 과제 · 시험에도 안 쓴 과목은 지울 수 있게
+    const removable = !state.tasks.some(t => t.subject === name) && customSubjects().includes(name);
+    const del = removable ? h('button', {
+      type: 'button', class: 'btn icon ghost sm-icon cr-del', title: '과목 지우기', 'aria-label': `${name} 지우기`,
+      onclick: () => { forgetSubject(name); applyOrder(subjectOrder.filter(n => n !== name)); renderAll(); renderColors(); toast(`"${name}" 과목을 지웠어요`); },
+    }) : null;
+    if (del) del.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6"/></svg>';
     let grip = null;
     if (movable) {
       grip = h('button', {
@@ -231,8 +247,8 @@ function renderColors() {
         h('button', {
           type: 'button', class: 'cr-name', 'aria-expanded': open ? 'true' : 'false',
           onclick: () => { colorOpen = open ? null : name; renderColors(); },
-        }, h('i', { class: 'cr-dot' }), h('span', null, name)),
-        reset),
+        }, h('i', { class: 'cr-dot' }), h('span', null, name), removable ? h('span', { class: 'cr-tag' }, '직접 추가') : null),
+        reset, del),
       open ? h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': `${name} 색` },
         SUBJECT_PALETTE.map(c => h('button', {
           type: 'button', class: 'swatch', role: 'radio', 'aria-checked': cur === c.toUpperCase() ? 'true' : 'false',
