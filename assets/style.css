@@ -1739,3 +1739,121 @@ svg.filled { fill: currentColor; stroke: none; }
   .cr-edit { padding: 0 14px 14px 14px; }
   .cr-groups { max-width: 45%; }
 }
+
+/* ═════ 위쪽 보기 고르기 (지금 · 분류 · 전체) ═════ */
+.scope { position: relative; }
+.scope-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; max-width: 280px; padding: 0 10px 0 12px;
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: inherit; cursor: pointer;
+}
+.scope-btn:hover { border-color: var(--pencil-2); }
+.scope-btn:focus-visible { outline: 2px solid var(--pen); outline-offset: 1px; }
+.scope-btn svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--pencil-2); }
+.scope-label { display: flex; align-items: baseline; gap: 7px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.scope-label b { font-size: 14px; font-weight: 750; }
+.scope-label small { font-size: 12.5px; color: var(--pencil); overflow: hidden; text-overflow: ellipsis; }
+.scope-pop {
+  position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; width: 280px; padding: 6px;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow);
+}
+.scope-list { display: flex; flex-direction: column; gap: 1px; max-height: 60vh; overflow-y: auto; }
+.scope-item {
+  all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.scope-item:hover, .scope-item:focus-visible { background: var(--sheet-2); }
+.scope-item .si-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.scope-item b { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.scope-item small { font-size: 12px; color: var(--pencil-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-item[aria-selected="true"] b { color: var(--pen); }
+.scope-item .flt-check { width: 16px; color: var(--pen); }
+.scope-item .flt-check svg { width: 16px; height: 16px; }
+.si-now { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.scope-item.special + .scope-item:not(.special), .scope-item:not(.special) + .scope-item.special { margin-top: 4px; position: relative; }
+.scope-item:not(.special) + .scope-item.special::before, .scope-item.special + .scope-item:not(.special)::before {
+  content: ''; position: absolute; left: 10px; right: 10px; top: -3px; border-top: 1px solid var(--rule);
+}
+.scope-manage {
+  all: unset; box-sizing: border-box; display: block; width: 100%; margin-top: 6px; padding: 9px 10px; border-top: 1px solid var(--rule);
+  font-size: 13px; font-weight: 600; color: var(--pencil); cursor: pointer; border-radius: 0 0 8px 8px;
+}
+.scope-manage:hover { color: var(--ink); background: var(--sheet-2); }
+
+/* 폰 필터 안: 칩으로 */
+.flt-sem { padding: 10px 12px; }
+.scope-chips { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; width: 100%; }
+.scope-chips::-webkit-scrollbar { display: none; }
+.scope-chip {
+  flex-shrink: 0; height: 32px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 999px; background: var(--sheet);
+  font: 600 13.5px var(--font); color: var(--pencil); cursor: pointer; white-space: nowrap;
+}
+.scope-chip[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+.scope-chip:focus-visible { outline: 2px solid var(--pen); outline-offset: 1px; }
+.scope-gear { flex-shrink: 0; margin-left: auto; }
+
+/* ═════ 설정 → 과목 ═════ */
+.sec-head { display: flex; align-items: center; gap: 6px; margin: 6px 0 10px; }
+.sec-head h4 { font-size: 14px; font-weight: 750; color: var(--ink); }
+.sec-head .scope-select { margin-left: auto; }
+.info-btn {
+  width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1.5px solid var(--pencil-2); background: none;
+  color: var(--pencil); font: italic 700 11.5px/1 Georgia, serif; cursor: pointer; display: grid; place-items: center;
+}
+.info-btn:hover, .info-btn[aria-expanded="true"] { border-color: var(--pen); color: var(--pen); }
+.info-text { font-size: 13px; line-height: 1.55; color: var(--pencil); background: var(--sheet-2); border-radius: 10px; padding: 10px 12px; margin: -2px 0 12px; }
+.scope-select {
+  height: 32px; padding: 0 28px 0 10px; border: 1px solid var(--rule); border-radius: 8px; appearance: none; cursor: pointer;
+  font: 600 13px var(--font); color: var(--ink);
+  background: var(--sheet) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%239AA1B5' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 12px;
+}
+#groupList { margin-bottom: 24px; }
+.grp-row { gap: 4px; }
+.grp-row.off .set-text b { color: var(--pencil); }
+.grp-switch { display: flex; align-items: center; gap: 6px; margin-right: 4px; font-size: 12px; color: var(--pencil); cursor: pointer; }
+.grp-hint { font-size: 12px; color: var(--pencil-2); margin-top: -4px; }
+.grp-add-row { padding-top: 8px !important; padding-bottom: 8px !important; }
+.grp-add { color: var(--pen); font-weight: 650; }
+.grp-now { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.color-row.off .cr-title, .color-row.off .cr-dot { opacity: 0.45; }
+.cr-head .sm-icon svg { width: 16px; height: 16px; }
+
+/* 공통 스위치 */
+input.switch {
+  appearance: none; flex-shrink: 0; width: 36px; height: 22px; margin: 0; border-radius: 11px; cursor: pointer;
+  background: var(--rule); position: relative; transition: background-color 150ms; border: 0;
+}
+input.switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 150ms;
+}
+input.switch:checked { background: var(--pen); }
+input.switch:checked::after { transform: translateX(14px); }
+input.switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }
+
+/* 과목 수정 창 */
+.subject-dialog { width: min(420px, calc(100% - 24px)); }
+.subject-dialog h2 { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.subject-dialog h2 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+.sd-body { padding: 4px 18px 8px; display: flex; flex-direction: column; max-height: min(70vh, 560px); overflow-y: auto; }
+.sd-sec { padding: 14px 0; border-bottom: 1px dashed var(--rule); display: flex; flex-direction: column; gap: 10px; }
+.sd-sec:last-child { border-bottom: 0; }
+.sd-sec h4 { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 750; }
+.sd-sec .swatches { padding: 0; }
+.sd-note { font-size: 12px; font-weight: 500; color: var(--pencil-2); }
+.sd-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.sd-row h4 + .sd-note { margin-top: 2px; }
+.sd-groups { display: flex; flex-direction: column; gap: 2px; }
+.sd-check { display: flex; align-items: center; gap: 9px; padding: 6px 2px; font-size: 14px; cursor: pointer; }
+.sd-check input { width: 17px; height: 17px; accent-color: var(--pen); flex-shrink: 0; }
+.sd-check small { margin-left: auto; color: var(--pencil-2); font-size: 12px; }
+.sd-check.always { border-top: 1px dashed var(--rule); margin-top: 4px; padding-top: 10px; }
+.sd-check input:disabled + span { color: var(--pencil); }
+.sd-foot { justify-content: flex-start; }
+.sd-foot:has(#sdDelete[hidden]) { display: none; }
+@media (max-width: 640px) {
+  .scope-label small { display: none; }
+}
+.scope-chip-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+.scope-chip-row .scope-chips { flex: 1; min-width: 0; }
+.scope-gear { margin-left: 0; }

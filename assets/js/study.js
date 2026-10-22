@@ -8,7 +8,7 @@ import { state, storage, subscribe } from './store.js';
 import { api, errText } from './api.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
 import { ambientControl } from './ambient.js';
-import { currentGroupId, inGroup } from './groups.js';
+import { inScope } from './groups.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
   subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects,
@@ -175,10 +175,9 @@ function planProgress(p) {
   return sec;
 }
 function currentSubjects() {
-  const cur = currentGroupId();                 // 오늘이 들어 있는 묶음의 과목
   const count = new Map();
   for (const t of state.tasks) {
-    if (!t.subject || !inGroup(t, cur)) continue;
+    if (!t.subject || !inScope(t, 'current')) continue;   // '지금' 분류들의 과목
     count.set(t.subject, (count.get(t.subject) || 0) + (t.done ? 0 : 1));
   }
   for (const s of study.sessions) if (s.subject && !count.has(s.subject)) count.set(s.subject, 0);
@@ -470,7 +469,7 @@ const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 // 공부 과목 목록: 이번 학기 과목 + 공부 기록·계획에 쓴 과목 + 이 기기에서 추가한 과목 + 예전 과목
 const studySubjects = () => [
   ...currentSubjects(), ...study.plans.map(p => p.subject),
-  ...taskSubjects(currentGroupId()),
+  ...taskSubjects('current'),
 ];
 const fmtDay = d => `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]})`;
 

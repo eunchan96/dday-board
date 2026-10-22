@@ -1,14 +1,16 @@
-// 묶음: 학기 · 기간 · 넓은 의미의 과목(토익, 운동 …)을 사용자가 직접 만들고 고친다
+// 분류: 학기 · 기간 · 넓은 의미의 과목(자격증, 운동 …)을 사용자가 직접 만들고 고친다
 //
 // 보드에 저장 (dday_subject_prefs.groups / dday_set_groups):
-//   groups  [{ id, name, start: 'YYYY-MM-DD'|null, end: 'YYYY-MM-DD'|null, auto }]
-//           auto = 마감 날짜로 저절로 만든 학기 (id는 '2026-2' 꼴)
-//   members { 과목: [묶음 id …] | ['*'] }   '*' = 모든 묶음에 항상 (예: 운동하기)
-//   removed ['2026-1' …]                     지운 자동 학기는 다시 만들지 않음
+//   groups   [{ id, name, start: 'YYYY-MM-DD'|null, end: 'YYYY-MM-DD'|null, auto, off }]
+//            auto = 마감 날짜로 저절로 만든 학기 (id는 '2026-2' 꼴), off = '지금' 보기에서 빼기
+//   members  { 과목: [분류 id …] | ['*'] }   '*' = 모든 분류에 항상 (예: 운동하기)
+//   inactive [과목 …]                         쓰지 않는 과목 ('지금' 보기와 과목 고르기에서 숨김)
+//   removed  ['2026-1' …]                     지운 자동 학기는 다시 만들지 않음
 //
-// 일정이 어느 묶음에 보이는지
-//   1) 과목이 묶음에 들어 있으면 그 묶음들 (여러 개 가능, '*'면 전부)
-//   2) 아니면 마감 날짜가 기간 안에 드는 묶음들
+// 일정이 어느 분류에 보이는지
+//   1) 과목이 분류에 들어 있으면 그 분류들 (여러 개 가능, '*'면 전부)
+//   2) 아니면 마감 날짜가 기간 안에 드는 분류들
+// 위쪽 '지금' = 오늘이 기간 안에 드는 분류 + 기간 없는 분류 (꺼 둔 분류 빼고) 를 모두 합쳐서
 
 import { state, storage } from './store.js';
 import { api } from './api.js';
@@ -25,20 +27,21 @@ function normalize(d) {
   const o = d && typeof d === 'object' ? d : {};
   const groups = (Array.isArray(o.groups) ? o.groups : [])
     .filter(g => g && typeof g.id === 'string' && typeof g.name === 'string')
-    .map(g => ({ id: g.id, name: g.name, start: g.start || null, end: g.end || null, auto: !!g.auto }));
+    .map(g => ({ id: g.id, name: g.name, start: g.start || null, end: g.end || null, auto: !!g.auto, off: !!g.off }));
   const members = {};
   for (const [k, v] of Object.entries(o.members && typeof o.members === 'object' ? o.members : {})) {
     if (Array.isArray(v) && v.length) members[k] = v.filter(x => typeof x === 'string');
   }
   const removed = (Array.isArray(o.removed) ? o.removed : []).filter(x => typeof x === 'string');
-  return { groups, members, removed };
+  const inactive = (Array.isArray(o.inactive) ? o.inactive : []).filter(x => typeof x === 'string');
+  return { groups, members, removed, inactive };
 }
 
 export const groupsData = () => data;
 
 function store() { storage.set(KEY, JSON.stringify(data)); }
 let saveTimer = 0;
-let serverLoaded = false;       // 보드 값을 한 번 받기 전에는 올리지 않음 (다른 기기에서 만든 묶음을 덮지 않게)
+let serverLoaded = false;       // 보드 값을 한 번 받기 전에는 올리지 않음 (다른 기기에서 만든 분류를 덮지 않게)
 function save() {
   store();
   listeners.forEach(f => f());
@@ -55,7 +58,7 @@ function save() {
 export function applyServerGroups(raw) {
   serverLoaded = true;
   const next = normalize(raw);
-  const empty = !next.groups.length && !Object.keys(next.members).length && !next.removed.length;
+  const empty = !next.groups.length && !Object.keys(next.members).length && !next.removed.length && !next.inactive.length;
   if (empty && data.groups.length) {             // 이 기기에서 먼저 만든 게 있으면 그걸 올림
     save();
     return true;
@@ -91,7 +94,7 @@ function termGroup(key) {
   const r = semesterRange(s);
   return { id: key, name: semesterLabel(s), start: dayStr(r.start), end: dayStr(addDays(r.end, -1)), auto: true };
 }
-// 일정이 있는 학기와 이번 학기는 묶음이 없으면 만든다 (사용자가 지운 학기는 빼고)
+// 일정이 있는 학기와 이번 학기는 분류가 없으면 만든다 (사용자가 지운 학기는 빼고)
 export function ensureTerms() {
   const keys = new Set(state.tasks.map(t => semesterKey(semesterOf(t.due))));
   keys.add(semesterKey(semesterOf(new Date())));
@@ -113,27 +116,66 @@ export function groupsSorted() {
 }
 export const groupById = id => data.groups.find(g => g.id === id) || null;
 
-// 오늘이 들어 있는 묶음 (여러 개면 자동 학기 → 짧은 기간 순)
+// '지금'에 드는 분류들: 켜 둔 분류 중 오늘이 기간 안이거나 기간이 없는 것
+export function currentIds(now = new Date()) {
+  return data.groups.filter(g => !g.off && (!isDated(g) || contains(g, now))).map(g => g.id);
+}
+// 오늘이 든 대표 분류 하나 (새 과목을 넣을 곳): 자동 학기 → 짧은 기간 순
 export function currentGroupId(now = new Date()) {
-  const hits = data.groups.filter(g => contains(g, now));
+  const hits = data.groups.filter(g => !g.off && contains(g, now));
   if (!hits.length) return null;
   const len = g => (groupEndExclusive(g) || new Date(8.64e15)) - (groupStart(g) || new Date(-8.64e15));
   hits.sort((a, b) => (b.auto - a.auto) || (len(a) - len(b)));
   return hits[0].id;
 }
 
-// 위에서 고른 묶음 ('all'이면 null = 전체)
+// 위에서 고른 보기: 'current'(지금) · 분류 id · 'all'(전체)
+export function scopeValue(v = state.prefs.semester) {
+  if (v === 'all') return 'all';
+  if (v && v !== 'current' && groupById(v)) return v;
+  return 'current';
+}
+// 하나만 고른 분류 (지금 · 전체면 null)
 export function activeGroupId() {
-  const p = state.prefs.semester;
-  if (p === 'all') return null;
-  if (p && p !== 'current' && groupById(p)) return p;
-  return currentGroupId();
+  const v = scopeValue();
+  return v === 'all' || v === 'current' ? null : v;
+}
+export function scopeIds(v = scopeValue()) {
+  if (v === 'all') return null;
+  if (v !== 'current') return [v];
+  const ids = currentIds();
+  return ids.length ? ids : null;                // 지금에 드는 분류가 하나도 없으면 전체
+}
+export const isInactive = name => data.inactive.includes(name);
+export function inScope(t, v = scopeValue()) {
+  if (v === 'current' && t.subject && isInactive(t.subject)) return false;
+  const ids = scopeIds(v);
+  if (!ids) return true;
+  const own = taskGroupIds(t);
+  return own.includes(ALL) || own.some(id => ids.includes(id));
+}
+export function subjectInScope(name, v = scopeValue()) {
+  if (v === 'current' && isInactive(name)) return false;
+  const ids = scopeIds(v);
+  if (!ids) return true;
+  return ids.some(id => subjectInGroup(name, id));
+}
+export function scopeLabel(v = scopeValue()) {
+  if (v === 'all') return '전체';
+  if (v !== 'current') return groupById(v)?.name || '지금';
+  return '지금';
+}
+export function scopeSub(v = scopeValue()) {
+  if (v === 'all') return '모든 일정';
+  if (v !== 'current') return periodText(groupById(v));
+  const names = currentIds().map(id => groupById(id).name);
+  return names.length ? names.join(' · ') : '모든 일정';
 }
 
 export const membersOf = name => data.members[name] || [];
 const memberIds = name => membersOf(name).filter(id => id === ALL || groupById(id));
 
-// 이 일정이 보이는 묶음 id들 (ALL이면 전부)
+// 이 일정이 보이는 분류 id들 (ALL이면 전부)
 export function taskGroupIds(t) {
   const m = t.subject ? memberIds(t.subject) : [];
   if (m.includes(ALL)) return [ALL];
@@ -145,7 +187,7 @@ export function inGroup(t, gid) {
   const ids = taskGroupIds(t);
   return ids.includes(ALL) || ids.includes(gid);
 }
-// 과목이 이 묶음에 속하는지: 직접 넣었거나, 소속을 안 정했으면 그 과목 일정이 기간 안에 있을 때
+// 과목이 이 분류에 속하는지: 직접 넣었거나, 소속을 안 정했으면 그 과목 일정이 기간 안에 있을 때
 // (일정도 소속도 없는 과목 = 직접 추가만 한 과목은 어디서나 보임)
 export function subjectInGroup(name, gid) {
   if (!gid) return true;
@@ -156,7 +198,7 @@ export function subjectInGroup(name, gid) {
   const g = groupById(gid);
   return !!g && tasks.some(t => contains(g, t.due));
 }
-// 소속을 안 정한 과목이 마감 날짜로 들어가는 묶음들
+// 소속을 안 정한 과목이 마감 날짜로 들어가는 분류들
 export function implicitGroupIds(name) {
   const ids = new Set();
   for (const t of state.tasks) if (t.subject === name) for (const g of data.groups) if (contains(g, t.due)) ids.add(g.id);
@@ -165,11 +207,11 @@ export function implicitGroupIds(name) {
 // 과목이 어디 속하는지 짧게 (설정 화면용)
 export function membershipText(name) {
   const m = memberIds(name);
-  if (m.includes(ALL)) return '모든 묶음';
+  if (m.includes(ALL)) return '모든 분류';
   if (m.length) return m.map(id => groupById(id)?.name).filter(Boolean).join(' · ');
   const ids = new Set();
   for (const t of state.tasks) if (t.subject === name) for (const g of data.groups) if (contains(g, t.due)) ids.add(g.id);
-  return ids.size ? `날짜로 · ${[...ids].map(id => groupById(id).name).join(' · ')}` : '날짜로';
+  return ids.size ? [...ids].map(id => groupById(id).name).join(' · ') : '분류 없음';
 }
 
 /* ───── 고치기 ───── */
@@ -181,10 +223,19 @@ export function setMembers(name, ids) {
   else { const { [n]: _, ...rest } = data.members; data.members = rest; }
   save();
 }
-// 새 과목을 만들면 지금 보고 있는 묶음에 넣어 둔다 (나중에 설정에서 바꿀 수 있음)
+// 새 과목을 만들면 지금 보고 있는 분류에 넣어 둔다 ('지금'이면 오늘이 든 학기). 나중에 설정에서 바꿀 수 있음
 export function assignNewSubject(name) {
-  const gid = activeGroupId();
+  const gid = activeGroupId() || currentGroupId();
   if (gid && !membersOf(name).length) setMembers(name, [gid]);
+}
+export function setInactive(name, off) {
+  const rest = data.inactive.filter(x => x !== name);
+  data.inactive = off ? [...rest, name] : rest;
+  save();
+}
+export function setGroupOff(id, off) {
+  data.groups = data.groups.map(g => (g.id === id ? { ...g, off: !!off } : g));
+  save();
 }
 
 const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -218,6 +269,7 @@ export function forgetMembers(name) {
   if (!data.members[name]) return;
   const { [name]: _, ...rest } = data.members;
   data.members = rest;
+  data.inactive = data.inactive.filter(x => x !== name);
   save();
 }
 

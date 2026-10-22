@@ -8,7 +8,7 @@
 import { h, subjectColor, orderSubjects } from './util.js';
 import { state, storage } from './store.js';
 import { api } from './api.js';
-import { subjectInGroup, assignNewSubject } from './groups.js';
+import { subjectInScope, assignNewSubject } from './groups.js';
 
 const KEY = 'ddayboard.subjects';
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -39,7 +39,7 @@ export function rememberSubject(name) {
   const list = [...cur, n].slice(-100);
   setCustomSubjects(list);
   pushCustom(list);
-  assignNewSubject(n);      // 지금 보고 있는 묶음에 넣어 둠
+  assignNewSubject(n);      // 지금 보고 있는 분류에 넣어 둠
 }
 export function forgetSubject(name) {
   const list = customSubjects().filter(x => x !== name);
@@ -47,17 +47,16 @@ export function forgetSubject(name) {
   pushCustom(list);
 }
 
-// 기본 목록: 고른 묶음의 과목(남은 일이 많은 순) → 직접 추가한 과목 → 나머지 과목
-// gid가 null이면 전체
-export function taskSubjects(gid) {
+// 기본 목록: 위에서 고른 보기(지금 · 분류 · 전체)의 과목(남은 일이 많은 순) → 직접 추가한 과목 → 나머지
+export function taskSubjects(scope) {
   const now = new Map(), old = new Set();
   for (const t of state.tasks) {
     if (!t.subject) continue;
-    if (subjectInGroup(t.subject, gid)) now.set(t.subject, (now.get(t.subject) || 0) + (t.done ? 0 : 1));
+    if (subjectInScope(t.subject, scope)) now.set(t.subject, (now.get(t.subject) || 0) + (t.done ? 0 : 1));
     else old.add(t.subject);
   }
   const cur = [...now.entries()].sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0], 'ko')).map(([n]) => n);
-  const custom = customSubjects().filter(n => subjectInGroup(n, gid));
+  const custom = customSubjects().filter(n => subjectInScope(n, scope));
   return unique([...cur, ...custom, ...[...old].filter(n => !now.has(n)).sort((a, b) => a.localeCompare(b, 'ko'))]);
 }
 const unique = list => [...new Set(list.filter(Boolean))];
