@@ -15,7 +15,7 @@ import {
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
-import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
+import { subjectPicker, taskSubjects, rememberSubject, customSubjects } from './subject-picker.js';
 import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
@@ -106,17 +106,91 @@ async function loadColors() {
     if (changedAny) renderAll();
   } catch { /* 다음에 다시 */ }
 }
-async function moveSubject(name, dir) {
-  const names = orderSubjects(taskSubjects(currentSemesterKey(), taskSemesterKey));
-  const i = names.indexOf(name), j = i + dir;
-  if (i < 0 || j < 0 || j >= names.length) return;
-  [names[i], names[j]] = [names[j], names[i]];
+// 설정 → 과목 목록: 이번 학기 과목(마감이 이번 학기인 과제 · 시험) + 이 기기에서 직접 추가한 과목
+// 지난 학기에만 있는 과목은 아래에 접어 둔다 (색만 바꿀 수 있음)
+function settingsSubjects() {
+  const cur = currentSemesterKey();
+  const now = new Set(), old = new Set();
+  for (const t of state.tasks) if (t.subject) (taskSemesterKey(t) === cur ? now : old).add(t.subject);
+  for (const n of customSubjects()) now.add(n);
+  const current = orderSubjects([...now]);
+  return { current, old: [...old].filter(n => !now.has(n)).sort((a, b) => a.localeCompare(b, 'ko')) };
+}
+async function saveOrder(names, focusName) {
   const prev = subjectOrder;
   applyOrder(names); renderAll(); renderColors();
-  requestAnimationFrame(() => $(`#colorList [data-name="${CSS.escape(name)}"] .cr-move[data-dir="${dir}"]`)?.focus());
+  if (focusName) requestAnimationFrame(() => $(`#colorList [data-name="${CSS.escape(focusName)}"] .cr-grip`)?.focus());
   try { applyOrder(await api.setSubjectOrder(state.code, names)); }
   catch (e) { applyOrder(prev); renderAll(); renderColors(); toast(errText(e)); }
 }
+function moveSubject(name, dir) {
+  const names = settingsSubjects().current;
+  const i = names.indexOf(name), j = i + dir;
+  if (i < 0 || j < 0 || j >= names.length) return;
+  [names[i], names[j]] = [names[j], names[i]];
+  saveOrder(names, name);
+}
+
+// 손잡이(⋮⋮)를 잡고 위아래로 끌어서 순서 바꾸기 — 마우스 · 터치 같은 방식 (pointer 이벤트)
+function startDrag(e, grip) {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  const list = $('#colorList .cr-current');
+  const rows = [...list.querySelectorAll(':scope > .color-row')];
+  const row = grip.closest('.color-row');
+  const from = rows.indexOf(row);
+  if (from < 0 || rows.length < 2) return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  const body = $('#settings .settings-body');
+  const items = rows.map(r => ({ el: r, top: r.offsetTop, h: r.offsetHeight }));
+  const span = items[from].h;
+  const listY = () => list.getBoundingClientRect().top;
+  const startY = e.clientY - listY();
+  let to = from, lastY = e.clientY, raf = 0;
+  row.classList.add('dragging');
+  list.classList.add('sorting');
+
+  const layout = () => {
+    const dy = (lastY - listY()) - startY;
+    const lo = -items[from].top, hi = items[items.length - 1].top + items[items.length - 1].h - items[from].top - span;
+    const d = Math.max(lo, Math.min(hi, dy));
+    row.style.transform = `translateY(${d}px)`;
+    const center = items[from].top + d + span / 2;
+    to = 0;
+    items.forEach((it, i) => { if (i !== from && it.top + it.h / 2 < center) to++; });
+    items.forEach((it, i) => {
+      if (i === from) return;
+      const shift = from < to && i > from && i <= to ? -span : to < from && i >= to && i < from ? span : 0;
+      it.el.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  };
+  // 칸 끝에 가까우면 설정 본문을 저절로 스크롤
+  const edge = () => {
+    raf = 0;
+    const r = body.getBoundingClientRect();
+    const v = lastY < r.top + 48 ? -8 : lastY > r.bottom - 48 ? 8 : 0;
+    if (v) { body.scrollTop += v; layout(); raf = requestAnimationFrame(edge); }
+  };
+  const move = ev => { lastY = ev.clientY; layout(); if (!raf) raf = requestAnimationFrame(edge); };
+  const end = () => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', end);
+    grip.removeEventListener('pointercancel', end);
+    cancelAnimationFrame(raf);
+    list.classList.remove('sorting');
+    row.classList.remove('dragging');
+    items.forEach(it => { it.el.style.transform = ''; });
+    if (to === from) return;
+    const names = rows.map(r => r.dataset.name);
+    const [n] = names.splice(from, 1);
+    names.splice(to, 0, n);
+    saveOrder(names, n);
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+}
+
 async function setColor(name, color) {
   const prev = colorMap;
   const next = { ...colorMap };
@@ -127,9 +201,10 @@ async function setColor(name, color) {
 }
 const RESET_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 9.5a5.5 5.5 0 1 1 1.6 4.4"/><path d="M4 5v4.5h4.5"/></svg>';
 let colorOpen = null;                           // 색 고르기를 펼친 과목 (한 번에 하나)
+const GRIP_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="5.5" r="1.3"/><circle cx="12.5" cy="5.5" r="1.3"/><circle cx="7.5" cy="10" r="1.3"/><circle cx="12.5" cy="10" r="1.3"/><circle cx="7.5" cy="14.5" r="1.3"/><circle cx="12.5" cy="14.5" r="1.3"/></svg>';
 function renderColors() {
-  const names = orderSubjects(taskSubjects(currentSemesterKey(), taskSemesterKey));
-  fill($('#colorList'), names.length ? names.map((name, idx) => {
+  const { current, old } = settingsSubjects();
+  const row = (name, movable) => {
     const cur = String(subjectColor(name)).toUpperCase();
     const open = colorOpen === name;
     const reset = customColorOf(name) ? h('button', {
@@ -137,29 +212,40 @@ function renderColors() {
       onclick: () => setColor(name, null),
     }) : null;
     if (reset) reset.innerHTML = RESET_SVG;
-    const move = (dir, label, path) => {
-      const b = h('button', {
-        type: 'button', class: 'btn icon ghost sm-icon cr-move', title: label, 'aria-label': `${name} ${label}`, dataset: { dir },
-        disabled: dir < 0 ? idx === 0 : idx === names.length - 1, onclick: () => moveSubject(name, dir),
+    let grip = null;
+    if (movable) {
+      grip = h('button', {
+        type: 'button', class: 'cr-grip', title: '끌어서 순서 바꾸기',
+        'aria-label': `${name} 순서 바꾸기 (위 · 아래 화살표 키)`,
+        onpointerdown: e => startDrag(e, grip),
+        onkeydown: e => {
+          if (e.key === 'ArrowUp') { e.preventDefault(); moveSubject(name, -1); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); moveSubject(name, 1); }
+        },
       });
-      b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${path}"/></svg>`;
-      return b;
-    };
+      grip.innerHTML = GRIP_SVG;
+    }
     return h('div', { class: `set-row stack color-row${open ? ' open' : ''}`, style: { '--c': cur }, dataset: { name } },
       h('div', { class: 'cr-head' },
+        grip,
         h('button', {
           type: 'button', class: 'cr-name', 'aria-expanded': open ? 'true' : 'false',
           onclick: () => { colorOpen = open ? null : name; renderColors(); },
         }, h('i', { class: 'cr-dot' }), h('span', null, name)),
-        reset,
-        move(-1, '위로', 'M10 15.5v-11M5.5 9l4.5-4.5L14.5 9'),
-        move(1, '아래로', 'M10 4.5v11M5.5 11l4.5 4.5 4.5-4.5')),
+        reset),
       open ? h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': `${name} 색` },
         SUBJECT_PALETTE.map(c => h('button', {
           type: 'button', class: 'swatch', role: 'radio', 'aria-checked': cur === c.toUpperCase() ? 'true' : 'false',
           style: { '--s': c }, 'aria-label': `${name} 색 ${c}`, onclick: () => setColor(name, c),
         }))) : null);
-  }) : h('p', { class: 'help pad' }, '과목이 있는 과제나 공부 기록이 생기면 여기서 색을 바꿀 수 있어요.'));
+  };
+  const wasOpen = $('#colorList .cr-old')?.open;
+  fill($('#colorList'),
+    current.length ? h('div', { class: 'cr-current' }, current.map(n => row(n, current.length > 1)))
+      : h('p', { class: 'help pad' }, '이번 학기 과제 · 시험에 과목이 생기면 여기서 색과 순서를 바꿀 수 있어요.'),
+    old.length ? h('details', { class: 'cr-old', open: !!wasOpen },
+      h('summary', null, `지난 학기 과목 ${old.length}개`),
+      old.map(n => row(n, false))) : null);
 }
 
 /* ───── 검색 ───── */

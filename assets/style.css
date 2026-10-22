@@ -1671,3 +1671,32 @@ svg.filled { fill: currentColor; stroke: none; }
 .plan-task.link.solo { color: var(--ink); font-size: inherit; font-weight: 650; }
 .plan-task.link:hover { text-decoration: underline; color: var(--ink); }
 .plan-task.link:focus-visible { outline: 2px solid var(--pen); border-radius: 3px; }
+
+/* ═════ 설정 → 과목: 손잡이로 끌어서 순서 바꾸기 ═════ */
+.cr-current { position: relative; }
+#settings .color-row .cr-head { padding-left: 4px; }
+.cr-grip {
+  all: unset; box-sizing: border-box; flex-shrink: 0; display: grid; place-items: center;
+  width: 32px; height: 40px; border-radius: 8px; color: var(--pencil-2); cursor: grab; touch-action: none;
+}
+.cr-grip svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+.cr-grip:hover { color: var(--ink); background: var(--sheet-2); }
+.cr-grip:focus-visible { outline: 2px solid var(--pen); outline-offset: -2px; color: var(--ink); }
+.cr-current.sorting { user-select: none; -webkit-user-select: none; }
+.cr-current.sorting .color-row { transition: transform 160ms ease; }
+.cr-current.sorting .color-row.dragging {
+  transition: none; position: relative; z-index: 2; background: var(--sheet);
+  box-shadow: 0 8px 24px rgba(16, 20, 31, 0.16), 0 0 0 1px var(--rule); border-radius: 10px;
+}
+.cr-current.sorting .color-row.dragging .cr-grip { cursor: grabbing; color: var(--pen); }
+.cr-old { border-top: 1px solid var(--rule); }
+.cr-old > summary {
+  list-style: none; cursor: pointer; padding: 12px 18px; font-size: 13px; font-weight: 650; color: var(--pencil);
+  display: flex; align-items: center; gap: 6px;
+}
+.cr-old > summary::-webkit-details-marker { display: none; }
+.cr-old > summary::before { content: '▸'; font-size: 11px; transition: transform 150ms; }
+.cr-old[open] > summary::before { transform: rotate(90deg); }
+.cr-old > summary:hover { color: var(--ink); background: var(--sheet-2); }
+.cr-old .cr-name { padding-left: 18px; }
+@media (prefers-reduced-motion: reduce) { .cr-current.sorting .color-row { transition: none; } }
