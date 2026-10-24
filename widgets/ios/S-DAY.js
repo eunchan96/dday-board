@@ -10,11 +10,14 @@
 //  4) 홈 화면을 길게 눌러 + → Scriptable → 크기 고르기 → 추가한 위젯을 길게 눌러 "위젯 편집" → Script 고르기
 //     (잠금 화면 위젯도 같은 방법으로 넣을 수 있어요)
 //  ※ 위젯 편집의 Parameter에 study · timer · upcoming 중 하나를 적으면 같은 스크립트로 다른 위젯도 돼요
+//     숫자를 함께 적으면 배경 진하기(%)예요. 예: upcoming 60
 //
 // 위젯은 15분쯤마다 새로 고쳐지고, 누르면 S-DAY가 열려요.
 
 const WIDGET_URL = '__WIDGET_URL__';
 const KIND = '__KIND__';            // study | timer | upcoming
+const OPACITY_SET = '__OPACITY__';  // 배경 진하기 0~100 (%)
+const OPACITY = /^\d{1,3}$/.test(OPACITY_SET) ? Number(OPACITY_SET) : 100;
 const APP_URL = 'https://dday-board-pink.vercel.app/';
 const MODES = { watch: null, p25: { focus: 25, rest: 5 }, p50: { focus: 50, rest: 10 } };
 
@@ -38,9 +41,13 @@ const KIND_COLOR = {
 
 function setup() {
   const p = ((typeof args !== 'undefined' && args.widgetParameter) || '').trim();
-  const kind = ['study', 'timer', 'upcoming'].includes(p) ? p : (['study', 'timer', 'upcoming'].includes(KIND) ? KIND : 'upcoming');
-  const url = /^https:\/\//.test(p) ? p : WIDGET_URL;
-  return { kind, url };
+  const words = p.split(/[\s,]+/).filter(Boolean);
+  const KINDS = ['study', 'timer', 'upcoming'];
+  const kind = words.find(x => KINDS.includes(x)) || (KINDS.includes(KIND) ? KIND : 'upcoming');
+  const url = words.find(x => /^https:\/\//.test(x)) || WIDGET_URL;
+  const n = words.find(x => /^\d{1,3}%?$/.test(x));
+  const opacity = Math.max(0, Math.min(100, n != null ? parseInt(n, 10) : OPACITY));
+  return { kind, url, opacity };
 }
 
 /* ───── 데이터 (실패하면 마지막으로 받은 걸 보여 줌) ───── */
@@ -122,7 +129,7 @@ const LOCK = ['accessoryCircular', 'accessoryRectangular', 'accessoryInline'];
 
 // 오늘 공부: 시간 · 목표 막대
 function studyWidget(w, d, now, fam) {
-  const sec = todaySec(d, now), goal = (d.study && d.study.goal) || 0;
+  const sec = todaySec(d, now);
   if (fam === 'accessoryCircular') {
     w.addSpacer();
     const t = w.addText(shortSpent(sec)); t.font = Font.boldSystemFont(14); t.centerAlignText();
@@ -133,19 +140,7 @@ function studyWidget(w, d, now, fam) {
   w.addSpacer();
   text(w, '오늘 공부', 12, C.pencil);
   w.addSpacer(2);
-  text(w, spent(sec), fam === 'small' ? 26 : 30, C.ink, 'heavy');
-  if (goal) {
-    const width = fam === 'small' ? 126 : 280;
-    w.addSpacer(10);
-    const bar = w.addStack();
-    bar.size = new Size(width, 6); bar.cornerRadius = 3; bar.backgroundColor = C.rule;
-    const fill = bar.addStack();
-    fill.size = new Size(Math.max(3, Math.min(1, sec / goal) * width), 6);
-    fill.backgroundColor = C.green; fill.cornerRadius = 3;
-    bar.addSpacer();
-    w.addSpacer(4);
-    text(w, `목표 ${spent(goal)}`, 11, C.faint, 'medium');
-  }
+  text(w, spent(sec), fam === 'small' ? 28 : 32, C.ink, 'heavy');
   w.addSpacer();
 }
 
@@ -195,18 +190,22 @@ function upcomingWidget(w, d, now, fam) {
     list.slice(0, fam === 'accessoryInline' ? 1 : 3).forEach(t => text(w, `${dday(t, nowD).text}  ${titleOf(t)}`, 12, Color.white(), 'medium'));
     return;
   }
-  const max = fam === 'small' ? 4 : fam === 'medium' ? 4 : 9;
+  const max = fam === 'small' ? 3 : fam === 'medium' ? 3 : 7;
   const items = list.slice(0, max);
   if (!items.length) { w.addSpacer(); text(w, '남은 일정이 없어요', 13, C.faint, 'medium'); w.addSpacer(); return; }
   const size = fam === 'small' ? 12 : 13.5;
   items.forEach((t, i) => {
     if (i) w.addSpacer(fam === 'large' ? 10 : 7);
+    // 과제 · 할 일은 과목을 아래 작은 글씨로 (시험은 이름 앞에 이미 있음)
+    const sub = t.kind !== 'exam' && t.subject ? t.subject : '';
     const row = w.addStack(); row.centerAlignContent();
     const bar = row.addStack();
-    bar.size = new Size(4, fam === 'small' ? 15 : 18); bar.cornerRadius = 2;
+    bar.size = new Size(4, sub ? 30 : (fam === 'small' ? 15 : 18)); bar.cornerRadius = 2;
     bar.backgroundColor = KIND_COLOR[t.kind] || KIND_COLOR.assignment;
     row.addSpacer(8);
-    text(row, titleOf(t), size, C.ink, 'medium');
+    const col = row.addStack(); col.layoutVertically();
+    text(col, titleOf(t), size, C.ink, 'medium');
+    if (sub) { col.addSpacer(1); text(col, sub, size - 2.5, C.faint, 'medium'); }
     row.addSpacer();
     row.addSpacer(6);
     const dd = dday(t, nowD);
@@ -215,9 +214,10 @@ function upcomingWidget(w, d, now, fam) {
   w.addSpacer();
 }
 
-function build(d, kind) {
+function build(d, kind, opacity = 100) {
   const w = new ListWidget();
-  w.backgroundColor = C.bg;
+  const a = opacity / 100;
+  w.backgroundColor = Color.dynamic(new Color('#FFFFFF', a), new Color('#161B29', a));
   w.url = APP_URL + (kind === 'upcoming' ? '#list' : '#study');
   const now = Date.now();
   const fam = config.widgetFamily || (kind === 'upcoming' ? 'medium' : 'small');
@@ -241,9 +241,9 @@ function build(d, kind) {
 }
 
 async function main() {
-  const { kind, url } = setup();
+  const { kind, url, opacity } = setup();
   const d = await load(url);
-  const w = build(d, kind);
+  const w = build(d, kind, opacity);
   if (config.runsInWidget) Script.setWidget(w);
   else if (kind === 'upcoming') await w.presentMedium();
   else await w.presentSmall();

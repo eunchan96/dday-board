@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.SeekBar
 import android.widget.TextView
 import kotlin.concurrent.thread
 
@@ -51,6 +52,23 @@ class MainActivity : Activity() {
                 }
             }
         }
+
+        // 배경 진하기: 0~100%를 10단계로
+        val opacity = findViewById<SeekBar>(R.id.opacity)
+        val opacityLabel = findViewById<TextView>(R.id.opacity_label)
+        fun showOpacity(v: Int) { opacityLabel.text = "위젯 배경 진하기 $v%" }
+        opacity.progress = Store.opacity(this) / 10
+        showOpacity(Store.opacity(this))
+        opacity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                Store.setOpacity(this@MainActivity, value * 10)
+                showOpacity(value * 10)
+                Widgets.render(this@MainActivity)
+            }
+            override fun onStartTrackingTouch(bar: SeekBar) {}
+            override fun onStopTrackingTouch(bar: SeekBar) {}
+        })
 
         findViewById<Button>(R.id.open).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Widgets.APP_URL)))

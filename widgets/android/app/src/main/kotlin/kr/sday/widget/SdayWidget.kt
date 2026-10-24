@@ -48,16 +48,20 @@ object Widgets {
     const val APP_URL = "https://dday-board-pink.vercel.app/"
     private val MODES = mapOf("p25" to (25 to 5), "p50" to (50 to 10))
     private val ROWS = listOf(
-        arrayOf(R.id.row0, R.id.bar0, R.id.title0, R.id.dday0),
-        arrayOf(R.id.row1, R.id.bar1, R.id.title1, R.id.dday1),
-        arrayOf(R.id.row2, R.id.bar2, R.id.title2, R.id.dday2),
-        arrayOf(R.id.row3, R.id.bar3, R.id.title3, R.id.dday3),
-        arrayOf(R.id.row4, R.id.bar4, R.id.title4, R.id.dday4),
-        arrayOf(R.id.row5, R.id.bar5, R.id.title5, R.id.dday5),
+        arrayOf(R.id.row0, R.id.bar0, R.id.title0, R.id.dday0, R.id.sub0),
+        arrayOf(R.id.row1, R.id.bar1, R.id.title1, R.id.dday1, R.id.sub1),
+        arrayOf(R.id.row2, R.id.bar2, R.id.title2, R.id.dday2, R.id.sub2),
+        arrayOf(R.id.row3, R.id.bar3, R.id.title3, R.id.dday3, R.id.sub3),
+        arrayOf(R.id.row4, R.id.bar4, R.id.title4, R.id.dday4, R.id.sub4),
+        arrayOf(R.id.row5, R.id.bar5, R.id.title5, R.id.dday5, R.id.sub5),
     )
 
     private fun ids(ctx: Context, cls: Class<*>) = AppWidgetManager.getInstance(ctx).getAppWidgetIds(ComponentName(ctx, cls))
     fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java).any { ids(ctx, it).isNotEmpty() }
+
+    /** 배경 진하기 (앱에서 정한 값) */
+    private fun applyOpacity(ctx: Context, views: RemoteViews) =
+        views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx) * 255 / 100)
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
         ctx, code, Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL + hash)),
@@ -80,6 +84,7 @@ object Widgets {
         val ids = ids(ctx, SdayWidget::class.java)
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget)
+        applyOpacity(ctx, views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#list", 0))
         val list = data?.upcoming.orEmpty()
         views.setViewVisibility(R.id.empty, if (list.isEmpty()) View.VISIBLE else View.GONE)
@@ -94,6 +99,10 @@ object Widgets {
             // 시험은 "중간고사"처럼 이름만 있는 경우가 많아 과목을 앞에 붙임 (접두어는 없음)
             val title = if (task.kind == "exam" && task.subject.isNotBlank() && !task.title.contains(task.subject)) "${task.subject} ${task.title}" else task.title
             views.setTextViewText(r[2], title)
+            // 과제 · 할 일은 과목을 아래 작은 글씨로 (시험은 이름 앞에 이미 있음)
+            val sub = if (task.kind != "exam") task.subject else ""
+            views.setTextViewText(r[4], sub)
+            views.setViewVisibility(r[4], if (sub.isBlank()) View.GONE else View.VISIBLE)
             val (label, late) = dday(task, now)
             views.setTextViewText(r[3], label)
             views.setTextColor(r[3], ctx.getColor(if (task.missing || late) R.color.red else R.color.ink))
@@ -106,24 +115,15 @@ object Widgets {
         val ids = ids(ctx, StudyWidget::class.java)
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget_study)
+        applyOpacity(ctx, views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 1))
         if (data == null) {
             views.setTextViewText(R.id.today, "—")
-            views.setViewVisibility(R.id.goal, View.GONE)
-            views.setTextViewText(R.id.goal_text, "")
         } else {
             val t = data.timer
             var today = data.todaySec
             if (t != null && t.phase == "focus" && t.running && t.segStart > 0) today += (t.acc + nowMs - t.segStart) / 1000
             views.setTextViewText(R.id.today, spent(today))
-            if (data.goalSec > 0) {
-                views.setViewVisibility(R.id.goal, View.VISIBLE)
-                views.setProgressBar(R.id.goal, 100, ((today * 100) / data.goalSec).toInt().coerceIn(0, 100), false)
-                views.setTextViewText(R.id.goal_text, "목표 ${spent(data.goalSec)}")
-            } else {
-                views.setViewVisibility(R.id.goal, View.GONE)
-                views.setTextViewText(R.id.goal_text, "")
-            }
         }
         AppWidgetManager.getInstance(ctx).updateAppWidget(ids, views)
     }
@@ -133,6 +133,7 @@ object Widgets {
         val ids = ids(ctx, TimerWidget::class.java)
         if (ids.isEmpty()) return null
         val views = RemoteViews(ctx.packageName, R.layout.widget_timer)
+        applyOpacity(ctx, views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 2))
         views.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(
             ctx, 3, Intent(ctx, TimerWidget::class.java).setAction(ACTION_REFRESH),

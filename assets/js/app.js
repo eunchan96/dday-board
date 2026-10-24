@@ -941,7 +941,8 @@ async function copyIosScript(kind, name) {
   try {
     const src = await (await fetch('widgets/ios/S-DAY.js', { cache: 'no-store' })).text();
     const code = src.replace("'__WIDGET_URL__'", JSON.stringify($('#widgetUrl').value).replace(/"/g, "'"))
-      .replace("'__KIND__'", `'${kind}'`);
+      .replace("'__KIND__'", `'${kind}'`)
+      .replace("'__OPACITY__'", `'${$('#iosOpacity').value}'`);
     let ok = false;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { /* 노션 안에서는 막힐 수 있음 */ }
     if (!ok) {
@@ -1477,6 +1478,8 @@ function bind() {
   $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg')));
   $('#btnWidgetKey').addEventListener('click', makeWidgetKey);
   $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg')));
+  try { const v = storage.get('ddayboard.iosOpacity'); if (v) $('#iosOpacity').value = v; } catch { /* 무시 */ }
+  $('#iosOpacity').addEventListener('change', e => { try { storage.set('ddayboard.iosOpacity', e.target.value); } catch { /* 무시 */ } });
   $('#iosCopy').addEventListener('click', e => {
     const b = e.target.closest('button[data-kind]');
     if (b) copyIosScript(b.dataset.kind, b.dataset.name);

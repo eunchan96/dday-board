@@ -2087,3 +2087,4 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
   #friendsDialog .set-nav .f-count { margin-left: 0; }
 }
 .f-count[hidden] { display: none; }
+.ios-opacity { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pencil); margin-top: 8px; }

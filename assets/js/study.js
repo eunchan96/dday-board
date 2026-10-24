@@ -1460,7 +1460,6 @@ function renderFriends() {
     fill(body,
       group('친구 신청하기', h('div', { class: 'set-card' },
         h('div', { class: 'set-row stack' },
-          h('div', { class: 'set-text' }, h('span', { class: 'set-sub' }, '친구에게 받은 친구 코드를 넣어 신청해요. 상대가 수락하면 서로 친구가 돼요')),
           h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn primary', onclick: add }, '신청')),
           msg))),
       group(['받은 신청', inc.length ? h('span', { class: 'f-count' }, inc.length) : null], h('div', { class: 'set-card' },
@@ -1512,17 +1511,16 @@ function renderFriends() {
             catch { setFriendMsg(`내 코드: ${p.friendCode}`); }
           },
         }, copyIcon(), '복사')),
-      row('코드 새로 만들기', '이전 코드로는 더 이상 신청할 수 없어요. 이미 친구인 사람은 그대로예요', newCodeBtn))),
+      row('코드 새로 만들기', '이전 코드는 막혀요', newCodeBtn))),
     group('닉네임', h('div', { class: 'set-card' },
       h('div', { class: 'set-row stack' },
-        h('div', { class: 'set-text' }, h('span', { class: 'set-sub' }, '친구의 랭킹에 보이는 이름이에요')),
         h('div', { class: 'inline-form' }, newNick, h('button', { type: 'button', class: 'btn', onclick: saveNick }, '바꾸기'))))),
     group('공개 설정', h('div', { class: 'set-card' },
-      row('친구에게 공부 시간 보이기', '그만하면 친구 랭킹에서 내가 보이지 않아요. 다시 공개하면 친구는 그대로 이어져요',
-        h('button', {
-          type: 'button', class: 'btn sm danger ghost',
-          onclick: () => friendAction(async () => { study.profile = await api.studyProfileHide(state.code); study.friends = []; }, '친구에게 더 이상 보이지 않아요'),
-        }, '공개 그만하기')))));
+      row('친구에게 공개', '끄면 랭킹에서 내가 안 보여요',
+        h('input', {
+          type: 'checkbox', role: 'switch', class: 'switch', checked: true, 'aria-label': '친구에게 공개',
+          onchange: () => friendAction(async () => { study.profile = await api.studyProfileHide(state.code); study.friends = []; }, '친구에게 더 이상 보이지 않아요'),
+        })))));
 }
 
 /* ───── 공부 화면 아래: 지금 공부 중인 친구 ───── */

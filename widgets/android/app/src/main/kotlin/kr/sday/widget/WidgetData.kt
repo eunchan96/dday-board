@@ -41,6 +41,9 @@ object Store {
 
     fun url(ctx: Context): String = ctx.getSharedPreferences(PREFS, 0).getString(KEY_URL, "") ?: ""
     fun setUrl(ctx: Context, url: String) = ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_URL, url.trim()).apply()
+    /** 위젯 배경 진하기 0~100 (%) */
+    fun opacity(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("opacity", 100)
+    fun setOpacity(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("opacity", v.coerceIn(0, 100)).apply()
     fun cache(ctx: Context): String? = ctx.getSharedPreferences(PREFS, 0).getString(KEY_CACHE, null)
     fun setCache(ctx: Context, json: String) = ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_CACHE, json).apply()
 
