@@ -54,6 +54,7 @@ const study = {
   plans: [],
   profile: null,
   friends: [],
+  requests: { incoming: [], outgoing: [] },
   friendsError: null,
   windowStart: null,          // sessions를 받아 온 시작 시각
   extra: new Map(),           // 기록 탭에서 더 불러온 예전 기록 (id → 기록)
@@ -122,9 +123,14 @@ function addSession(s) {
 
 export async function loadFriends() {
   if (!state.code || !study.profile || !study.profile.visible) return;
-  try { study.friends = (await api.friends(state.code)) || []; study.friendsError = null; }
-  catch (e) { study.friendsError = errText(e); }
+  try {
+    const [list, req] = await Promise.all([api.friends(state.code), api.friendRequests(state.code).catch(() => null)]);
+    study.friends = list || [];
+    if (req) study.requests = { incoming: req.incoming || [], outgoing: req.outgoing || [] };
+    study.friendsError = null;
+  } catch (e) { study.friendsError = errText(e); }
   renderFriends();
+  renderLiveFriends();
 }
 
 /* ───── 계산 ───── */
@@ -286,6 +292,7 @@ if (timer.phase !== 'idle' && !timer.running) {
 
 // 1초마다: 시간이 다 된 단계를 넘기고 화면 숫자만 바꾼다
 function tick() {
+  tickLiveFriends();
   if (timer.phase === 'idle') return;
   const now = Date.now();
   let moved = false;
@@ -481,6 +488,7 @@ const playIcon = () => svgIcon(['M7 5.2v9.6l7.6-4.8z'], true);
 const plusIcon = () => svgIcon(['M10 4.5v11M4.5 10h11']);
 const watchIcon = () => svgIcon(['M10 17a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM10 8v3l2 1.4M8.3 2.8h3.4M15 5.5l1.2-1.2']);
 const copyIcon = () => svgIcon(['M7 7h9v9H7zM4 13V4h9']);
+const personIcon = () => svgIcon(['M10 9.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z', 'M3.8 17c.6-3.2 3-5 6.2-5s5.6 1.8 6.2 5']);
 const userPlusIcon = () => svgIcon(['M8 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 16.5c.6-3 2.6-4.6 5.2-4.6s4.1 1 4.9 3M15.5 10v5M13 12.5h5']);
 const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
 const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
@@ -524,6 +532,7 @@ function build(root) {
     el.planPick.set('');
   };
   el.planMemo.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addPlan(); } });
+  el.liveFriends = h('section', { class: 's-live-friends', 'aria-label': '지금 공부 중인 친구', hidden: true });
   el.plans = h('section', { class: 's-plans' },
     h('h3', null, '오늘 공부'),
     el.planList,
@@ -537,7 +546,7 @@ function build(root) {
   el.todaySubj = h('div', { class: 'day-subjects' });
 
   el.todayRoot = h('div', { class: 'st-today' },
-    h('div', { class: 'st-left' }, el.timerCard, el.plans),
+    h('div', { class: 'st-left' }, el.timerCard, el.plans, el.liveFriends),
     h('aside', { class: 'st-right', 'aria-label': '오늘 타임라인' }, el.dayHead, el.timeline, el.addBox.box, el.todaySubj));
 
   /* 기록 */
@@ -593,7 +602,7 @@ export function render() {
   const v = studyView();
   el.todayRoot.hidden = v !== 'today';
   el.recRoot.hidden = v !== 'records';
-  if (v === 'today') { renderTimer(); renderPlans(); renderDay(); }
+  if (v === 'today') { renderTimer(); renderPlans(); renderDay(); renderLiveFriends(); }
   else renderRecords();
 }
 
@@ -1151,11 +1160,14 @@ async function friendAction(fn, ok) {
 function renderFriendsBtn() {
   const badge = $('#friendsLive');
   if (!badge) return;
-  const n = study.profile && study.profile.visible ? study.friends.filter(f => f.liveSince).length : 0;
-  badge.hidden = !n;
-  badge.textContent = n;
+  const vis = study.profile && study.profile.visible;
+  const n = vis ? study.friends.filter(f => f.liveSince).length : 0;
+  const req = vis ? study.requests.incoming.length : 0;
+  badge.hidden = !n && !req;
+  badge.textContent = req ? `+${req}` : n;
+  badge.classList.toggle('req', !!req);
   const btn = $('#btnFriends');
-  if (btn) btn.title = n ? `친구 ${n}명 공부 중` : '친구';
+  if (btn) btn.title = req ? `친구 신청 ${req}개` : n ? `친구 ${n}명 공부 중` : '친구';
 }
 
 export async function openFriends() {
@@ -1166,6 +1178,11 @@ export async function openFriends() {
   if (!study.loaded) await loadStudy();
   await loadFriends();
 }
+
+// 이름 첫 글자 동그라미 (공부 중이면 초록 테두리)
+const avatar = (name, live = false, me = false) =>
+  h('span', { class: `f-avatar${live ? ' live' : ''}${me ? ' me' : ''}`, 'aria-hidden': 'true' }, [...String(name || '?')][0]);
+const liveMinOf = r => (r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 60000)) : 0);
 
 function renderFriends() {
   renderFriendsBtn();
@@ -1182,8 +1199,10 @@ function renderFriends() {
     }, p ? '다시 공개했어요' : '친구 코드를 만들었어요. 친구에게 알려 주세요');
     nick.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) go(); });
     fill(body,
-      h('p', { class: 'help' }, p ? '지금은 친구에게 공부 시간을 보여 주지 않고 있어요.'
-        : '닉네임을 정하면 친구 코드가 생겨요. 코드를 주고받으면 서로 오늘 공부한 시간과 지금 공부 중인지 볼 수 있어요. 과목이나 계획은 보이지 않아요.'),
+      h('div', { class: 'f-intro' },
+        h('span', { class: 'f-intro-icon' }, userPlusIcon()),
+        h('b', null, p ? '지금은 친구에게 공부 시간을 보여 주지 않고 있어요' : '친구와 공부 시간 겨루기'),
+        h('p', null, '닉네임을 정하면 친구 코드가 생겨요. 코드로 신청하고 상대가 수락하면 서로 오늘 공부 시간과 지금 공부 중인지 보여요. 과목이나 계획은 보이지 않아요.')),
       h('div', { class: 'inline-form' }, nick, h('button', { type: 'button', class: 'btn primary', onclick: go }, p ? '다시 공개' : '시작하기')),
       msg);
     return;
@@ -1204,19 +1223,77 @@ function renderFriends() {
   const val = r => (r.me ? r[friendRange] || 0 : (r[friendRange] || 0) + liveSec(r));
   const rows = [me, ...study.friends].sort((a, b) => (val(b) - val(a)) || (a.me ? -1 : b.me ? 1 : 0));
   const top = Math.max(1, ...rows.map(val));
-  const liveN = rows.filter(r => r.liveSince).length;
   let rank = 0, prev = null;
   const ranks = rows.map((r, i) => { if (val(r) !== prev) { rank = i + 1; prev = val(r); } return rank; });
-  const code = h('input', { type: 'text', maxlength: 12, placeholder: '친구 코드', 'aria-label': '친구 코드', class: 'code-input', autocomplete: 'off', spellcheck: 'false' });
+
+  const rangeBtns = h('div', { class: 'segmented f-range', role: 'radiogroup', 'aria-label': '기간' },
+    [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달']].map(([k, label]) => h('button', {
+      type: 'button', role: 'radio', 'aria-checked': friendRange === k ? 'true' : 'false',
+      onclick: () => { friendRange = k; try { storage.set('ddayboard.friendRange', k); } catch { /* 무시 */ } renderFriends(); },
+    }, label)));
+
+  // 받은 신청
+  const inc = study.requests.incoming;
+  const incoming = inc.length ? h('section', { class: 'f-sec f-requests' },
+    h('h4', null, '받은 신청', h('span', { class: 'f-count' }, inc.length)),
+    h('ul', { class: 'f-req-list' }, inc.map(r => h('li', null,
+      avatar(r.nickname),
+      h('span', { class: 'f-req-name' }, r.nickname),
+      h('button', { type: 'button', class: 'btn sm primary', onclick: () => friendAction(async () => {
+        study.friends = await api.friendAccept(state.code, r.code);
+        study.requests.incoming = study.requests.incoming.filter(x => x.code !== r.code);
+      }, `${r.nickname} 님과 친구가 됐어요`) }, '수락'),
+      h('button', { type: 'button', class: 'btn sm ghost', onclick: () => friendAction(async () => {
+        await api.friendRemove(state.code, r.code);
+        study.requests.incoming = study.requests.incoming.filter(x => x.code !== r.code);
+      }, '신청을 거절했어요') }, '거절'))))) : null;
+
+  // 순위
+  const ranking = h('section', { class: 'f-sec' },
+    h('div', { class: 'f-sec-head' }, h('h4', null, '순위'), rangeBtns),
+    h('ol', { class: 'friend-list' }, rows.map((r, i) => {
+      const v = val(r);
+      return h('li', { class: `${r.me ? 'me' : ''}${r.liveSince ? ' live' : ''}` },
+        h('span', { class: `f-rank${ranks[i] <= 3 && v > 0 ? ` r${ranks[i]}` : ''}`, 'aria-label': `${ranks[i]}등` }, ranks[i]),
+        avatar(r.nickname, !!r.liveSince, r.me),
+        h('span', { class: 'f-main' },
+          h('span', { class: 'f-line' },
+            h('span', { class: 'f-nick' }, r.nickname, r.me ? h('span', { class: 'f-me' }, '나') : null),
+            r.liveSince ? h('span', { class: 'f-live' }, `공부 중 ${liveMinOf(r)}분`) : null),
+          h('span', { class: 'f-bar' }, h('i', { style: { width: `${Math.max(v ? 3 : 0, (v / top) * 100)}%` } }))),
+        h('span', { class: 'f-time' }, fmtSpent(v)),
+        r.me ? h('span', { class: 'f-x' }) : h('button', {
+          type: 'button', class: 'btn icon ghost sm-icon f-x', title: '친구 끊기', 'aria-label': `${r.nickname} 친구 끊기`,
+          onclick: () => friendAction(async () => { study.friends = await api.friendRemove(state.code, r.code); }, `${r.nickname} 님과 친구를 끊었어요`),
+        }, xIcon()));
+    })),
+    rows.length === 1 ? h('p', { class: 'f-empty' }, '아직 친구가 없어요. 아래에서 친구 코드로 신청해 보세요.') : null);
+
+  // 친구 신청 보내기 + 보낸 신청
+  const code = h('input', { type: 'text', maxlength: 12, placeholder: '친구 코드 (예: AB12-CD34)', 'aria-label': '친구 코드', class: 'code-input', autocomplete: 'off', spellcheck: 'false' });
   const add = () => friendAction(async () => {
     if (!code.value.trim()) throw new Error('friend_not_found');
     const before = study.friends.length;
     study.friends = await api.friendAdd(state.code, code.value);
     code.value = '';
-    friendMsg = { text: study.friends.length === before ? '이미 추가한 친구예요' : '친구를 추가했어요', err: false };
+    const req = await api.friendRequests(state.code).catch(() => null);
+    if (req) study.requests = { incoming: req.incoming || [], outgoing: req.outgoing || [] };
+    friendMsg = { text: study.friends.length > before ? '서로 친구가 됐어요' : '신청했어요. 상대가 수락하면 순위에 보여요', err: false };
   });
   code.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) add(); });
+  const out = study.requests.outgoing;
+  const addSec = h('section', { class: 'f-sec' },
+    h('h4', null, '친구 신청'),
+    h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn primary', onclick: add }, '신청')),
+    msg,
+    out.length ? h('ul', { class: 'f-out' }, out.map(r => h('li', null,
+      h('span', null, r.nickname, h('small', null, ' · 수락 기다리는 중')),
+      h('button', { type: 'button', class: 'btn sm ghost', onclick: () => friendAction(async () => {
+        await api.friendRemove(state.code, r.code);
+        study.requests.outgoing = study.requests.outgoing.filter(x => x.code !== r.code);
+      }, '신청을 취소했어요') }, '취소')))) : null);
 
+  // 내 코드 · 관리
   const newNick = h('input', { type: 'text', maxlength: 20, value: p.nickname, 'aria-label': '새 닉네임' });
   let armed = null;
   const newCodeBtn = h('button', { type: 'button', class: 'btn sm' }, '코드 새로 만들기');
@@ -1227,39 +1304,9 @@ function renderFriends() {
       return;
     }
     clearTimeout(armed); armed = null;
-    friendAction(async () => { study.profile = await api.studyNewCode(state.code); }, '새 코드를 만들었어요. 이전 코드로 나를 추가한 친구는 더 이상 볼 수 없어요');
+    friendAction(async () => { study.profile = await api.studyNewCode(state.code); }, '새 코드를 만들었어요. 이전 코드로는 더 이상 신청할 수 없어요');
   });
-
-  const rangeBtns = h('div', { class: 'segmented f-range', role: 'radiogroup', 'aria-label': '기간' },
-    [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달']].map(([k, label]) => h('button', {
-      type: 'button', role: 'radio', 'aria-checked': friendRange === k ? 'true' : 'false',
-      onclick: () => { friendRange = k; try { storage.set('ddayboard.friendRange', k); } catch { /* 무시 */ } renderFriends(); },
-    }, label)));
-
-  fill(body,
-    h('div', { class: 'f-head' },
-      rangeBtns,
-      h('span', { class: `f-live-count${liveN ? ' on' : ''}` }, h('i', { class: `f-dot${liveN ? ' live' : ''}` }), liveN ? `${liveN}명 공부 중` : '지금 공부 중인 사람 없음')),
-    msg,
-    h('ol', { class: 'friend-list' }, rows.map((r, i) => {
-      const liveMin = r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 60000)) : null;
-      const v = val(r);
-      return h('li', { class: `${r.me ? 'me' : ''}${r.liveSince ? ' live' : ''}` },
-        h('span', { class: `f-rank${ranks[i] <= 3 && v > 0 ? ` r${ranks[i]}` : ''}`, 'aria-label': `${ranks[i]}등` }, ranks[i]),
-        h('span', { class: 'f-name' },
-          h('span', { class: 'f-nick' }, r.me ? `${r.nickname} (나)` : r.nickname),
-          r.liveSince ? h('span', { class: 'f-live' }, h('i', { class: 'f-dot live' }), `공부 중 · ${liveMin}분째`) : null),
-        h('span', { class: 'f-bar' }, h('i', { style: { width: `${(v / top) * 100}%` } })),
-        h('span', { class: 'f-time' }, fmtSpent(v)),
-        r.me ? h('span', { class: 'f-x' }) : h('button', {
-          type: 'button', class: 'btn icon ghost sm-icon row-x f-x', title: '친구 빼기', 'aria-label': `${r.nickname} 친구 빼기`,
-          onclick: () => friendAction(async () => {
-            study.friends = await api.friendRemove(state.code, r.code);
-          }, `${r.nickname} 님을 친구에서 뺐어요`),
-        }, xIcon()));
-    })),
-    rows.length === 1 ? h('p', { class: 'help fine' }, '친구 코드를 넣으면 여기에 함께 순위가 보여요.') : null,
-    h('div', { class: 'inline-form f-add' }, code, h('button', { type: 'button', class: 'btn icon primary', onclick: add, title: '친구 추가', 'aria-label': '친구 추가' }, userPlusIcon())),
+  const mine = h('section', { class: 'f-sec f-mine' },
     h('div', { class: 'my-code' },
       h('span', null, '내 친구 코드'),
       h('b', { class: 'code' }, p.friendCode),
@@ -1271,7 +1318,7 @@ function renderFriends() {
         },
       }, copyIcon())),
     h('details', { class: 'more friend-manage' },
-      h('summary', null, '관리'),
+      h('summary', null, '닉네임 · 공개 설정'),
       h('div', { class: 'inline-form' }, newNick, h('button', {
         type: 'button', class: 'btn sm',
         onclick: () => friendAction(async () => { study.profile = await api.studyProfile(state.code, newNick.value); }, '닉네임을 바꿨어요'),
@@ -1281,9 +1328,30 @@ function renderFriends() {
         h('button', {
           type: 'button', class: 'btn sm danger ghost',
           onclick: () => friendAction(async () => { study.profile = await api.studyProfileHide(state.code); study.friends = []; }, '친구에게 더 이상 보이지 않아요'),
-        }, '공개 그만하기')),
-      h('p', { class: 'help fine' }, '친구는 내 코드를 넣은 사람이에요. 코드를 새로 만들면 지금까지 나를 추가한 사람은 더 이상 내 기록을 못 봐요.')),
-  );
+        }, '공개 그만하기'))));
+
+  fill(body, incoming, ranking, addSec, mine);
+}
+
+/* ───── 공부 화면 아래: 지금 공부 중인 친구 ───── */
+function renderLiveFriends() {
+  if (!el.liveFriends) return;
+  const vis = study.profile && study.profile.visible;
+  const live = vis ? study.friends.filter(f => f.liveSince).sort((a, b) => new Date(a.liveSince) - new Date(b.liveSince)) : [];
+  el.liveFriends.hidden = !live.length;
+  if (!live.length) { el.liveFriends.replaceChildren(); return; }
+  fill(el.liveFriends,
+    h('h3', null, '지금 공부 중인 친구', h('span', { class: 'lf-count' }, live.length)),
+    h('ul', { class: 'lf-list' }, live.map(f => h('li', null,
+      h('span', { class: 'lf-icon', 'aria-hidden': 'true' }, personIcon()),
+      h('span', { class: 'lf-name' }, f.nickname),
+      h('span', { class: 'lf-today' }, `오늘 ${fmtSpent((f.today || 0) + Math.floor((Date.now() - new Date(f.liveSince)) / 1000))}`),
+      h('span', { class: 'lf-timer', dataset: { since: f.liveSince } }, clock(Date.now() - new Date(f.liveSince), true))))));
+}
+// 1초마다 친구 타이머 숫자만
+function tickLiveFriends() {
+  if (!el.liveFriends || el.liveFriends.hidden) return;
+  for (const t of el.liveFriends.querySelectorAll('.lf-timer')) t.textContent = clock(Math.max(0, Date.now() - new Date(t.dataset.since)), true);
 }
 
 /* ───── 시작 ───── */
@@ -1291,7 +1359,7 @@ export function initStudy(options) {
   ctx = { ...ctx, ...options };
   subscribe(what => {
     if (what === 'board') {
-      Object.assign(study, { loaded: false, sessions: [], daily: new Map(), plans: [], profile: null, friends: [], extra: new Map() });
+      Object.assign(study, { loaded: false, sessions: [], daily: new Map(), plans: [], profile: null, friends: [], requests: { incoming: [], outgoing: [] }, extra: new Map() });
       loadedRanges.clear();
       builtFor = null;
     }

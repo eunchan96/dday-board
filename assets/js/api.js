@@ -75,6 +75,8 @@ export const api = {
   friends: code => rpc('dday_friends', { p_code: code }),
   friendAdd: (code, friendCode) => rpc('dday_friend_add', { p_code: code, p_friend_code: friendCode }),
   friendRemove: (code, friendCode) => rpc('dday_friend_remove', { p_code: code, p_friend_code: friendCode }),
+  friendAccept: (code, friendCode) => rpc('dday_friend_accept', { p_code: code, p_friend_code: friendCode }),
+  friendRequests: code => rpc('dday_friend_requests', { p_code: code }),
 };
 
 export function errText(e) {
@@ -106,6 +108,7 @@ export function errText(e) {
     case 'invalid_nickname': return '닉네임은 1~20자로 적어 주세요';
     case 'friend_not_found': return '그 친구 코드를 찾지 못했어요. 코드를 다시 확인해 주세요';
     case 'friend_self': return '내 친구 코드예요';
+    case 'profile_required': return '먼저 닉네임을 정해 주세요';
     case 'too_many_friends': return '친구는 50명까지 추가할 수 있어요';
     case 'invalid_order': return '과목 순서를 저장하지 못했어요';
     case 'invalid_subjects': return '과목을 저장하지 못했어요';

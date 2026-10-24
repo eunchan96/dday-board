@@ -1895,3 +1895,70 @@ input.switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px;
 .help.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
 a.btn { text-decoration: none; color: inherit; }
 a.btn.primary { color: #fff; }
+
+/* ═════ 친구 창 (정리) ═════ */
+#friendsDialog { width: min(460px, calc(100% - 24px)); }
+.friends-body { gap: 0 !important; padding-top: 4px !important; }
+.f-sec { padding: 16px 0; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+.f-sec:last-child { border-bottom: 0; padding-bottom: 4px; }
+.f-sec h4 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 750; color: var(--pencil); }
+.f-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.f-sec-head .segmented button { min-height: 30px; padding: 0 10px; font-size: 13px; }
+.f-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; font-weight: 750; display: inline-grid; place-items: center; }
+.f-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+  background: var(--sheet-2); color: var(--pencil); font-size: 14px; font-weight: 750; box-shadow: inset 0 0 0 1px var(--rule);
+}
+.f-avatar.me { background: var(--pen-soft); color: var(--pen); box-shadow: none; }
+.f-avatar.live { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--green); }
+.friend-list { list-style: none; display: flex; flex-direction: column; gap: 2px; border: 0 !important; margin: 0 -8px; }
+.friend-list li {
+  display: grid !important; grid-template-columns: 22px 32px minmax(0, 1fr) auto 28px !important; align-items: center; gap: 10px !important;
+  padding: 8px !important; border: 0 !important; border-radius: 10px; background: none !important;
+}
+.friend-list li.me { background: color-mix(in srgb, var(--pen) 6%, transparent) !important; }
+.f-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.f-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.f-nick { font-weight: 650; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.f-me { font-size: 11px; font-weight: 700; color: var(--pen); background: var(--pen-soft); border-radius: 999px; padding: 0 6px; }
+.f-live { font-size: 12px; font-weight: 650; color: var(--green); white-space: nowrap; }
+.f-bar { height: 4px !important; background: var(--sheet-2); border-radius: 2px; overflow: hidden; }
+.f-bar i { display: block; height: 100%; background: var(--pencil-2); border-radius: 2px; }
+.friend-list li.me .f-bar i { background: var(--pen); }
+.friend-list li.live .f-bar i { background: var(--green); }
+.f-time { font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.f-x { opacity: 0; }
+.friend-list li:hover .f-x, .f-x:focus-visible { opacity: 1; }
+@media (hover: none) { .f-x { opacity: 0.6; } }
+.f-empty { font-size: 13px; color: var(--pencil-2); padding: 4px 0; }
+.f-req-list, .f-out { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.f-req-list li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--sheet-2); }
+.f-req-name { flex: 1; min-width: 0; font-weight: 650; }
+.f-out li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13.5px; font-weight: 600; }
+.f-out small { color: var(--pencil-2); font-weight: 500; }
+.f-mine { gap: 6px; }
+.f-intro { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 8px 16px; }
+.f-intro-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--pen-soft); color: var(--pen); display: grid; place-items: center; }
+.f-intro-icon svg { width: 22px; height: 22px; }
+.f-intro b { font-size: 16px; }
+.f-intro p { font-size: 13.5px; color: var(--pencil); line-height: 1.55; }
+.fb-live.req { background: var(--red); }
+@media (max-width: 640px) {
+  .friend-list li { grid-template-columns: 18px 30px minmax(0, 1fr) auto 26px !important; gap: 8px !important; }
+  .f-avatar { width: 30px; height: 30px; font-size: 13px; }
+}
+
+/* ═════ 공부 화면: 지금 공부 중인 친구 ═════ */
+.s-live-friends { margin-top: 28px; }
+.s-live-friends h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--pencil); margin-bottom: 8px; }
+.lf-count { font-size: 12px; color: var(--green); font-weight: 750; }
+.lf-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.lf-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 9px 4px; border-bottom: 1px solid var(--rule); }
+.lf-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); position: relative; }
+.lf-icon svg { width: 17px; height: 17px; }
+.lf-icon::after { content: ''; position: absolute; right: 0; bottom: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 2px var(--paper); animation: live-pulse 1.6s ease-in-out infinite; }
+.lf-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lf-today { font-size: 12.5px; color: var(--pencil-2); white-space: nowrap; }
+.lf-timer { font-weight: 750; font-variant-numeric: tabular-nums; font-size: 15px; color: var(--green); min-width: 4.5em; text-align: right; }
+@media (max-width: 640px) { .lf-today { display: none; } .lf-list li { grid-template-columns: 32px minmax(0, 1fr) auto; } }
+@media (prefers-reduced-motion: reduce) { .lf-icon::after { animation: none; } }
