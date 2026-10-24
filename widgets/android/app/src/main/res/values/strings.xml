@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">S-DAY 위젯</string>
+    <string name="widget_name">S-DAY</string>
+    <string name="widget_desc">오늘 공부 시간 · 타이머 · 다가오는 일정</string>
+</resources>

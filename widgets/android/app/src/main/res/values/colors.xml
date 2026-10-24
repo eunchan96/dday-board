@@ -1,0 +1,13 @@
+<resources>
+    <color name="paper">#F6F8FB</color>
+    <color name="sheet">#FFFFFF</color>
+    <color name="ink">#1C2540</color>
+    <color name="pencil">#59627C</color>
+    <color name="faint">#9AA1B5</color>
+    <color name="rule">#E2E6EF</color>
+    <color name="pen">#2C4BD1</color>
+    <color name="green">#1F8A5B</color>
+    <color name="red">#D23F3F</color>
+    <color name="exam">#7B4FD6</color>
+    <color name="launcher_bg">#2C4BD1</color>
+</resources>

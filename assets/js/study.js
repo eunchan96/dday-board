@@ -9,6 +9,7 @@ import { api, errText } from './api.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
 import { ambientControl } from './ambient.js';
 import { inScope } from './groups.js';
+import { initPip, togglePip, pipSupported, pipOpen, renderPip } from './pip.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
   subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects,
@@ -314,6 +315,7 @@ function tick() {
   if (moved) { changed(); render(); ctx.onTimer(); return; }
   if (timer.phase === 'focus' && timer.running && Date.now() - lastLive > LIVE_EVERY) live(true);
   renderClock();
+  renderPip();
   ctx.onTimer();
 }
 setInterval(tick, 1000);
@@ -341,6 +343,26 @@ function alertUser(title, body) {
       navigator.serviceWorker.ready.then(reg => reg.showNotification(title, { body, tag: 'study-timer', data: { url: './#study' } })).catch(() => {});
     }
   } catch { /* 무시 */ }
+}
+
+// 떠 있는 타이머 (PiP)에 넘기는 상태
+function pipState() {
+  const idle = timer.phase === 'idle';
+  const el0 = idle ? 0 : elapsed();
+  const shown = isPomo() ? Math.max(0, (idle ? modeOf().focus * 60000 : phaseLength()) - el0) : el0;
+  return {
+    phase: timer.phase,
+    text: clock(shown, !isPomo()),
+    label: timer.label || timer.subject || '',
+    color: timer.phase === 'rest' ? '#1F8A5B' : subjectColor(timer.subject),
+    subLabel: idle ? (isPomo() ? `${modeOf().focus}분 집중` : '스톱워치') : timer.phase === 'rest' ? '쉬는 시간' : '집중 중',
+  };
+}
+initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => renderTopTimer() });
+async function onPipClick() {
+  const ok = await togglePip();
+  if (!ok) ctx.toast('이 브라우저에서는 타이머를 띄울 수 없어요');
+  renderTopTimer();
 }
 
 // 지금 타이머 상태 (상단 작은 표시용)
@@ -464,6 +486,7 @@ const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
 const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
 const trashIcon = () => svgIcon(['M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6M8.5 9v4M11.5 9v4']);
 const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
+const pipIcon = () => svgIcon(['M3 5.5h14v9H3z', 'M10.5 10h5v3.5h-5z']);
 const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 
 // 공부 과목 목록: 이번 학기 과목 + 공부 기록·계획에 쓴 과목 + 이 기기에서 추가한 과목 + 예전 과목
@@ -548,14 +571,22 @@ function renderTopTimer() {
   const idle = timer.phase === 'idle';
   // 상단바의 다른 버튼과 같은 네모 버튼에 글자로
   const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
-  if (idle) box.replaceChildren(b('시작', '타이머 시작 (Space)', start, 'primary'));
-  else if (timer.phase === 'rest') box.replaceChildren(b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest'));
-  else box.replaceChildren(b('끝내기', '끝내고 기록 (Space)', stop, 'primary'));
+  // 다른 창 위에 작게 띄우기 (지원하는 브라우저만)
+  const pip = pipSupported() ? h('button', {
+    type: 'button', class: `btn icon ghost tt-pip${pipOpen() ? ' on' : ''}`, onclick: onPipClick,
+    title: pipOpen() ? '띄운 타이머 닫기' : '타이머 띄우기 (다른 창 위에)', 'aria-label': pipOpen() ? '띄운 타이머 닫기' : '타이머 띄우기',
+    'aria-pressed': pipOpen() ? 'true' : 'false',
+  }, pipIcon()) : null;
+  const main = idle ? b('시작', '타이머 시작 (Space)', start, 'primary')
+    : timer.phase === 'rest' ? b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest')
+    : b('끝내기', '끝내고 기록 (Space)', stop, 'primary');
+  box.replaceChildren(...[pip, main].filter(Boolean));
 }
 
 export function render() {
   renderFriendsBtn();
   renderTopTimer();
+  renderPip();
   const root = $('#viewStudy');
   if (!root || root.hidden) return;
   if (builtFor !== root) build(root);
@@ -1109,6 +1140,7 @@ function renderRecDay() {
 
 /* ───── 친구 (위쪽 버튼 → 창) ───── */
 let friendMsg = { text: '', err: false };
+let friendRange = (() => { try { const v = storage.get('ddayboard.friendRange'); return ['today', 'week', 'month'].includes(v) ? v : 'today'; } catch { return 'today'; } })();
 function setFriendMsg(text, err = false) { friendMsg = { text, err }; renderFriends(); }
 
 async function friendAction(fn, ok) {
@@ -1157,9 +1189,24 @@ function renderFriends() {
     return;
   }
 
-  const me = { me: true, nickname: p.nickname, today: todaySeconds(), liveSince: timer.phase === 'focus' && timer.running ? new Date(timer.sessStart).toISOString() : null };
-  const rows = [me, ...study.friends].sort((a, b) => b.today - a.today);
-  const top = Math.max(1, ...rows.map(r => r.today));
+  // 랭킹: 오늘 · 이번 주 · 이번 달. 지금 공부 중인 시간도 더해서 (친구 쪽은 공부 시작 시각부터)
+  const m = dailyMap();
+  const sumFrom = key => [...m.entries()].reduce((a, [k, v]) => (k >= key ? a + v : a), 0);
+  const today = studyDate();
+  const me = {
+    me: true, nickname: p.nickname,
+    today: todaySeconds(),
+    week: sumFrom(dayKey(startOfWeek(today))),
+    month: sumFrom(dayKey(new Date(today.getFullYear(), today.getMonth(), 1))),
+    liveSince: timer.phase === 'focus' && timer.running ? new Date(timer.sessStart).toISOString() : null,
+  };
+  const liveSec = r => (r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 1000)) : 0);
+  const val = r => (r.me ? r[friendRange] || 0 : (r[friendRange] || 0) + liveSec(r));
+  const rows = [me, ...study.friends].sort((a, b) => (val(b) - val(a)) || (a.me ? -1 : b.me ? 1 : 0));
+  const top = Math.max(1, ...rows.map(val));
+  const liveN = rows.filter(r => r.liveSince).length;
+  let rank = 0, prev = null;
+  const ranks = rows.map((r, i) => { if (val(r) !== prev) { rank = i + 1; prev = val(r); } return rank; });
   const code = h('input', { type: 'text', maxlength: 12, placeholder: '친구 코드', 'aria-label': '친구 코드', class: 'code-input', autocomplete: 'off', spellcheck: 'false' });
   const add = () => friendAction(async () => {
     if (!code.value.trim()) throw new Error('friend_not_found');
@@ -1183,17 +1230,27 @@ function renderFriends() {
     friendAction(async () => { study.profile = await api.studyNewCode(state.code); }, '새 코드를 만들었어요. 이전 코드로 나를 추가한 친구는 더 이상 볼 수 없어요');
   });
 
+  const rangeBtns = h('div', { class: 'segmented f-range', role: 'radiogroup', 'aria-label': '기간' },
+    [['today', '오늘'], ['week', '이번 주'], ['month', '이번 달']].map(([k, label]) => h('button', {
+      type: 'button', role: 'radio', 'aria-checked': friendRange === k ? 'true' : 'false',
+      onclick: () => { friendRange = k; try { storage.set('ddayboard.friendRange', k); } catch { /* 무시 */ } renderFriends(); },
+    }, label)));
+
   fill(body,
-    h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn icon primary', onclick: add, title: '친구 추가', 'aria-label': '친구 추가' }, userPlusIcon())),
+    h('div', { class: 'f-head' },
+      rangeBtns,
+      h('span', { class: `f-live-count${liveN ? ' on' : ''}` }, h('i', { class: `f-dot${liveN ? ' live' : ''}` }), liveN ? `${liveN}명 공부 중` : '지금 공부 중인 사람 없음')),
     msg,
-    h('ul', { class: 'friend-list' }, rows.map(r => {
+    h('ol', { class: 'friend-list' }, rows.map((r, i) => {
       const liveMin = r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 60000)) : null;
-      return h('li', { class: r.me ? 'me' : '' },
-        h('span', { class: `f-dot${r.liveSince ? ' live' : ''}`, title: r.liveSince ? '공부 중' : '' }),
-        h('span', { class: 'f-name' }, r.me ? `${r.nickname} (나)` : r.nickname,
-          r.liveSince ? h('span', { class: 'f-live' }, `공부 중 ${liveMin}분째`) : null),
-        h('span', { class: 'f-bar' }, h('i', { style: { width: `${(r.today / top) * 100}%` } })),
-        h('span', { class: 'f-time' }, fmtSpent(r.today)),
+      const v = val(r);
+      return h('li', { class: `${r.me ? 'me' : ''}${r.liveSince ? ' live' : ''}` },
+        h('span', { class: `f-rank${ranks[i] <= 3 && v > 0 ? ` r${ranks[i]}` : ''}`, 'aria-label': `${ranks[i]}등` }, ranks[i]),
+        h('span', { class: 'f-name' },
+          h('span', { class: 'f-nick' }, r.me ? `${r.nickname} (나)` : r.nickname),
+          r.liveSince ? h('span', { class: 'f-live' }, h('i', { class: 'f-dot live' }), `공부 중 · ${liveMin}분째`) : null),
+        h('span', { class: 'f-bar' }, h('i', { style: { width: `${(v / top) * 100}%` } })),
+        h('span', { class: 'f-time' }, fmtSpent(v)),
         r.me ? h('span', { class: 'f-x' }) : h('button', {
           type: 'button', class: 'btn icon ghost sm-icon row-x f-x', title: '친구 빼기', 'aria-label': `${r.nickname} 친구 빼기`,
           onclick: () => friendAction(async () => {
@@ -1201,7 +1258,8 @@ function renderFriends() {
           }, `${r.nickname} 님을 친구에서 뺐어요`),
         }, xIcon()));
     })),
-    rows.length === 1 ? h('p', { class: 'help fine' }, '친구 코드를 넣으면 여기에 오늘 공부 시간이 함께 보여요.') : null,
+    rows.length === 1 ? h('p', { class: 'help fine' }, '친구 코드를 넣으면 여기에 함께 순위가 보여요.') : null,
+    h('div', { class: 'inline-form f-add' }, code, h('button', { type: 'button', class: 'btn icon primary', onclick: add, title: '친구 추가', 'aria-label': '친구 추가' }, userPlusIcon())),
     h('div', { class: 'my-code' },
       h('span', null, '내 친구 코드'),
       h('b', { class: 'code' }, p.friendCode),

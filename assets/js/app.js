@@ -7,7 +7,7 @@ import {
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
 import { pushSupport, pushStatus, enablePush, disablePush, setLeads, testPush, LEAD_OPTIONS, DEFAULT_LEADS } from './push.js';
-import { errText, api, CALENDAR_FEED_URL } from './api.js';
+import { errText, api, CALENDAR_FEED_URL, WIDGET_URL } from './api.js';
 import {
   $, $$, h, fmtDate, fmtDuration, fmtClock, subjectColor, setSubjects, startOfDay, addDays,
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
@@ -883,6 +883,54 @@ async function makeCalendarKey() {
   finally { btn.disabled = false; }
 }
 
+/* ───── 폰 위젯 ───── */
+// 위젯 주소는 열쇠 원본을 저장하지 않아서(해시만) 만든 직후에만 보여 준다. 이 기기에는 복사용으로 기억
+let widgetExists = false, widgetArmed = false;
+const WIDGET_LOCAL = 'ddayboard.widgetUrl';
+async function loadWidget() {
+  $('#widgetMsg').textContent = ''; widgetArmed = false;
+  try { widgetExists = !!(await api.widgetStatus(state.code)); } catch { widgetExists = false; }
+  const saved = widgetExists ? storage.get(WIDGET_LOCAL) : null;
+  $('#widgetBox').hidden = !saved;
+  if (saved) $('#widgetUrl').value = saved;
+  $('#btnWidgetIos').disabled = !saved;
+  $('#widgetSub').textContent = widgetExists
+    ? (saved ? '폰에서 이 주소를 쓰면 돼요' : '만든 주소가 있어요. 이 기기에서 다시 보려면 새로 만드세요')
+    : '오늘 공부 시간 · 타이머 · 다가오는 일정을 홈 화면에서 봐요';
+  $('#btnWidgetKey').textContent = widgetExists ? '새로 만들기' : '주소 만들기';
+}
+async function makeWidgetKey() {
+  const btn = $('#btnWidgetKey'), msg = $('#widgetMsg');
+  if (widgetExists && !widgetArmed) { widgetArmed = true; btn.textContent = '한 번 더 누르면 이전 주소는 막혀요'; return; }
+  btn.disabled = true; msg.className = 'msg'; msg.textContent = '';
+  try {
+    const url = `${WIDGET_URL}?k=${await api.widgetKey(state.code)}`;
+    storage.set(WIDGET_LOCAL, url);
+    widgetExists = true;
+    await loadWidget();
+    msg.className = 'msg ok'; msg.textContent = '주소를 만들었어요';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
+  finally { btn.disabled = false; }
+}
+// 아이폰 Scriptable 스크립트: 주소를 넣은 채로 복사
+async function copyIosScript() {
+  const msg = $('#widgetMsg');
+  try {
+    const src = await (await fetch('widgets/ios/S-DAY.js', { cache: 'no-store' })).text();
+    const code = src.replace("'__WIDGET_URL__'", JSON.stringify($('#widgetUrl').value).replace(/"/g, "'"));
+    let ok = false;
+    try { await navigator.clipboard.writeText(code); ok = true; } catch { /* 노션 안에서는 막힐 수 있음 */ }
+    if (!ok) {
+      const ta = h('textarea', { style: { position: 'fixed', opacity: '0', top: '0' } }, code);
+      $('#settings').append(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      ta.remove();
+    }
+    msg.className = ok ? 'msg ok' : 'msg err';
+    msg.textContent = ok ? '스크립트를 복사했어요. Scriptable에 붙여 넣어 주세요' : '복사가 막혀 있어요. S-DAY를 새 창으로 열어 다시 해 주세요';
+  } catch (e) { msg.className = 'msg err'; msg.textContent = '복사하지 못했어요. 다시 해 주세요'; }
+}
+
 /* ───── 마감 알림 ───── */
 const push = { subscribed: false, leads: DEFAULT_LEADS.slice(), busy: false };
 
@@ -1168,7 +1216,7 @@ const mask = c => `${c.slice(0, 5)}-•••••-•••••-${c.slice(-5
 
 // 설정은 탭으로 나눠 한 번에 한 묶음만
 function setSettingsTab(tab) {
-  if (!['lms', 'push', 'cal', 'colors', 'device'].includes(tab)) tab = 'colors';
+  if (!['lms', 'push', 'cal', 'widget', 'colors', 'device'].includes(tab)) tab = 'colors';
   if (tab === 'colors') renderColors();
   $$('#setNav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
   $$('#settings .set-group').forEach(g => { g.hidden = g.dataset.tab !== tab; });
@@ -1184,7 +1232,7 @@ function openSettings(tab = 'colors') {
   $('#pushMsg').textContent = ''; tokenEditing = false;
   renderLms(); renderPush(); applyTheme(); prepareCanvasSettings();
   $('#settings').showModal();
-  loadLms(); loadPush(); loadCalendar();
+  loadLms(); loadPush(); loadCalendar(); loadWidget();
 }
 
 async function copyText(text, input, msgEl) {
@@ -1388,6 +1436,9 @@ function bind() {
   $('#noticesClose').addEventListener('click', () => $('#noticesDialog').close());
   $('#btnCalKey').addEventListener('click', makeCalendarKey);
   $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg')));
+  $('#btnWidgetKey').addEventListener('click', makeWidgetKey);
+  $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg')));
+  $('#btnWidgetIos').addEventListener('click', copyIosScript);
   $('#fStarBtn').addEventListener('click', () => { $('#fStar').checked = !$('#fStar').checked; renderStarBtn(); });
   $('#fDoneBtn').addEventListener('click', () => {
     const done = !$('#fDone').checked;

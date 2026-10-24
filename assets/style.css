@@ -1870,3 +1870,28 @@ input.switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px;
 .sd-foot { justify-content: space-between; }
 .sd-foot:has(#sdDelete[hidden]):has(#sdAdd[hidden]) { display: none; }
 .sd-foot #sdAdd { margin-left: auto; }
+
+/* ═════ 친구: 랭킹 ═════ */
+.f-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.f-live-count { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--pencil-2); }
+.f-live-count.on { color: var(--green); }
+.friend-list li { grid-template-columns: 26px minmax(0, 1fr) 72px auto 30px; }
+.friend-list li.live { background: color-mix(in srgb, var(--green) 6%, transparent); }
+.f-rank { font-weight: 800; font-size: 15px; color: var(--pencil-2); text-align: center; font-variant-numeric: tabular-nums; }
+.f-rank.r1 { color: #D4A017; }
+.f-rank.r2 { color: #8E98A8; }
+.f-rank.r3 { color: #B8743C; }
+.f-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-live { display: inline-flex; align-items: center; gap: 5px; }
+.f-live .f-dot { width: 6px; height: 6px; }
+.f-add { margin-top: 2px; }
+@media (max-width: 640px) {
+  .friend-list li { grid-template-columns: 22px minmax(0, 1fr) 40px auto 28px; gap: 8px; }
+}
+/* 타이머 띄우기 버튼 (상단 시작 버튼 왼쪽) */
+.tt-pip svg { width: 18px; height: 18px; }
+.tt-pip.on { color: var(--pen); background: var(--pen-soft); }
+.tt-pip path:last-child { fill: currentColor; stroke: none; }
+.help.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+a.btn { text-decoration: none; color: inherit; }
+a.btn.primary { color: #fff; }
