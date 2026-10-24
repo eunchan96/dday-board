@@ -2061,3 +2061,29 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 .f-fold .f-out { margin: 0; }
 .friends-body > .msg { margin: -8px 4px 0; }
 .f-empty { padding: 10px 4px 0; }
+
+/* ═════ 친구 창: 설정 창처럼 왼쪽(폰은 위) 탭 ═════ */
+#friendsDialog { width: min(680px, calc(100% - 24px)); height: min(560px, calc(100vh - 48px)); }
+#friendsDialog[open] { display: flex; flex-direction: column; }
+#friendsDialog .settings-wrap { grid-template-columns: 168px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+#friendsDialog .set-nav[hidden] { display: none; }
+#friendsDialog .settings-wrap:has(.set-nav[hidden]) { grid-template-columns: minmax(0, 1fr); }
+#friendsDialog .set-nav .f-count { margin-left: auto; }
+#friendsDialog .friends-body { min-height: 0; overflow-y: auto; padding: 20px 22px 24px !important; gap: 20px !important; }
+#friendsDialog .set-row { padding: 14px 16px; }
+#friendsDialog .set-row + .set-row { border-top: 1px solid var(--rule); }
+.f-req { justify-content: flex-start; gap: 10px; }
+.f-req .f-req-name { flex: 1; min-width: 0; font-weight: 650; }
+.f-req small { color: var(--pencil-2); font-weight: 500; }
+.f-mine, .my-code { gap: 10px; }
+#friendsDialog .my-code .code { flex: 1; font-size: 20px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink); }
+#friendsDialog .my-code .btn svg { width: 16px; height: 16px; margin-right: 4px; }
+.friends-body .f-msg { margin: 0 4px; }
+.f-empty .link { all: unset; color: var(--pen); font-weight: 650; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 640px) {
+  #friendsDialog { height: calc(100vh - 24px); }
+  #friendsDialog .settings-wrap { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #friendsDialog .friends-body { padding: 16px 14px 22px !important; }
+  #friendsDialog .set-nav .f-count { margin-left: 0; }
+}
+.f-count[hidden] { display: none; }

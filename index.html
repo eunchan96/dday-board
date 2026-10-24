@@ -495,7 +495,23 @@
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
     </button>
   </header>
+  <div class="settings-wrap">
+  <nav class="set-nav" id="friendsNav" role="tablist" aria-label="친구 항목">
+    <button type="button" role="tab" data-tab="rank">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16.5V11M10 16.5V5M16 16.5V8.5"/></svg>
+      <span>랭킹</span>
+    </button>
+    <button type="button" role="tab" data-tab="add">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 16.5c.6-3 2.6-4.6 5.2-4.6s4.1 1 4.9 3M15.5 10v5M13 12.5h5"/></svg>
+      <span>친구 신청</span><span class="f-count" hidden></span>
+    </button>
+    <button type="button" role="tab" data-tab="me">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 9.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M3.8 17c.6-3.2 3-5 6.2-5s5.6 1.8 6.2 5"/></svg>
+      <span>개인 설정</span>
+    </button>
+  </nav>
   <div class="settings-body friends-body" id="friendsBody"></div>
+  </div>
 </dialog>
 
 <!-- 새 보드 코드 안내 -->

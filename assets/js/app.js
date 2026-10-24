@@ -1437,6 +1437,21 @@ function bind() {
   $$('#modeBtn .ms-opt').forEach(o => o.addEventListener('click', () => { if ((o.dataset.m === 'study') !== (state.prefs.mode === 'study')) toggleMode(); }));
   $('#btnFriends').addEventListener('click', openFriends);
   $('#friendsClose').addEventListener('click', () => $('#friendsDialog').close());
+  // 창(설정 · 친구 · 공지 · 과목 수정 등) 바깥을 누르면 닫기
+  // 창 안에서 누르기 시작해 바깥에서 뗀 경우(글자 고르기 등)는 닫지 않음
+  // (새 보드 코드 안내는 꼭 읽어야 해서 제외)
+  $$('dialog:not(#newCodeDialog)').forEach(d => {
+    let downOutside = false;
+    const outside = e => {
+      const r = d.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
+    d.addEventListener('pointerdown', e => { downOutside = e.target === d && outside(e); });
+    d.addEventListener('click', e => {
+      if (downOutside && e.target === d && outside(e)) d.close();
+      downOutside = false;
+    });
+  });
   $('#search').addEventListener('input', e => { ui.query = e.target.value; renderView(); });
   // 검색은 평소엔 아이콘, 누르면 상단을 덮는 입력 칸
   $('#btnSearch').addEventListener('click', openSearch);
