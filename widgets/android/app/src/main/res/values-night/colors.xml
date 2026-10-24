@@ -9,4 +9,7 @@
     <color name="green">#3FBF85</color>
     <color name="red">#FF7A7A</color>
     <color name="exam">#B79BFF</color>
+    <color name="kind_exam">#FF6B6B</color>
+    <color name="kind_assignment">#FFD23F</color>
+    <color name="kind_todo">#7C9BFF</color>
 </resources>

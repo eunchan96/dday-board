@@ -366,10 +366,12 @@ function pipState() {
   };
 }
 initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => renderTopTimer() });
-async function onPipClick() {
-  const ok = await togglePip();
-  if (!ok) ctx.toast('이 브라우저에서는 타이머를 띄울 수 없어요');
-  renderTopTimer();
+// 사용자가 눌러서 시작할 때: 시작과 함께 타이머를 다른 창 위에 띄운다 (닫기는 직접)
+// 브라우저는 누른 순간에만 띄우기를 허락해서, 클릭 · 키 입력에서 바로 부른다
+function startByUser() {
+  const wasIdle = timer.phase === 'idle';
+  start();
+  if (wasIdle && timer.phase !== 'idle' && pipSupported() && !pipOpen()) togglePip().then(() => renderTopTimer());
 }
 
 // 지금 타이머 상태 (상단 작은 표시용)
@@ -397,7 +399,7 @@ export function startFor(task) {
     return;
   }
   selectWhat({ subject: task.subject || '', taskId: task.id, planId: null, label: displayTitle(task) });
-  start();
+  startByUser();
 }
 function selectWhat(w) {
   Object.assign(timer, { subject: w.subject || '', taskId: w.taskId || null, planId: w.planId || null, label: w.label || '' });
@@ -494,7 +496,6 @@ const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
 const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
 const trashIcon = () => svgIcon(['M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6M8.5 9v4M11.5 9v4']);
 const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
-const pipIcon = () => svgIcon(['M3 5.5h14v9H3z', 'M10.5 10h5v3.5h-5z']);
 const nextIcon = () => svgIcon(['M8 5l5 5-5 5']);
 
 // 공부 과목 목록: 이번 학기 과목 + 공부 기록·계획에 쓴 과목 + 이 기기에서 추가한 과목 + 예전 과목
@@ -586,16 +587,10 @@ function renderTopTimer() {
   const idle = timer.phase === 'idle';
   // 상단바의 다른 버튼과 같은 네모 버튼에 글자로
   const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
-  // 다른 창 위에 작게 띄우기 (지원하는 브라우저만)
-  const pip = pipSupported() ? h('button', {
-    type: 'button', class: `btn icon ghost tt-pip${pipOpen() ? ' on' : ''}`, onclick: onPipClick,
-    title: pipOpen() ? '띄운 타이머 닫기' : '타이머 띄우기 (다른 창 위에)', 'aria-label': pipOpen() ? '띄운 타이머 닫기' : '타이머 띄우기',
-    'aria-pressed': pipOpen() ? 'true' : 'false',
-  }, pipIcon()) : null;
-  const main = idle ? b('시작', '타이머 시작 (Space)', start, 'primary')
+  const main = idle ? b('시작', '타이머 시작 (Space)', startByUser, 'primary')
     : timer.phase === 'rest' ? b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest')
     : b('끝내기', '끝내고 기록 (Space)', stop, 'primary');
-  box.replaceChildren(...[pip, main].filter(Boolean));
+  box.replaceChildren(main);
 }
 
 export function render() {
@@ -737,7 +732,7 @@ function renderPlans() {
   const plans = study.plans.filter(p => p.day === today);
   const playBtn = (label, w) => idle ? h('button', {
     type: 'button', class: 'btn icon ghost sm-icon play', title: '공부 시작', 'aria-label': `${label} 공부 시작`,
-    onclick: () => { selectWhat(w); start(); },
+    onclick: () => { selectWhat(w); startByUser(); },
   }, playIcon()) : h('span', { class: 'sm-icon' });
 
   const mine = plans.map(p => {
@@ -1327,6 +1322,7 @@ const avatar = (name, live = false, me = false) =>
   h('span', { class: `f-avatar${live ? ' live' : ''}${me ? ' me' : ''}`, 'aria-hidden': 'true' }, [...String(name || '?')][0]);
 const liveMinOf = r => (r.liveSince ? Math.max(0, Math.floor((Date.now() - new Date(r.liveSince)) / 60000)) : 0);
 
+const friendOpen = new Set();   // 친구 창에서 펼쳐 둔 칸
 function renderFriends() {
   renderFriendsBtn();
   const body = $('#friendsBody');
@@ -1410,7 +1406,7 @@ function renderFriends() {
           onclick: () => friendAction(async () => { study.friends = await api.friendRemove(state.code, r.code); }, `${r.nickname} 님과 친구를 끊었어요`),
         }, xIcon()));
     })),
-    rows.length === 1 ? h('p', { class: 'f-empty' }, '아직 친구가 없어요. 아래에서 친구 코드로 신청해 보세요.') : null);
+    rows.length === 1 ? h('p', { class: 'f-empty' }, '아직 친구가 없어요. 아래 친구 신청에서 코드로 신청해 보세요.') : null);
 
   // 친구 신청 보내기 + 보낸 신청
   const code = h('input', { type: 'text', maxlength: 12, placeholder: '친구 코드 (예: AB12-CD34)', 'aria-label': '친구 코드', class: 'code-input', autocomplete: 'off', spellcheck: 'false' });
@@ -1425,10 +1421,15 @@ function renderFriends() {
   });
   code.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) add(); });
   const out = study.requests.outgoing;
-  const addSec = h('section', { class: 'f-sec' },
-    h('h4', null, '친구 신청'),
+  // 접어 두는 칸: 다시 그려도 펼친 상태 유지 (친구가 없거나 안내가 있으면 펼쳐서)
+  const fold = (key, summary, ...kids) => {
+    const d = h('details', { class: 'more f-fold', open: friendOpen.has(key) }, h('summary', null, ...[summary].flat()), ...kids);
+    d.addEventListener('toggle', () => { if (d.open) friendOpen.add(key); else friendOpen.delete(key); });
+    return d;
+  };
+  if (rows.length === 1) friendOpen.add('add');
+  const addSec = fold('add', ['친구 신청', out.length ? h('span', { class: 'f-count' }, out.length) : null],
     h('div', { class: 'inline-form' }, code, h('button', { type: 'button', class: 'btn primary', onclick: add }, '신청')),
-    msg,
     out.length ? h('ul', { class: 'f-out' }, out.map(r => h('li', null,
       h('span', null, r.nickname, h('small', null, ' · 수락 기다리는 중')),
       h('button', { type: 'button', class: 'btn sm ghost', onclick: () => friendAction(async () => {
@@ -1460,8 +1461,8 @@ function renderFriends() {
           catch { setFriendMsg(`내 코드: ${p.friendCode}`); }
         },
       }, copyIcon())),
-    h('details', { class: 'more friend-manage' },
-      h('summary', null, '닉네임 · 공개 설정'),
+    addSec,
+    fold('manage', '닉네임 · 공개 설정',
       h('div', { class: 'inline-form' }, newNick, h('button', {
         type: 'button', class: 'btn sm',
         onclick: () => friendAction(async () => { study.profile = await api.studyProfile(state.code, newNick.value); }, '닉네임을 바꿨어요'),
@@ -1473,7 +1474,7 @@ function renderFriends() {
           onclick: () => friendAction(async () => { study.profile = await api.studyProfileHide(state.code); study.friends = []; }, '친구에게 더 이상 보이지 않아요'),
         }, '공개 그만하기'))));
 
-  fill(body, incoming, ranking, addSec, mine);
+  fill(body, incoming, ranking, msg, mine);
 }
 
 /* ───── 공부 화면 아래: 지금 공부 중인 친구 ───── */
@@ -1527,7 +1528,7 @@ export function handleKey(e) {
   if (studyView() !== 'today') return false;
   if (e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
-    if (timer.phase === 'idle') start();
+    if (timer.phase === 'idle') startByUser();
     else if (timer.phase === 'rest') toIdle();
     else stop();
     return true;

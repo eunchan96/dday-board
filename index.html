@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>S-DAY</title>
 <meta name="description" content="스마트캠퍼스 과제를 마감 순으로 모아 보는 과제 플래너">
-<meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10141F" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
@@ -337,7 +337,7 @@
       <div class="set-card">
         <div class="set-row stack">
           <div class="set-head">
-            <div class="set-text"><b>위젯 주소</b><span class="set-sub" id="widgetSub">오늘 공부 시간 · 타이머 · 다가오는 일정을 홈 화면에서 봐요</span></div>
+            <div class="set-text"><b>위젯 주소</b><span class="set-sub" id="widgetSub">오늘 공부 · 타이머 · 다가오는 일정을 각각 위젯으로 넣어요</span></div>
             <button class="btn sm" id="btnWidgetKey">주소 만들기</button>
           </div>
           <div id="widgetBox" hidden>
@@ -350,15 +350,17 @@
           <p class="msg" id="widgetMsg" role="status"></p>
         </div>
         <div class="set-row stack">
-          <div class="set-head">
-            <div class="set-text"><b>아이폰</b><span class="set-sub">무료 앱 Scriptable로 넣어요</span></div>
-            <button class="btn sm" id="btnWidgetIos" disabled>스크립트 복사</button>
+          <div class="set-text"><b>아이폰</b><span class="set-sub">무료 앱 Scriptable로 넣어요. 넣을 위젯마다 스크립트를 복사해요</span></div>
+          <div class="row-actions start ios-copy" id="iosCopy">
+            <button class="btn sm" data-kind="study" data-name="S-DAY 공부" disabled>오늘 공부 복사</button>
+            <button class="btn sm" data-kind="timer" data-name="S-DAY 타이머" disabled>타이머 복사</button>
+            <button class="btn sm" data-kind="upcoming" data-name="S-DAY 일정" disabled>다가오는 일정 복사</button>
           </div>
           <ol class="help steps">
             <li>App Store에서 <b>Scriptable</b> 설치</li>
-            <li>위에서 주소를 만든 뒤 <b>스크립트 복사</b></li>
-            <li>Scriptable에서 <b>+</b> → 붙여 넣기 → 제목을 <b>S-DAY</b>로</li>
-            <li>홈 화면 길게 누르기 → <b>+</b> → Scriptable → 크기 고르기 → 위젯을 길게 눌러 <b>위젯 편집</b> → Script: S-DAY</li>
+            <li>위에서 주소를 만든 뒤 넣고 싶은 위젯의 <b>복사</b></li>
+            <li>Scriptable에서 <b>+</b> → 붙여 넣기 → 제목을 <b>S-DAY 공부</b>처럼</li>
+            <li>홈 화면 길게 누르기 → <b>+</b> → Scriptable → 크기 고르기 → 위젯을 길게 눌러 <b>위젯 편집</b> → Script 고르기</li>
           </ol>
         </div>
         <div class="set-row stack">
@@ -369,7 +371,7 @@
           <ol class="help steps">
             <li><b>앱 받기</b>에서 <b>S-DAY-widget.apk</b>를 내려받아 설치 (출처를 알 수 없는 앱 허용)</li>
             <li>앱을 열어 위젯 주소 붙여 넣기 → 저장</li>
-            <li>홈 화면 길게 누르기 → 위젯 → <b>S-DAY</b></li>
+            <li>홈 화면 길게 누르기 → 위젯 → <b>S-DAY 위젯</b>에서 오늘 공부 · 타이머 · 다가오는 일정 중 골라 각각 추가</li>
           </ol>
         </div>
       </div>

@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">S-DAY 위젯</string>
-    <string name="widget_name">S-DAY</string>
-    <string name="widget_desc">오늘 공부 시간 · 타이머 · 다가오는 일정</string>
+    <string name="widget_name">S-DAY 다가오는 일정</string>
+    <string name="widget_desc">다가오는 시험 · 과제 · 할 일과 D-day</string>
+    <string name="study_widget_name">S-DAY 오늘 공부</string>
+    <string name="study_widget_desc">오늘 공부 시간과 목표</string>
+    <string name="timer_widget_name">S-DAY 타이머</string>
+    <string name="timer_widget_desc">공부 중이면 흘러가는 타이머</string>
 </resources>

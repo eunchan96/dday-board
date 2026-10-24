@@ -6,8 +6,8 @@
    ───────────────────────────────────────────── */
 
 :root {
-  --paper: #F6F8FB;
-  --grid: rgba(61, 107, 224, 0.075);
+  --paper: #FFFFFF;
+  --grid: transparent;
   --sheet: #FFFFFF;
   --sheet-2: #F1F4F9;
   --ink: #1C2540;
@@ -1085,7 +1085,10 @@ li:hover > .row-x, .row-x:focus-visible { opacity: 1; }
 .f-bar i { display: block; height: 100%; background: var(--pencil-2); border-radius: 3px; }
 .friend-list li.me .f-bar i { background: var(--green); }
 .f-time { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; min-width: 5.5em; }
-.friend-manage .inline-form { margin: 8px 0; }
+.f-fold .inline-form { margin: 8px 0; }
+.f-fold > summary { display: inline-flex; align-items: center; gap: 6px; }
+.f-fold .f-out { margin: 4px 0 6px; }
+.f-fold .msg { margin: 0 0 6px; }
 
 /* 과제 패널: 공부 시작 */
 .study-start { color: var(--green); }
@@ -1889,9 +1892,6 @@ input.switch:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px;
   .friend-list li { grid-template-columns: 22px minmax(0, 1fr) 40px auto 28px; gap: 8px; }
 }
 /* 타이머 띄우기 버튼 (상단 시작 버튼 왼쪽) */
-.tt-pip svg { width: 18px; height: 18px; }
-.tt-pip.on { color: var(--pen); background: var(--pen-soft); }
-.tt-pip path:last-child { fill: currentColor; stroke: none; }
 .help.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
 a.btn { text-decoration: none; color: inherit; }
 a.btn.primary { color: #fff; }
@@ -2007,3 +2007,10 @@ a.btn.primary { color: #fff; }
 .yg-legend .yg-day { width: 11px; height: 11px; cursor: default; }
 /* 좁은 화면에서 가로로 넘겨도 요일은 왼쪽에 */
 .yg-wd { position: sticky; left: 0; z-index: 1; background: var(--paper); box-shadow: 6px 0 0 var(--paper); }
+
+/* 모바일 일정 탭: 위쪽 '다음 마감' 줄 없이 바로 필터와 목록 */
+@media (max-width: 640px) {
+  .next { display: none; }
+}
+
+.ios-copy { flex-wrap: wrap; gap: 6px; margin-top: 8px; }

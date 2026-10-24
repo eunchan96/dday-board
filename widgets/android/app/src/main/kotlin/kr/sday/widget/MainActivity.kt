@@ -38,7 +38,7 @@ class MainActivity : Activity() {
             thread {
                 val msg = try {
                     val data = Api.parse(Api.fetch(this))
-                    "저장했어요. 다가오는 일정 ${data.upcoming.size}개를 받았어요.\n홈 화면을 길게 눌러 위젯 → S-DAY를 추가하세요."
+                    "저장했어요. 다가오는 일정 ${data.upcoming.size}개를 받았어요.\n홈 화면을 길게 눌러 위젯 → S-DAY에서 오늘 공부 · 타이머 · 다가오는 일정을 골라 추가하세요."
                 } catch (e: WidgetError) {
                     e.message ?: "불러오지 못했어요"
                 } catch (e: Exception) {
@@ -46,14 +46,14 @@ class MainActivity : Activity() {
                 }
                 runOnUiThread {
                     status.text = msg
-                    SdayWidget.render(this)
+                    Widgets.render(this)
                     RefreshWorker.schedule(this)
                 }
             }
         }
 
         findViewById<Button>(R.id.open).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SdayWidget.APP_URL)))
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Widgets.APP_URL)))
         }
     }
 }

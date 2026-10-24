@@ -22,7 +22,7 @@ class RefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val error = withContext(Dispatchers.IO) {
             try { Api.fetch(ctx); null } catch (e: WidgetError) { e.message } catch (e: Exception) { "불러오지 못했어요" }
         }
-        val timerEnd = SdayWidget.render(ctx, error)
+        val timerEnd = Widgets.render(ctx, error)
         // 25분 · 50분 타이머가 끝나면 한 번 더 새로 받아 화면을 맞춤
         if (timerEnd != null) {
             val delay = (timerEnd - System.currentTimeMillis()).coerceAtLeast(5_000L) + 5_000L

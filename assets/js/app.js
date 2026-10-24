@@ -916,10 +916,10 @@ async function loadWidget() {
   const saved = widgetExists ? storage.get(WIDGET_LOCAL) : null;
   $('#widgetBox').hidden = !saved;
   if (saved) $('#widgetUrl').value = saved;
-  $('#btnWidgetIos').disabled = !saved;
+  for (const b of $('#iosCopy').querySelectorAll('button')) b.disabled = !saved;
   $('#widgetSub').textContent = widgetExists
     ? (saved ? '폰에서 이 주소를 쓰면 돼요' : '만든 주소가 있어요. 이 기기에서 다시 보려면 새로 만드세요')
-    : '오늘 공부 시간 · 타이머 · 다가오는 일정을 홈 화면에서 봐요';
+    : '오늘 공부 · 타이머 · 다가오는 일정을 각각 위젯으로 넣어요';
   $('#btnWidgetKey').textContent = widgetExists ? '새로 만들기' : '주소 만들기';
 }
 async function makeWidgetKey() {
@@ -936,11 +936,12 @@ async function makeWidgetKey() {
   finally { btn.disabled = false; }
 }
 // 아이폰 Scriptable 스크립트: 주소를 넣은 채로 복사
-async function copyIosScript() {
+async function copyIosScript(kind, name) {
   const msg = $('#widgetMsg');
   try {
     const src = await (await fetch('widgets/ios/S-DAY.js', { cache: 'no-store' })).text();
-    const code = src.replace("'__WIDGET_URL__'", JSON.stringify($('#widgetUrl').value).replace(/"/g, "'"));
+    const code = src.replace("'__WIDGET_URL__'", JSON.stringify($('#widgetUrl').value).replace(/"/g, "'"))
+      .replace("'__KIND__'", `'${kind}'`);
     let ok = false;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { /* 노션 안에서는 막힐 수 있음 */ }
     if (!ok) {
@@ -950,7 +951,7 @@ async function copyIosScript() {
       ta.remove();
     }
     msg.className = ok ? 'msg ok' : 'msg err';
-    msg.textContent = ok ? '스크립트를 복사했어요. Scriptable에 붙여 넣어 주세요' : '복사가 막혀 있어요. S-DAY를 새 창으로 열어 다시 해 주세요';
+    msg.textContent = ok ? `스크립트를 복사했어요. Scriptable에 붙여 넣고 제목을 "${name}"로 해 주세요` : '복사가 막혀 있어요. S-DAY를 새 창으로 열어 다시 해 주세요';
   } catch (e) { msg.className = 'msg err'; msg.textContent = '복사하지 못했어요. 다시 해 주세요'; }
 }
 
@@ -1461,7 +1462,10 @@ function bind() {
   $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg')));
   $('#btnWidgetKey').addEventListener('click', makeWidgetKey);
   $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg')));
-  $('#btnWidgetIos').addEventListener('click', copyIosScript);
+  $('#iosCopy').addEventListener('click', e => {
+    const b = e.target.closest('button[data-kind]');
+    if (b) copyIosScript(b.dataset.kind, b.dataset.name);
+  });
   $('#fStarBtn').addEventListener('click', () => { $('#fStar').checked = !$('#fStar').checked; renderStarBtn(); });
   $('#fDoneBtn').addEventListener('click', () => {
     const done = !$('#fDone').checked;
