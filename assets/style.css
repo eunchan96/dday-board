@@ -1962,3 +1962,48 @@ a.btn.primary { color: #fff; }
 .lf-timer { font-weight: 750; font-variant-numeric: tabular-nums; font-size: 15px; color: var(--green); min-width: 4.5em; text-align: right; }
 @media (max-width: 640px) { .lf-today { display: none; } .lf-list li { grid-template-columns: 32px minmax(0, 1fr) auto; } }
 @media (prefers-reduced-motion: reduce) { .lf-icon::after { animation: none; } }
+
+/* ───── 공부 계획: 오늘 · 내일 · 이번 주 ───── */
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.s-plans .plan-head h3 { margin: 0; }
+.plan-views button { height: 26px; padding: 0 10px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
+.pv-n { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--pen); color: #fff; font-size: 10.5px; font-weight: 750; line-height: 16px; text-align: center; }
+.plan-add .plan-day { flex: none; width: 104px; }
+.plan-add .plan-day[hidden] { display: none; }
+.plan-when { font-size: 12.5px; font-weight: 650; }
+.plan .to-today { color: var(--pen); }
+.plan.past { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--c) 40%, transparent); }
+.plan.past .plan-subj, .plan.past .plan-memo, .plan.past .plan-when { color: var(--pencil); }
+.plan-list li.plan-missed-head { padding: 12px 4px 6px; border-bottom: 0; font-size: 12px; font-weight: 700; color: var(--pencil); }
+@media (max-width: 640px) {
+  /* 날 고르기까지 있으면 메모 칸을 아랫줄로 */
+  .plan-add.with-day { flex-wrap: wrap; }
+  .plan-add.with-day .plan-day { flex: 1; width: auto; max-width: none; }
+  .plan-add.with-day input[type=text] { order: 3; flex: 1 1 calc(100% - 46px); }
+  .plan-add.with-day .btn.icon { order: 4; }
+}
+
+/* ───── 1년 잔디 ───── */
+.year-grass { margin-bottom: 22px; }
+.yg-scroll { overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.yg-grid {
+  --cell: 13px; --gap: 3px;
+  display: grid; grid-template-columns: 18px auto; grid-template-rows: 16px auto; column-gap: 6px; row-gap: 4px; width: max-content;
+}
+.yg-months { grid-column: 2; display: grid; grid-template-columns: repeat(var(--weeks), var(--cell)); gap: var(--gap); font-size: 11px; color: var(--pencil); white-space: nowrap; }
+.yg-wd { grid-column: 1; grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--cell)); gap: var(--gap); font-size: 10.5px; color: var(--pencil); line-height: var(--cell); }
+.yg-cells { grid-column: 2; grid-row: 2; display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, var(--cell)); grid-auto-columns: var(--cell); gap: var(--gap); }
+.yg-day { display: block; width: var(--cell, 13px); height: var(--cell, 13px); padding: 0; border: 0; border-radius: 3px; background: var(--sheet-2); cursor: pointer; }
+.yg-day.future { background: transparent; cursor: default; }
+.yg-day.lv1 { background: color-mix(in srgb, var(--green) 22%, var(--sheet)); }
+.yg-day.lv2 { background: color-mix(in srgb, var(--green) 42%, var(--sheet)); }
+.yg-day.lv3 { background: color-mix(in srgb, var(--green) 66%, var(--sheet)); }
+.yg-day.lv4 { background: var(--green); }
+.yg-day.today { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.yg-day.sel { outline: 2px solid var(--pen); outline-offset: 1px; }
+.yg-day:focus-visible { outline: 2px solid var(--pen); outline-offset: 1px; }
+.yg-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 8px; font-size: 11.5px; color: var(--pencil); }
+.yg-legend span { margin: 0 4px; }
+.yg-legend .yg-day { width: 11px; height: 11px; cursor: default; }
+/* 좁은 화면에서 가로로 넘겨도 요일은 왼쪽에 */
+.yg-wd { position: sticky; left: 0; z-index: 1; background: var(--paper); box-shadow: 6px 0 0 var(--paper); }

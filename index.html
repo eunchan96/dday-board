@@ -263,7 +263,7 @@
           <details class="more" id="tokenHelp">
             <summary>토큰 만드는 법</summary>
             <ol class="help steps" id="tokenSteps">
-              <li><a href="https://canvas.ssu.ac.kr/profile/settings" target="_blank" rel="noopener">스마트캠퍼스 설정</a>에서 <b>+ 새 액세스 토큰</b></li>
+              <li><a href="https://canvas.ssu.ac.kr/profile/settings" id="tokenSettingsLink" target="_blank" rel="noopener">스마트캠퍼스 설정</a>에서 <b>+ 새 액세스 토큰</b></li>
               <li>목적 "S-DAY", 만료일은 학기 끝나는 날</li>
               <li>나온 토큰을 복사해 여기에 붙여 넣기</li>
             </ol>
@@ -292,6 +292,18 @@
             </div>
             <p class="help fine">플래너 파일: 로그인한 브라우저에서 <code id="plannerUrl"></code> 를 열어 저장한 파일</p>
             <p class="msg" id="canvasFileMsg" role="status"></p>
+          </div>
+        </details>
+        <details class="set-more" id="originMore">
+          <summary>다른 학교 (Canvas)</summary>
+          <div class="set-row stack">
+            <div class="set-text"><b>학교 LMS 주소</b><span class="set-sub" id="originSub">Canvas를 쓰는 학교라면 그 학교 주소로 바꿔요</span></div>
+            <div class="inline-form">
+              <input type="text" id="originInput" placeholder="canvas.ssu.ac.kr" autocomplete="off" spellcheck="false" inputmode="url">
+              <button class="btn" id="btnOriginSave">저장</button>
+            </div>
+            <p class="help fine">토큰도 그 학교 LMS에서 만든 것이어야 해요. 강의 영상(할 일)은 숭실대처럼 learningx를 쓰는 학교만 가져와요.</p>
+            <p class="msg" id="originMsg" role="status"></p>
           </div>
         </details>
         <p class="msg pad" id="lmsMsg" role="status"></p>

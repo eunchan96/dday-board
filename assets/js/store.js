@@ -254,6 +254,12 @@ export async function setToken(token) {
   return state.lms;
 }
 
+export async function setOrigin(origin) {
+  state.lms = await api.setOrigin(state.code, origin);
+  emit('lms');
+  return state.lms;
+}
+
 export async function canvasImport(items) {
   const r = await api.canvasImport(state.code, items);
   await pull();

@@ -39,6 +39,7 @@ export const api = {
   lmsStatus: code => rpc('dday_canvas_status', { p_code: code }),
   setFeed: (code, url) => rpc('dday_set_canvas_feed', { p_code: code, p_url: url }),
   setToken: (code, token) => rpc('dday_set_canvas_token', { p_code: code, p_token: token }),
+  setOrigin: (code, origin) => rpc('dday_set_canvas_origin', { p_code: code, p_origin: origin }),
   lmsSync: code => post(LMS_SYNC_URL, { code }),
   canvasImport: (code, items) => rpc('dday_canvas_import', { p_code: code, p_items: items }),
   notices: code => rpc('dday_announcements', { p_code: code }),
@@ -90,6 +91,7 @@ export function errText(e) {
     case 'no_feed': return '스마트캠퍼스 피드가 등록되지 않았어요';
     case 'feed_invalid': return '피드 내용을 읽을 수 없어요. 주소를 다시 복사해 주세요';
     case 'feed_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';
+    case 'invalid_origin': return '주소를 확인해 주세요 (예: canvas.학교.ac.kr)';
     case 'invalid_token': return '토큰을 읽지 못했어요. 스마트캠퍼스에 나온 토큰 전체를 다시 복사해 붙여 넣어 주세요';
     case 'token_invalid': return '토큰이 만료됐거나 지워졌어요. 스마트캠퍼스에서 새 토큰을 만들어 넣어 주세요';
     case 'api_fetch_failed': return '스마트캠퍼스에 접속하지 못했어요. 잠시 후 다시 시도해 주세요';

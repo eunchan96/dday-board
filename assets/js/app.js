@@ -2,7 +2,7 @@
 
 import {
   state, subscribe, setPref, pull, saveTask, toggleDone, toggleStar, removeTask, undoRemove,
-  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, importBackup, exportBackup, canvasImport, storage,
+  createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, setOrigin, importBackup, exportBackup, canvasImport, storage,
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
 import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
@@ -806,6 +806,13 @@ function renderLms() {
   $('#btnTokenSave').textContent = token ? '바꾸기' : '연결';
   $('#tokenSub').textContent = token ? `…${l.tokenHint} 연결됨` : '과제와 제출 파일을 하루 3번 가져와요';
   $('#bookmarkletSection').hidden = token;          // 토큰이 있으면 북마클릿은 필요 없음
+  // 학교 LMS 주소 (기본 숭실대)
+  const origin = lmsOrigin();
+  const host = origin.replace(/^https:\/\//, '');
+  if (document.activeElement !== $('#originInput')) $('#originInput').value = host;
+  $('#originSub').textContent = host === 'canvas.ssu.ac.kr' ? 'Canvas를 쓰는 학교라면 그 학교 주소로 바꿔요' : `${host} 에서 가져와요`;
+  $('#tokenSettingsLink').href = `${origin}/profile/settings`;
+  $('#plannerUrl').textContent = $('#plannerUrl').textContent.replace(/^https:\/\/[^/]+/, origin);
   $('#lmsNavDot').hidden = !l.error;
   const st = $('#lmsState');
   st.className = 'set-sub';
@@ -816,6 +823,22 @@ function renderLms() {
     const how = token ? '토큰' : '캘린더 피드';
     st.textContent = l.syncedAt ? `${how} · ${fmtAgo(new Date(l.syncedAt))} 가져옴` : `${how} · 아직 가져오기 전`;
   }
+}
+
+const lmsOrigin = () => state.lms?.origin || 'https://canvas.ssu.ac.kr';
+
+async function saveOrigin() {
+  const m = $('#originMsg');
+  const v = $('#originInput').value.trim();
+  m.className = 'msg';
+  try {
+    const before = lmsOrigin();
+    await setOrigin(v);
+    $('#originInput').blur();
+    m.classList.add('ok');
+    m.textContent = lmsOrigin() === before ? '그대로예요' : `${lmsOrigin().replace(/^https:\/\//, '')} 로 바꿨어요${state.lms.token ? '. 토큰도 그 학교 것으로 바꿔 주세요' : ''}`;
+    renderLms();
+  } catch (e) { m.classList.add('err'); m.textContent = errText(e); }
 }
 
 function fmtAgo(d) {
@@ -1280,7 +1303,7 @@ function prepareCanvasSettings() {
   const r = semesterRange(semesterOf(new Date()));
   const d = x => toDateInput(x);
   $('#plannerUrl').textContent =
-    `https://canvas.ssu.ac.kr/api/v1/planner/items?start_date=${d(r.start)}&end_date=${d(r.end)}&per_page=100`;
+    `${lmsOrigin()}/api/v1/planner/items?start_date=${d(r.start)}&end_date=${d(r.end)}&per_page=100`;
 }
 
 function showImport(items) {
@@ -1486,6 +1509,8 @@ function bind() {
     } catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
   });
   $('#btnLmsNow').addEventListener('click', e => runLmsSync(e.currentTarget));
+  $('#btnOriginSave').addEventListener('click', saveOrigin);
+  $('#originInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); saveOrigin(); } });
   $('#btnTokenSave').addEventListener('click', async () => {
     const input = $('#tokenInput'), msg = $('#tokenMsg'), btn = $('#btnTokenSave');
     const token = input.value.trim();

@@ -521,23 +521,29 @@ function build(root) {
   el.planMemo = h('input', { type: 'text', maxlength: 100, placeholder: '메모 (안 적어도 돼요)', 'aria-label': '메모' });
   el.planPick = subjectPicker({ id: 'planSubject', options: studySubjects, allowNone: false, placeholder: '과목 고르기' });
   el.planSubjectWrap = h('span', { class: 'plan-subject' }, el.planPick.el);
+  // 이번 주 보기에서 넣을 날 (모레 ~ 7일 뒤)
+  el.planDay = h('select', { class: 'plan-day', 'aria-label': '언제' });
   const addPlan = () => {
     const subject = $('#planSubject')?.value || '';
     const memo = el.planMemo.value.trim();
     if (!subject && !memo) { $('#planSubject')?.focus(); ctx.toast('과목을 골라 주세요'); return; }
+    const day = planView === 'today' ? studyKey() : planView === 'tomorrow' ? dayKey(addDays(studyDate(), 1)) : el.planDay.value;
     // 메모가 없으면 과목 이름을 제목으로 (서버는 제목이 꼭 있어야 함)
-    savePlan({ id: newId(), day: studyKey(), title: (memo || subject).slice(0, 100), subject, minutes: null, done: false });
+    savePlan({ id: newId(), day, title: (memo || subject).slice(0, 100), subject, minutes: null, done: false });
     rememberSubject(subject);
     el.planMemo.value = '';
     el.planPick.set('');
+    if (planView === 'week') ctx.toast(`${planDayLabel(day)}에 넣었어요`);
   };
   el.planMemo.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addPlan(); } });
   el.liveFriends = h('section', { class: 's-live-friends', 'aria-label': '지금 공부 중인 친구', hidden: true });
+  el.planTitle = h('h3', null, '오늘 공부');
+  el.planViews = h('div', { class: 'segmented plan-views', role: 'radiogroup', 'aria-label': '언제 할 공부' });
+  el.planAddBtn = h('button', { class: 'btn icon primary', type: 'button', onclick: addPlan, title: '추가', 'aria-label': '오늘 공부에 추가' }, plusIcon());
   el.plans = h('section', { class: 's-plans' },
-    h('h3', null, '오늘 공부'),
+    h('div', { class: 'plan-head' }, el.planTitle, el.planViews),
     el.planList,
-    h('div', { class: 'plan-add' }, el.planSubjectWrap, el.planMemo,
-      h('button', { class: 'btn icon primary', type: 'button', onclick: addPlan, title: '추가', 'aria-label': '오늘 공부에 추가' }, plusIcon())));
+    h('div', { class: 'plan-add' }, el.planSubjectWrap, el.planDay, el.planMemo, el.planAddBtn));
 
   /* 오늘: 타임라인 */
   el.dayHead = h('div', { class: 'tl-head' });
@@ -656,8 +662,76 @@ function renderClock() {
   if (m !== lastTimelineMin) { lastTimelineMin = m; renderTimeline(); }
 }
 
-/* ───── 오늘 공부: 내가 넣은 것 + D-7 안의 일정 ───── */
+/* ───── 오늘 공부: 내가 넣은 것 + D-7 안의 일정 ─────
+   내일 · 이번 주(모레~7일 뒤)로 미리 잡아 둘 수도 있다. 지난 날에 못 한 계획은 오늘로 옮길 수 있게 */
+let planView = 'today';
+const PLAN_VIEWS = [['today', '오늘'], ['tomorrow', '내일'], ['week', '이번 주']];
+function planDayLabel(key) {
+  const d = new Date(`${key}T00:00:00`);
+  const diff = Math.round((d - studyDate()) / DAY);
+  if (diff === 0) return '오늘';
+  if (diff === 1) return '내일';
+  if (diff === -1) return '어제';
+  return `${d.getMonth() + 1}/${d.getDate()} ${WEEK[d.getDay()]}`;
+}
+function movePlanToday(p) {
+  savePlan({ ...p, day: studyKey() });
+  ctx.toast(`"${p.title}" 계획을 오늘로 옮겼어요`);
+}
+const moveIcon = () => svgIcon(['M15.5 10h-11M8.5 6l-4 4 4 4']);
+
+function renderPlanHead() {
+  el.planTitle.textContent = planView === 'today' ? '오늘 공부' : planView === 'tomorrow' ? '내일 공부' : '이번 주 공부';
+  const base = studyDate();
+  const later = study.plans.filter(p => !p.done && p.day > studyKey());
+  const count = key => key === 'tomorrow' ? later.filter(p => p.day === dayKey(addDays(base, 1))).length
+    : key === 'week' ? later.filter(p => p.day > dayKey(addDays(base, 1))).length : 0;
+  el.planViews.replaceChildren(...PLAN_VIEWS.map(([k, label]) => h('button', {
+    type: 'button', role: 'radio', 'aria-checked': planView === k ? 'true' : 'false',
+    onclick: () => { planView = k; renderPlans(); },
+  }, label, count(k) ? h('span', { class: 'pv-n' }, count(k)) : null)));
+  // 이번 주: 넣을 날 고르기 (모레 ~ 7일 뒤)
+  el.planDay.hidden = planView !== 'week';
+  el.planDay.parentElement?.classList.toggle('with-day', planView === 'week');
+  if (planView === 'week') {
+    const keep = el.planDay.value;
+    el.planDay.replaceChildren(...Array.from({ length: 6 }, (_, i) => {
+      const k = dayKey(addDays(base, i + 2));
+      return h('option', { value: k, selected: k === keep }, planDayLabel(k));
+    }));
+  }
+  const where = planView === 'today' ? '오늘' : planView === 'tomorrow' ? '내일' : '이번 주';
+  el.planAddBtn.setAttribute('aria-label', `${where} 공부에 추가`);
+  el.planMemo.placeholder = planView === 'today' ? '메모 (안 적어도 돼요)' : '메모';
+}
+
+// 내일 · 이번 주 · 지난 날의 계획 한 줄: 과목 | 날짜 | (비움) | 오늘로 | x
+function laterPlanRow(p, { past = false } = {}) {
+  const memo = p.title && p.title !== p.subject ? p.title : '';
+  const name = p.subject || memo || '공부';
+  return h('li', { class: `plan later${past ? ' past' : ''}`, style: { '--c': subjectColor(p.subject) } },
+    h('span', { class: 'plan-name' },
+      h('span', { class: 'plan-subj' }, name),
+      p.subject && memo ? h('span', { class: 'plan-memo' }, memo) : null),
+    h('span', { class: 'plan-dday plan-when' }, planDayLabel(p.day)),
+    h('span', { class: 'plan-time' }),
+    h('button', { type: 'button', class: 'btn icon ghost sm-icon to-today', title: '오늘로 옮기기', 'aria-label': `${name} 오늘로 옮기기`, onclick: () => movePlanToday(p) }, moveIcon()),
+    h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '지우기', 'aria-label': `${name} 지우기`, onclick: () => removePlan(p) }, xIcon()));
+}
+
 function renderPlans() {
+  renderPlanHead();
+  if (planView !== 'today') {
+    const base = studyDate();
+    const tomorrow = dayKey(addDays(base, 1));
+    const list = study.plans
+      .filter(p => planView === 'tomorrow' ? p.day === tomorrow : p.day > tomorrow)
+      .sort((a, b) => a.day.localeCompare(b.day) || 0)
+      .map(p => laterPlanRow(p));
+    fill(el.planList, list, !list.length ? h('li', { class: 'empty' },
+      planView === 'tomorrow' ? '내일 할 공부를 미리 넣어 두면 내일 오늘 공부에 나와요.' : '날을 골라 이번 주 공부를 미리 잡아 둘 수 있어요.') : null);
+    return;
+  }
   const today = studyKey();
   const idle = timer.phase === 'idle';
   const plans = study.plans.filter(p => p.day === today);
@@ -698,8 +772,16 @@ function renderPlans() {
       h('span', { class: 'sm-icon' }));
   });
 
+  // 지난 날(최근 7일)에 넣고 못 한 계획: 끝에 흐리게, 오늘로 옮길 수 있게
+  const missed = study.plans
+    .filter(p => p.day < today && !p.done && !planProgress(p))
+    .sort((a, b) => b.day.localeCompare(a.day))
+    .map(p => laterPlanRow(p, { past: true }));
+
   fill(el.planList, mine, upcoming,
-    !mine.length && !upcoming.length ? h('li', { class: 'empty' }, '과목을 골라 넣어 두면 ▶로 바로 시작할 수 있어요.') : null);
+    !mine.length && !upcoming.length ? h('li', { class: 'empty' }, '과목을 골라 넣어 두면 ▶로 바로 시작할 수 있어요.') : null,
+    missed.length ? h('li', { class: 'plan-missed-head' }, `지난 계획 ${missed.length}개`) : null,
+    missed);
 }
 
 /* ───── 오늘 타임라인 ───── */
@@ -974,6 +1056,11 @@ function daySubjects(key, withLive = false) {
 /* ───── 기록 ───── */
 function period() {
   const a = rec.anchor || studyDate();
+  if (rec.mode === 'year') {
+    // 이 주를 끝으로 53주 (월요일 시작)
+    const end = addDays(startOfWeek(a), 7);
+    return { start: addDays(end, -53 * 7), end };
+  }
   if (rec.mode === 'month') {
     const start = new Date(a.getFullYear(), a.getMonth(), 1);
     return { start, end: new Date(a.getFullYear(), a.getMonth() + 1, 1) };
@@ -983,7 +1070,8 @@ function period() {
 }
 function shiftPeriod(dir) {
   const a = rec.anchor || studyDate();
-  rec.anchor = rec.mode === 'month' ? new Date(a.getFullYear(), a.getMonth() + dir, 1) : addDays(a, 7 * dir);
+  rec.anchor = rec.mode === 'month' ? new Date(a.getFullYear(), a.getMonth() + dir, 1)
+    : rec.mode === 'year' ? addDays(a, 52 * 7 * dir) : addDays(a, 7 * dir);
   const { start, end } = period();
   const today = studyDate();
   // 고른 날을 새 기간 안으로 (이번 기간이면 오늘, 아니면 마지막 날)
@@ -993,6 +1081,7 @@ function shiftPeriod(dir) {
 function periodTitle({ start, end }) {
   if (rec.mode === 'month') return `${start.getFullYear()}년 ${start.getMonth() + 1}월`;
   const last = addDays(end, -1);
+  if (rec.mode === 'year') return `${start.getFullYear() % 100}.${start.getMonth() + 1} – ${last.getFullYear() % 100}.${last.getMonth() + 1}`;
   return start.getMonth() === last.getMonth()
     ? `${start.getMonth() + 1}월 ${start.getDate()}일 – ${last.getDate()}일`
     : `${start.getMonth() + 1}월 ${start.getDate()}일 – ${last.getMonth() + 1}월 ${last.getDate()}일`;
@@ -1021,9 +1110,10 @@ function renderRecords() {
   const p = period();
   const today = studyDate();
   if (!rec.day) rec.day = dayKey(today);
-  ensureRange(p.start, p.end);
+  // 1년(잔디)은 날짜별 합계만 쓰므로 기록을 더 불러오지 않음
+  if (rec.mode !== 'year') ensureRange(p.start, p.end);
 
-  el.recModes.replaceChildren(...[['week', '주간'], ['month', '월간']].map(([k, l]) => h('button', {
+  el.recModes.replaceChildren(...[['week', '주간'], ['month', '월간'], ['year', '1년']].map(([k, l]) => h('button', {
     type: 'button', role: 'radio', 'aria-checked': rec.mode === k ? 'true' : 'false',
     onclick: () => { rec.mode = k; rec.anchor = rec.day ? new Date(`${rec.day}T00:00`) : today; renderRecords(); },
   }, l)));
@@ -1051,7 +1141,14 @@ function renderRecords() {
     h('span', { class: 'sb-bar' }, h('i', { style: { width: `${(v / max) * 100}%` } })),
     h('span', { class: 'sb-time' }, fmtSpent(v))))) : null;
 
-  fill(el.recMain, rec.mode === 'month' ? monthGrid(p, m, today) : weekStrips(days, m, today), subjects);
+  if (rec.mode === 'year') {
+    fill(el.recSummary,
+      h('b', null, fmtSpent(total)),
+      h('span', null, `${studied}일 공부`),
+      h('span', null, `가장 길게 ${longestStreak(m, past)}일 연속`),
+      p.end > today && streak(m) > 1 ? h('span', null, `지금 ${streak(m)}일 연속`) : null);
+    fill(el.recMain, yearGrass(p, m, today));
+  } else fill(el.recMain, rec.mode === 'month' ? monthGrid(p, m, today) : weekStrips(days, m, today), subjects);
   renderRecDay();
 }
 
@@ -1090,6 +1187,51 @@ function weekStrips(days, m, today) {
 }
 
 // 월간: 달력, 목표 대비 공부한 만큼 진하게
+function longestStreak(m, days) {
+  let best = 0, n = 0;
+  for (const d of days) { n = m.get(dayKey(d)) ? n + 1 : 0; best = Math.max(best, n); }
+  return best;
+}
+
+// 1년 잔디: 세로 = 요일(월~일), 가로 = 주. 진하기는 하루 목표 대비 (달력과 같은 4단계)
+function yearGrass({ start, end }, m, today) {
+  const goal = study.goal * 60;
+  const weeks = [];
+  for (let w = start; w < end; w = addDays(w, 7)) weeks.push(w);
+  // 그 달 1일이 들어 있는 주에 달 이름 (첫 주 머리말끼리 겹치지 않게)
+  const months = weeks.map(w => {
+    const d = addDays(w, 6);
+    return d.getDate() <= 7 ? `${d.getMonth() + 1}월` : '';
+  });
+  const cell = d => {
+    const key = dayKey(d);
+    const sec = m.get(key) || 0;
+    const r = sec / goal;
+    const lv = !sec ? 0 : r < 0.25 ? 1 : r < 0.5 ? 2 : r < 1 ? 3 : 4;
+    if (d > today) return h('span', { class: 'yg-day future' });
+    return h('button', {
+      type: 'button', class: `yg-day lv${lv}${key === rec.day ? ' sel' : ''}${key === dayKey(today) ? ' today' : ''}`,
+      title: `${fmtDay(d)} · ${sec ? fmtSpent(sec) : '공부 안 함'}`, 'aria-label': `${fmtDay(d)} ${fmtSpent(sec)}`,
+      onclick: () => { rec.day = key; renderRecords(); },
+    });
+  };
+  const grid = h('div', { class: 'yg-grid', style: { '--weeks': weeks.length } },
+    h('div', { class: 'yg-months', 'aria-hidden': 'true' }, months.map(t => h('span', null, t))),
+    h('div', { class: 'yg-wd', 'aria-hidden': 'true' }, ['월', '', '수', '', '금', '', '일'].map(t => h('span', null, t))),
+    h('div', { class: 'yg-cells' }, weeks.map(w => Array.from({ length: 7 }, (_, i) => cell(addDays(w, i)))).flat()));
+  const legend = h('div', { class: 'yg-legend', 'aria-hidden': 'true' },
+    h('span', null, '적게'), [0, 1, 2, 3, 4].map(l => h('i', { class: `yg-day lv${l}` })), h('span', null, `목표(${fmtSpent(goal)}) 이상`));
+  const box = h('div', { class: 'year-grass' }, h('div', { class: 'yg-scroll' }, grid), legend);
+  // 칸 크기를 폭에 맞추고(10~16px), 그래도 넘치는 좁은 화면에서는 최근 주가 보이게 오른쪽 끝으로
+  requestAnimationFrame(() => {
+    const sc = box.firstChild;
+    const cell = Math.max(10, Math.min(16, Math.floor((sc.clientWidth - 24) / weeks.length) - 3));
+    grid.style.setProperty('--cell', `${cell}px`);
+    sc.scrollLeft = sc.scrollWidth;
+  });
+  return box;
+}
+
 function monthGrid({ start, end }, m, today) {
   const first = startOfWeek(start);
   const cells = [];
@@ -1126,7 +1268,8 @@ function renderRecDay() {
   fill(el.recDay,
     h('div', { class: 'today-head' },
       h('p', { class: 'today-total' }, fmtSpent(sec)),
-      h('span', { class: 'rd-date' }, isToday ? `오늘 · ${fmtDay(date)}` : fmtDay(date))),
+      h('span', { class: 'rd-date' }, isToday ? `오늘 · ${fmtDay(date)}`
+        : date.getFullYear() !== studyDate().getFullYear() ? `${date.getFullYear()}년 ${fmtDay(date)}` : fmtDay(date))),
     h('div', { class: 'goal-bar' }, h('i', { style: { width: `${Math.min(100, sec / (study.goal * 60) * 100)}%` } })),
     // 40일 안의 날짜는 타임라인에서 직접 기록 넣기 (서버가 그보다 오래된 기록은 받지 않음)
     timeline(date, segs, { showNow: isToday, editable: date >= addDays(studyDate(), -39) }),
