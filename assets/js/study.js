@@ -855,14 +855,31 @@ function attachPick(ol, date) {
   const key = dayKey(date);
   let down = null;
   ol.classList.add('editable');
+  // 폰: 길게 누르면(0.35초) 그 자리부터 끌어서 범위 고르기. 그냥 누르면 30분, 바로 움직이면 스크롤
+  const startLong = () => {
+    if (!down || down.moved || down.editId) return;
+    down.long = true; down.dragging = true;
+    if (sel && sel.editId) sel = null;
+    try { navigator.vibrate?.(12); } catch { /* 진동 없음 */ }
+    if (setSel(key, down.t, down.t + SNAP)) paintSel(ol, date);
+    ol.classList.add('picking');
+  };
   ol.addEventListener('pointerdown', e => {
     if (e.button !== 0 || !e.target.closest('.tl-track')) return;
     const recSeg = e.target.closest('.tl-seg.rec');
-    down = { x: e.clientX, y: e.clientY, t: timeAt(ol, e, date), type: e.pointerType, dragging: false, editId: recSeg ? recSeg.dataset.id : null };
+    down = { x: e.clientX, y: e.clientY, t: timeAt(ol, e, date), type: e.pointerType, dragging: false, long: false, moved: false, editId: recSeg ? recSeg.dataset.id : null };
     if (e.pointerType === 'mouse') { e.preventDefault(); ol.setPointerCapture(e.pointerId); }
+    else down.timer = setTimeout(startLong, 350);
   });
+  // 길게 누른 뒤에는 화면이 스크롤되지 않게
+  ol.addEventListener('touchmove', e => { if (down && down.long) e.preventDefault(); }, { passive: false });
+  ol.addEventListener('contextmenu', e => { if (down) e.preventDefault(); });
   ol.addEventListener('pointermove', e => {
-    if (!down || down.type !== 'mouse') return;
+    if (!down) return;
+    if (down.type !== 'mouse' && !down.long) {
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) { down.moved = true; clearTimeout(down.timer); }
+      return;
+    }
     if (down.editId) return;                    // 기록 막대에서 시작한 건 끌기 대신 고치기
     if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) return;
     if (!down.dragging && sel && sel.editId) { sel = null; refreshSel(); }
@@ -873,7 +890,9 @@ function attachPick(ol, date) {
   const finish = e => {
     if (!down) return;
     const d = down; down = null;
-    if (d.type !== 'mouse' && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;   // 폰에서 스크롤한 것
+    clearTimeout(d.timer);
+    ol.classList.remove('picking');
+    if (d.type !== 'mouse' && !d.long && (d.moved || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8)) return;   // 폰에서 스크롤한 것
     if (d.editId) { openEdit(d.editId); return; }
     if (!d.dragging) { sel = null; if (!setSel(key, d.t, d.t + 30 * 60000)) { refreshSel(); return; } }
     refreshSel();
@@ -881,7 +900,7 @@ function attachPick(ol, date) {
     box.pick.button.focus({ preventScroll: true });
   };
   ol.addEventListener('pointerup', finish);
-  ol.addEventListener('pointercancel', () => { down = null; });
+  ol.addEventListener('pointercancel', () => { if (down) clearTimeout(down.timer); if (down && down.long) { ol.classList.remove('picking'); } down = null; });
 }
 // 기록 고치기: 그 기록의 시각 · 과목으로 아래 칸을 채움
 function openEdit(id) {
@@ -956,7 +975,7 @@ function makeAddBox(id) {
       h('button', { type: 'button', class: 'btn icon ghost', title: '취소', 'aria-label': '취소', onclick: () => { sel = null; refreshSel(); } }, xIcon())),
     box.warn);
   box.hint = h('p', { class: 'tl-hint' }, matchMedia('(pointer: coarse)').matches
-    ? '타임라인을 누르면 그 시각부터 공부한 시간을 넣을 수 있어요'
+    ? '타임라인을 누르면 그 시각부터 30분, 길게 누른 채 끌면 원하는 만큼 넣을 수 있어요'
     : '타임라인의 빈 곳을 끌어서 공부한 시간을 넣을 수 있어요');
   box.box = h('div', { class: 'tl-add' }, box.hint, box.form);
   return box;
@@ -1373,9 +1392,9 @@ function renderFriends() {
 
   // 받은 신청
   const inc = study.requests.incoming;
-  const incoming = inc.length ? h('section', { class: 'f-sec f-requests' },
-    h('h4', null, '받은 신청', h('span', { class: 'f-count' }, inc.length)),
-    h('ul', { class: 'f-req-list' }, inc.map(r => h('li', null,
+  const incoming = inc.length ? h('section', { class: 'set-group f-requests' },
+    h('h3', { class: 'f-h' }, '받은 신청', h('span', { class: 'f-count' }, inc.length)),
+    h('ul', { class: 'set-card f-req-list' }, inc.map(r => h('li', null,
       avatar(r.nickname),
       h('span', { class: 'f-req-name' }, r.nickname),
       h('button', { type: 'button', class: 'btn sm primary', onclick: () => friendAction(async () => {
@@ -1388,9 +1407,9 @@ function renderFriends() {
       }, '신청을 거절했어요') }, '거절'))))) : null;
 
   // 순위
-  const ranking = h('section', { class: 'f-sec' },
-    h('div', { class: 'f-sec-head' }, h('h4', null, '순위'), rangeBtns),
-    h('ol', { class: 'friend-list' }, rows.map((r, i) => {
+  const ranking = h('section', { class: 'set-group' },
+    h('div', { class: 'f-group-head' }, h('h3', { class: 'f-h' }, '순위'), rangeBtns),
+    h('ol', { class: 'set-card friend-list' }, rows.map((r, i) => {
       const v = val(r);
       return h('li', { class: `${r.me ? 'me' : ''}${r.liveSince ? ' live' : ''}` },
         h('span', { class: `f-rank${ranks[i] <= 3 && v > 0 ? ` r${ranks[i]}` : ''}`, 'aria-label': `${ranks[i]}등` }, ranks[i]),
@@ -1423,7 +1442,8 @@ function renderFriends() {
   const out = study.requests.outgoing;
   // 접어 두는 칸: 다시 그려도 펼친 상태 유지 (친구가 없거나 안내가 있으면 펼쳐서)
   const fold = (key, summary, ...kids) => {
-    const d = h('details', { class: 'more f-fold', open: friendOpen.has(key) }, h('summary', null, ...[summary].flat()), ...kids);
+    const d = h('details', { class: 'set-more f-fold', open: friendOpen.has(key) }, h('summary', null, ...[summary].flat()),
+      h('div', { class: 'set-row stack' }, ...kids));
     d.addEventListener('toggle', () => { if (d.open) friendOpen.add(key); else friendOpen.delete(key); });
     return d;
   };
@@ -1450,9 +1470,9 @@ function renderFriends() {
     clearTimeout(armed); armed = null;
     friendAction(async () => { study.profile = await api.studyNewCode(state.code); }, '새 코드를 만들었어요. 이전 코드로는 더 이상 신청할 수 없어요');
   });
-  const mine = h('section', { class: 'f-sec f-mine' },
-    h('div', { class: 'my-code' },
-      h('span', null, '내 친구 코드'),
+  const mine = h('section', { class: 'set-group f-mine' }, h('div', { class: 'set-card' },
+    h('div', { class: 'set-row my-code' },
+      h('div', { class: 'set-text' }, h('b', null, '내 친구 코드'), h('span', { class: 'set-sub' }, '친구에게 알려 주면 신청할 수 있어요')),
       h('b', { class: 'code' }, p.friendCode),
       h('button', {
         type: 'button', class: 'btn icon ghost sm-icon', title: '내 코드 복사', 'aria-label': '내 코드 복사',
@@ -1472,7 +1492,7 @@ function renderFriends() {
         h('button', {
           type: 'button', class: 'btn sm danger ghost',
           onclick: () => friendAction(async () => { study.profile = await api.studyProfileHide(state.code); study.friends = []; }, '친구에게 더 이상 보이지 않아요'),
-        }, '공개 그만하기'))));
+        }, '공개 그만하기')))));
 
   fill(body, incoming, ranking, msg, mine);
 }

@@ -146,11 +146,14 @@ export function renderCalendar(root, tasks, ctx) {
   }
   for (const list of byDay.values()) list.sort(byDue);
 
+  // 가운데 ‹ 2026년 10월 ›, 오른쪽 끝 오늘
   const head = h('div', { class: 'cal-head' },
-    h('h3', null, `${month.getFullYear()}년 ${month.getMonth() + 1}월`),
-    h('button', { class: 'btn icon ghost', 'aria-label': '이전 달', onclick: () => ctx.onMonth(-1) }, '‹'),
-    h('button', { class: 'btn', onclick: () => ctx.onMonth(0) }, '오늘'),
-    h('button', { class: 'btn icon ghost', 'aria-label': '다음 달', onclick: () => ctx.onMonth(1) }, '›'),
+    h('span', { class: 'cal-head-side', 'aria-hidden': 'true' }),
+    h('div', { class: 'cal-head-mid' },
+      h('button', { class: 'btn icon ghost', 'aria-label': '이전 달', onclick: () => ctx.onMonth(-1) }, '‹'),
+      h('h3', null, `${month.getFullYear()}년 ${month.getMonth() + 1}월`),
+      h('button', { class: 'btn icon ghost', 'aria-label': '다음 달', onclick: () => ctx.onMonth(1) }, '›')),
+    h('button', { class: 'btn cal-today', onclick: () => ctx.onMonth(0) }, '오늘'),
   );
 
   const grid = h('div', { class: 'cal-grid', role: 'grid' },

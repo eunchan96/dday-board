@@ -451,25 +451,25 @@
     </section>
 
     <section class="set-group" data-tab="device">
-      <h4 class="set-sub-head">백업</h4>
       <div class="set-card">
-        <div class="set-row stack">
-          <div class="set-text"><span class="set-sub">예전 위젯 백업 텍스트를 붙여 넣으면 옮겨 와요</span></div>
-          <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
-          <div class="row-actions">
-            <span class="msg" id="importMsg" role="status"></span>
-            <button class="btn sm" id="btnExport">백업 복사</button>
-            <button class="btn sm primary" id="btnImport">가져오기</button>
+        <details class="set-more" id="backupMore">
+          <summary>백업</summary>
+          <div class="set-row stack">
+            <div class="set-text"><span class="set-sub">예전 위젯 백업 텍스트를 붙여 넣으면 옮겨 와요</span></div>
+            <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
+            <div class="row-actions">
+              <span class="msg" id="importMsg" role="status"></span>
+              <button class="btn sm" id="btnExport">백업 복사</button>
+              <button class="btn sm primary" id="btnImport">가져오기</button>
+            </div>
           </div>
-        </div>
-      </div>
-    </section>
-    <section class="set-group" data-tab="device">
-      <h4 class="set-sub-head">단축키</h4>
-      <div class="set-card">
-        <div class="set-row">
-          <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>T</kbd> 할 일 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
-        </div>
+        </details>
+        <details class="set-more" id="keysMore">
+          <summary>단축키</summary>
+          <div class="set-row">
+            <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>T</kbd> 할 일 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
+          </div>
+        </details>
       </div>
     </section>
   </div>

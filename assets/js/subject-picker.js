@@ -107,8 +107,8 @@ function move(dir) {
   paintActive();
 }
 function paintActive() {
-  [...pop.list.children].forEach((li, i) => li.classList.toggle('active', i === active));
-  pop.list.children[active]?.scrollIntoView({ block: 'nearest' });
+  items.forEach((it, i) => it.li.classList.toggle('active', i === active));
+  items[active]?.li.scrollIntoView({ block: 'nearest' });
 }
 
 function renderList() {
@@ -137,7 +137,12 @@ function renderList() {
   };
   const kids = [];
   if (current.allowNone && !q) kids.push(row('', current.noneLabel, { none: true }));
-  for (const n of names) kids.push(row(n, n));
+  // '지금' 분류의 과목을 먼저(설정 → 과목에서 정한 순서), 그 밖의 과목은 아래에 따로
+  const now = names.filter(n => subjectInScope(n, 'current'));
+  const rest = names.filter(n => !subjectInScope(n, 'current'));
+  for (const n of now) kids.push(row(n, n));
+  if (now.length && rest.length) kids.push(h('li', { class: 'sp-sep', role: 'presentation' }, '다른 과목'));
+  for (const n of rest) kids.push(row(n, n));
   if (q && !exact) kids.push(row(q.slice(0, 40), `"${q.slice(0, 40)}" 새 과목으로 추가`, { isNew: true }));
   if (!kids.length) kids.push(h('li', { class: 'sp-empty' }, '과목 이름을 적으면 새로 추가할 수 있어요'));
   pop.list.replaceChildren(...kids);
