@@ -2146,9 +2146,32 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 .danger-text { color: var(--red) !important; }
 .friend-list li { grid-template-columns: 22px 32px minmax(0, 1fr) auto !important; }
 @media (max-width: 640px) { .friend-list li { grid-template-columns: 18px 30px minmax(0, 1fr) auto !important; } }
-.timer-pip { flex-shrink: 0; gap: 6px; }
-.timer-pip[hidden] { display: none; }
-.timer-pip svg { width: 16px; height: 16px; }
-.timer-pip svg path:last-child { fill: currentColor; stroke: none; }
-.timer-line:has(.timer-pip:not([hidden])) .timer-digits { font-size: min(120px, calc((100cqi - 180px) / 3.05)); }
-.timer-line:has(.timer-pip:not([hidden])) .timer-digits.long { font-size: min(100px, calc((100cqi - 180px) / 4.3)); }
+
+/* 타이머 ▶ / ❚❚ 버튼: 숫자 높이에 맞춤 (숫자 + 버튼이 한 줄에 들어가도록 같이 줄어듦) */
+.timer-line { --dsz: min(136px, calc((100cqi - 24px) / 3.75)); }
+.timer-line:has(.timer-digits.long) { --dsz: min(112px, calc((100cqi - 24px) / 5)); }
+.timer-line .timer-digits, .timer-line .timer-digits.long { font-size: var(--dsz); }
+.timer-go { width: calc(var(--dsz) * 0.7); height: calc(var(--dsz) * 0.7); min-width: 44px; min-height: 44px; }
+.timer-go svg { width: 44%; height: 44%; }
+@media (max-width: 640px) {
+  .timer-line { --dsz: min(80px, calc((100cqi - 16px) / 3.75)); }
+  .timer-line:has(.timer-digits.long) { --dsz: min(68px, calc((100cqi - 16px) / 5)); }
+  .timer-go { width: calc(var(--dsz) * 0.7); height: calc(var(--dsz) * 0.7); }
+  .timer-go svg { width: 44%; height: 44%; }
+}
+/* 위쪽 띄우기 아이콘 */
+.tt-pip svg { width: 19px; height: 19px; }
+.tt-pip svg path:last-child { fill: currentColor; stroke: none; }
+
+/* ═════ 친구 창 글자 크기 맞춤: 제목 13 · 본문 14.5 · 보조 12.5 ═════ */
+#friendsDialog .f-h { font-size: 13px !important; font-weight: 700 !important; }
+#friendsDialog .f-nick, #friendsDialog .f-req-name, #friendsDialog .set-text b { font-size: 14.5px; font-weight: 650; }
+#friendsDialog .f-time { font-size: 14.5px; font-weight: 700; }
+#friendsDialog .f-rank { font-size: 14px; font-weight: 750; }
+#friendsDialog .f-avatar { font-size: 13px; font-weight: 700; }
+#friendsDialog .f-live, #friendsDialog .f-req small, #friendsDialog .set-sub, #friendsDialog .f-note, #friendsDialog .f-empty, #friendsDialog .f-msg { font-size: 12.5px; font-weight: 500; }
+#friendsDialog .f-note, #friendsDialog .f-empty { color: var(--pencil); }
+#friendsDialog .my-code .code { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; }
+#friendsDialog .btn, #friendsDialog .segmented button { font-size: 13px; }
+#friendsDialog input[type=text] { font-size: 14.5px; }
+#friendsDialog .inline-form .btn { min-width: 64px; }

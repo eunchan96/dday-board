@@ -365,15 +365,19 @@ function pipState() {
     subLabel: idle ? (isPomo() ? `${modeOf().focus}분 집중` : '스톱워치') : timer.phase === 'rest' ? '쉬는 시간' : '집중 중',
   };
 }
-initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => { renderTopTimer(); renderPipBtn(); } });
-function renderPipBtn() {
-  if (!el.pipBtn) return;
-  el.pipBtn.hidden = timer.phase === 'idle' || !pipSupported() || pipOpen();
+initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => renderTopTimer() });
+// 다른 기기에서 시작해 이 기기에 떠 있지 않을 때: 위쪽 띄우기 아이콘 (브라우저는 누를 때만 허락)
+const pipNeeded = () => timer.phase !== 'idle' && pipSupported() && !pipOpen();
+function pipButton() {
+  return h('button', {
+    type: 'button', class: 'btn icon ghost tt-pip', title: '타이머 띄우기 (다른 창 위에)', 'aria-label': '타이머 띄우기',
+    onclick: () => togglePip().then(ok => { if (!ok) ctx.toast('이 브라우저에서는 띄울 수 없어요'); renderTopTimer(); }),
+  }, svgIcon(['M3 5.5h14v9H3z', 'M10.5 10h5v3.5h-5z']));
 }
 // 크롬: 탭을 벗어날 때 저절로 띄우기 (지원하는 경우, 소리가 나는 중일 때 등)
 try {
   navigator.mediaSession?.setActionHandler?.('enterpictureinpicture', () => {
-    if (timer.phase !== 'idle' && !pipOpen()) togglePip().then(() => { renderTopTimer(); renderPipBtn(); });
+    if (timer.phase !== 'idle' && !pipOpen()) togglePip().then(() => renderTopTimer());
   });
 } catch { /* 지원 안 함 */ }
 // 사용자가 눌러서 시작할 때: 시작과 함께 타이머를 다른 창 위에 띄운다 (닫기는 직접)
@@ -528,12 +532,7 @@ function build(root) {
     h('div', { class: 'timer-top' }, el.modes, ambientControl()),
     h('div', { class: 'timer-face' }, el.phase,
       // 시간 바로 오른쪽에 ▶ / ❚❚ (줄이 바뀌지 않게, 길어지면 글자를 줄임)
-      h('div', { class: 'timer-line' }, el.digits, el.mainBtn = h('button', { type: 'button', class: 'timer-go' }),
-        // 다른 기기에서 시작해 이 기기에 떠 있지 않을 때: 한 번 눌러 띄우기 (브라우저는 누를 때만 허락)
-        el.pipBtn = h('button', {
-          type: 'button', class: 'btn sm timer-pip', hidden: true, title: '타이머를 다른 창 위에 띄우기',
-          onclick: () => togglePip().then(ok => { if (!ok) ctx.toast('이 브라우저에서는 띄울 수 없어요'); renderPipBtn(); renderTopTimer(); }),
-        }, svgIcon(['M3 5.5h14v9H3z', 'M10.5 10h5v3.5h-5z']), '띄우기')),
+      h('div', { class: 'timer-line' }, el.digits, el.mainBtn = h('button', { type: 'button', class: 'timer-go' })),
       h('div', { class: 'timer-bar' }, el.bar)),
     el.what);
 
@@ -607,12 +606,13 @@ function renderTopTimer() {
   const idle = timer.phase === 'idle';
   // 상단바의 다른 버튼과 같은 네모 버튼에 글자로
   const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
-  // 오늘 탭에서는 타이머 칸에 버튼이 있으니 위쪽에는 두지 않음
-  if (studyView() === 'today' && !$('#viewStudy')?.hidden) { box.replaceChildren(); return; }
+  const pip = pipNeeded() ? pipButton() : null;
+  // 오늘 탭에서는 타이머 칸에 버튼이 있으니 위쪽에는 띄우기만
+  if (studyView() === 'today' && !$('#viewStudy')?.hidden) { box.replaceChildren(...[pip].filter(Boolean)); return; }
   const main = idle ? b('시작', '타이머 시작 (Space)', startByUser, 'primary')
     : timer.phase === 'rest' ? b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest')
     : b('끝내기', '끝내고 기록 (Space)', stop, 'primary');
-  box.replaceChildren(main);
+  box.replaceChildren(...[pip, main].filter(Boolean));
 }
 
 export function render() {
@@ -662,7 +662,6 @@ function renderTimer() {
   const label = ph === 'idle' ? '시작 (Space)' : ph === 'rest' ? '쉬는 시간 끝' : '끝내고 기록 (Space)';
   go.title = label; go.setAttribute('aria-label', label);
   go.onclick = ph === 'idle' ? startByUser : ph === 'rest' ? toIdle : stop;
-  renderPipBtn();
   renderClock();
 }
 

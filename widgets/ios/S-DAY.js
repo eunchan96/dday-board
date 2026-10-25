@@ -214,50 +214,86 @@ function upcomingWidget(w, d, now, fam) {
   w.addSpacer();
 }
 
-// 캘린더: 이번 달, 일정 있는 날 아래 점 (시험 빨강 · 과제 노랑 · 할 일 파랑)
+// 캘린더: 날짜 칸마다 그날 일정 이름을 한 줄씩 (시험 빨강 · 과제 노랑 · 할 일 파랑 막대)
+//   큰 위젯 = 이번 달, 중간 = 이번 주 · 다음 주, 작은 = 다가오는 날짜별 목록
 function calendarWidget(w, d, now, fam) {
   const today = new Date(now);
-  const first = new Date(today.getFullYear(), today.getMonth(), 1);
-  const start = new Date(first); start.setDate(1 - first.getDay());
-  const weeks = Math.ceil((first.getDay() + new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()) / 7);
-  const marks = {};
-  for (const m of d.month || []) (marks[m.d] = marks[m.d] || new Set()).add(m.kind);
   const key = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
-  if (LOCK.includes(fam)) { text(w, `${today.getMonth() + 1}월 ${today.getDate()}일`, 13, Color.white(), 'bold'); return; }
+  const byDay = {};
+  for (const m of d.month || []) (byDay[m.d] = byDay[m.d] || []).push(m);
+  if (LOCK.includes(fam)) {
+    const n = (byDay[key(today)] || [])[0];
+    text(w, n ? `오늘 ${n.title}` : `${today.getMonth() + 1}월 ${today.getDate()}일`, 12, Color.white(), 'bold');
+    return;
+  }
+  const W = '일월화수목금토';
+  if (fam === 'small') {
+    // 오늘부터 일정 있는 날을 차례로
+    const days = Object.keys(byDay).filter(k => k >= key(today)).sort().slice(0, 3);
+    if (!days.length) { w.addSpacer(); text(w, '이번 달 남은 일정이 없어요', 12, C.faint, 'medium'); w.addSpacer(); return; }
+    let lines = 0;
+    for (const k of days) {
+      if (lines >= 5) break;
+      const dt = new Date(`${k}T00:00:00`);
+      if (lines) w.addSpacer(5);
+      text(w, k === key(today) ? '오늘' : `${dt.getMonth() + 1}/${dt.getDate()} ${W[dt.getDay()]}`, 10, C.pencil, 'bold');
+      lines++;
+      for (const it of byDay[k]) {
+        if (lines >= 5) break;
+        w.addSpacer(2);
+        const r = w.addStack(); r.centerAlignContent();
+        const bar = r.addStack(); bar.size = new Size(3, 12); bar.cornerRadius = 1.5; bar.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
+        r.addSpacer(5);
+        text(r, it.title, 11.5, C.ink, 'medium');
+        lines++;
+      }
+    }
+    w.addSpacer();
+    return;
+  }
   const big = fam === 'large';
-  const W = fam === 'small' ? 17 : 42, H = fam === 'small' ? 15 : big ? 40 : 14.5;
-  const num = fam === 'small' ? 9.5 : big ? 14 : 10;
-  text(w, `${today.getMonth() + 1}월`, big ? 15 : 12, C.ink, 'bold');
-  w.addSpacer(big ? 8 : 3);
+  const first = new Date(today.getFullYear(), today.getMonth(), 1);
+  let start, weeks;
+  if (big) {
+    start = new Date(first); start.setDate(1 - first.getDay());
+    weeks = Math.ceil((first.getDay() + new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()) / 7);
+  } else {
+    start = new Date(today); start.setDate(today.getDate() - today.getDay());
+    weeks = 2;
+  }
+  const CW = 42, CH = big ? Math.floor(270 / weeks) : 46;
+  const lines = Math.max(1, Math.floor((CH - 13) / 10));
+  text(w, `${today.getMonth() + 1}월`, big ? 14 : 12, C.ink, 'bold');
+  w.addSpacer(big ? 5 : 3);
   const head = w.addStack();
-  '일월화수목금토'.split('').forEach((ch, i) => {
-    const c = head.addStack(); c.size = new Size(W, big ? 18 : 12); c.centerAlignContent();
-    const t = c.addText(ch); t.font = Font.mediumSystemFont(big ? 11 : 8); t.textColor = i === 0 ? C.red : C.faint;
+  W.split('').forEach((ch, i) => {
+    const c = head.addStack(); c.size = new Size(CW, 12); c.centerAlignContent();
+    const t = c.addText(ch); t.font = Font.mediumSystemFont(8.5); t.textColor = i === 0 ? C.red : C.faint;
   });
   for (let r = 0; r < weeks; r++) {
     const row = w.addStack();
     for (let i = 0; i < 7; i++) {
       const day = new Date(start); day.setDate(start.getDate() + r * 7 + i);
-      const inMonth = day.getMonth() === today.getMonth();
+      const inMonth = !big || day.getMonth() === today.getMonth();
       const isToday = key(day) === key(today);
-      const cell = row.addStack(); cell.size = new Size(W, H); cell.layoutVertically(); cell.centerAlignContent();
-      const top = cell.addStack(); top.addSpacer();
-      const n = top.addStack(); n.centerAlignContent();
-      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = num * 0.8; n.size = new Size(num * 1.6, num * 1.6); }
+      const cell = row.addStack(); cell.size = new Size(CW, CH); cell.layoutVertically(); cell.topAlignContent?.();
+      cell.setPadding(2, 2, 0, 1);
+      const n = cell.addStack(); n.centerAlignContent();
+      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = 6; n.setPadding(0, 3, 0, 3); }
       const t = n.addText(String(day.getDate()));
-      t.font = isToday ? Font.boldSystemFont(num) : Font.mediumSystemFont(num);
-      t.textColor = isToday ? Color.white() : !inMonth ? C.rule : i === 0 ? C.red : C.ink;
-      top.addSpacer();
-      const ks = marks[key(day)];
-      if (ks) {
-        const dots = cell.addStack(); dots.addSpacer();
-        ['exam', 'assignment', 'todo'].filter(k => ks.has(k)).forEach((k, j) => {
-          if (j) dots.addSpacer(2);
-          const s2 = big ? 5 : 3.5;
-          const dd = dots.addStack(); dd.size = new Size(s2, s2); dd.cornerRadius = s2 / 2; dd.backgroundColor = KIND_COLOR[k];
-        });
-        dots.addSpacer();
-      }
+      t.font = isToday ? Font.boldSystemFont(9) : Font.mediumSystemFont(9);
+      t.textColor = isToday ? Color.white() : !inMonth ? C.faint : i === 0 ? C.red : C.ink;
+      const items = byDay[key(day)] || [];
+      const show = items.length > lines ? lines - 1 : items.length;
+      items.slice(0, show).forEach(it => {
+        cell.addSpacer(1);
+        const l = cell.addStack(); l.centerAlignContent();
+        const bar = l.addStack(); bar.size = new Size(2, 8); bar.cornerRadius = 1; bar.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
+        l.addSpacer(2);
+        const tt = l.addText(it.title); tt.font = Font.mediumSystemFont(7.5); tt.textColor = inMonth ? C.ink : C.faint; tt.lineLimit = 1;
+      });
+      if (show < items.length) { cell.addSpacer(1); text(cell, `+${items.length - show}`, 7.5, C.pencil, 'medium'); }
+      cell.addSpacer();
     }
   }
 }
