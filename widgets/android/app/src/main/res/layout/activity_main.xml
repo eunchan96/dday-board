@@ -65,7 +65,6 @@
             android:textSize="14sp" />
 
         <TextView
-            android:id="@+id/opacity_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
@@ -73,19 +72,20 @@
             android:textColor="@color/ink"
             android:textSize="16sp"
             android:textStyle="bold" />
-        <SeekBar
-            android:id="@+id/opacity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:max="10" />
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="왼쪽 끝은 완전히 투명해요. 세 위젯에 모두 적용돼요."
+            android:layout_marginTop="2dp"
+            android:text="위젯마다 따로 정해요. 왼쪽 끝은 완전히 투명해요."
             android:textColor="@color/pencil"
             android:textSize="13sp" />
+        <!-- 위젯 종류마다 막대 하나씩 (MainActivity가 채움) -->
+        <LinearLayout
+            android:id="@+id/opacity_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical" />
 
         <Button
             android:id="@+id/open"

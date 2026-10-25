@@ -10,7 +10,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import java.time.LocalDate
 
-/** 캘린더 위젯의 달력 그림: 요일, 가운데 맞춘 날짜, 그날 일정 이름을 한 줄씩 (줄 배경이 종류 색) */
+/** 캘린더 위젯의 달력 그림: 요일, 가운데 맞춘 날짜, 그날 일정 이름을 한 줄씩 (줄 배경이 종류 색, 글자 흰색, 끝낸 건 취소선) */
 object CalendarDraw {
     private fun kindColor(kind: String) = when (kind) { "exam" -> R.color.kind_exam; "todo" -> R.color.kind_todo; else -> R.color.kind_assignment }
 
@@ -69,19 +69,17 @@ object CalendarDraw {
             val room = ((y0 + rowH - pad - y) / (lineH + gap)).toInt().coerceAtLeast(0)
             val show = if (list.size > room) (room - 1).coerceAtLeast(0) else list.size
             for (it in list.take(show)) {
-                val bg = ctx.getColor(kindColor(it.kind))
-                fill.color = bg
-                fill.alpha = if (it.done || !inMonth) 90 else 255
+                // 지난 일정 · 다른 달도 종류 색 그대로, 글자는 모두 흰색. 끝낸 일정은 취소선
+                fill.color = ctx.getColor(kindColor(it.kind))
                 c.drawRoundRect(RectF(x0 + pad, y, x0 + colW - pad, y + lineH), 2.5f * s, 2.5f * s, fill)
-                // 노랑 배경은 진한 글자, 빨강 · 파랑은 흰 글자
-                item.color = if (it.kind == "assignment" && !it.done) 0xFF3A2C00.toInt() else 0xFFFFFFFF.toInt()
-                if (it.done) item.color = ink
+                item.color = 0xFFFFFFFF.toInt()
+                item.isStrikeThruText = it.done
                 val text = TextUtils.ellipsize(it.title, item, colW - pad * 2 - 4f * s, TextUtils.TruncateAt.END)
                 c.drawText(text, 0, text.length, x0 + pad + 2f * s, y + lineH * 0.76f, item)
                 y += lineH + gap
             }
             if (show < list.size && room > 0) {
-                item.color = pencil
+                item.color = pencil; item.isStrikeThruText = false
                 c.drawText("+${list.size - show}", x0 + pad + 2f * s, y + lineH * 0.76f, item)
             }
         }

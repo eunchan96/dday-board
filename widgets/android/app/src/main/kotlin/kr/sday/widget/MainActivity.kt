@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import kotlin.concurrent.thread
@@ -53,22 +54,30 @@ class MainActivity : Activity() {
             }
         }
 
-        // 배경 진하기: 0~100%를 10단계로
-        val opacity = findViewById<SeekBar>(R.id.opacity)
-        val opacityLabel = findViewById<TextView>(R.id.opacity_label)
-        fun showOpacity(v: Int) { opacityLabel.text = "위젯 배경 진하기 $v%" }
-        opacity.progress = Store.opacity(this) / 10
-        showOpacity(Store.opacity(this))
-        opacity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
-                if (!fromUser) return
-                Store.setOpacity(this@MainActivity, value * 10)
-                showOpacity(value * 10)
-                Widgets.render(this@MainActivity)
+        // 배경 진하기: 위젯 종류마다 0~100%를 10단계로
+        val box = findViewById<LinearLayout>(R.id.opacity_box)
+        val dp = resources.displayMetrics.density
+        for ((kind, name) in Store.KINDS) {
+            val label = TextView(this).apply {
+                textSize = 14f; setTextColor(getColor(R.color.ink)); setPadding(0, (14 * dp).toInt(), 0, 0)
             }
-            override fun onStartTrackingTouch(bar: SeekBar) {}
-            override fun onStopTrackingTouch(bar: SeekBar) {}
-        })
+            fun show(v: Int) { label.text = "$name  $v%" }
+            show(Store.opacity(this, kind))
+            val bar = SeekBar(this).apply {
+                max = 10; progress = Store.opacity(this@MainActivity, kind) / 10
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(b: SeekBar, value: Int, fromUser: Boolean) {
+                        if (!fromUser) return
+                        Store.setOpacity(this@MainActivity, kind, value * 10)
+                        show(value * 10)
+                        Widgets.render(this@MainActivity)
+                    }
+                    override fun onStartTrackingTouch(b: SeekBar) {}
+                    override fun onStopTrackingTouch(b: SeekBar) {}
+                })
+            }
+            box.addView(label); box.addView(bar)
+        }
 
         findViewById<Button>(R.id.open).setOnClickListener {
             startActivity(Widgets.appIntent(this, Widgets.APP_URL))

@@ -46,8 +46,15 @@ object Store {
     fun url(ctx: Context): String = ctx.getSharedPreferences(PREFS, 0).getString(KEY_URL, "") ?: ""
     fun setUrl(ctx: Context, url: String) = ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_URL, url.trim()).apply()
     /** 위젯 배경 진하기 0~100 (%) */
-    fun opacity(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("opacity", 100)
-    fun setOpacity(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("opacity", v.coerceIn(0, 100)).apply()
+    /** 위젯 종류: 키 → 이름 */
+    val KINDS = listOf("study" to "오늘 공부", "timer" to "타이머", "upcoming" to "다가오는 일정", "calendar" to "캘린더")
+    /** 위젯마다 배경 진하기 (따로 정하지 않았으면 예전에 정한 공통 값, 그것도 없으면 100) */
+    fun opacity(ctx: Context, kind: String): Int {
+        val p = ctx.getSharedPreferences(PREFS, 0)
+        return p.getInt("opacity_$kind", p.getInt("opacity", 100))
+    }
+    fun setOpacity(ctx: Context, kind: String, v: Int) =
+        ctx.getSharedPreferences(PREFS, 0).edit().putInt("opacity_$kind", v.coerceIn(0, 100)).apply()
     /** 캘린더 위젯에서 넘겨 본 달 (0 = 이번 달) */
     fun calOffset(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("calOffset", 0)
     fun setCalOffset(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("calOffset", v.coerceIn(-3, 6)).apply()

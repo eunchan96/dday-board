@@ -214,6 +214,8 @@ function upcomingWidget(w, d, now, fam) {
   w.addSpacer();
 }
 
+const strike = t => [...String(t)].map(ch => ch + '\u0336').join('');
+
 // 캘린더: 날짜 칸마다 그날 일정 이름을 한 줄씩 (시험 빨강 · 과제 노랑 · 할 일 파랑 막대)
 //   큰 위젯 = 이번 달, 중간 = 이번 주 · 다음 주, 작은 = 다가오는 날짜별 목록
 function calendarWidget(w, d, now, fam) {
@@ -285,7 +287,6 @@ function calendarWidget(w, d, now, fam) {
     const c = dow.addStack(); c.size = new Size(CW, 15); c.centerAlignContent();
     const t = c.addText(ch); t.font = Font.boldSystemFont(10); t.textColor = i === 0 ? C.red : i === 6 ? BLUE : C.faint;
   });
-  const TEXT_ON = { exam: Color.white(), todo: Color.white(), assignment: new Color('#3A2C00') };
   for (let r = 0; r < weeks; r++) {
     const row = w.addStack();
     for (let i = 0; i < 7; i++) {
@@ -308,10 +309,10 @@ function calendarWidget(w, d, now, fam) {
       items.slice(0, show).forEach(it => {
         cell.addSpacer(1);
         const l = cell.addStack(); l.size = new Size(CW - 2, LH); l.cornerRadius = 3; l.setPadding(0, 2, 0, 1); l.centerAlignContent();
+        // 지난 일정 · 다른 달도 종류 색 그대로, 글자는 흰색. 끝낸 일정은 취소선 (글자마다 긋는 선 문자)
         l.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
-        if (it.done || !inMonth) l.backgroundColor = C.rule;
-        const tt = l.addText(it.title); tt.font = Font.semiboldSystemFont(8.5); tt.lineLimit = 1;
-        tt.textColor = it.done || !inMonth ? C.pencil : (TEXT_ON[it.kind] || TEXT_ON.assignment);
+        const tt = l.addText(it.done ? strike(it.title) : it.title); tt.font = Font.semiboldSystemFont(8.5); tt.lineLimit = 1;
+        tt.textColor = Color.white();
         l.addSpacer();
       });
       if (show < items.length) { cell.addSpacer(1); text(cell, `+${items.length - show}`, 8.5, C.pencil, 'bold'); }

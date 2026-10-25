@@ -71,8 +71,8 @@ object Widgets {
     fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java, CalendarWidget::class.java).any { ids(ctx, it).isNotEmpty() }
 
     /** 배경 진하기 (앱에서 정한 값) */
-    internal fun applyOpacity(ctx: Context, views: RemoteViews) =
-        views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx) * 255 / 100)
+    internal fun applyOpacity(ctx: Context, views: RemoteViews, kind: String) =
+        views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx, kind) * 255 / 100)
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
         ctx, code, appIntent(ctx, APP_URL + hash),
@@ -114,7 +114,7 @@ object Widgets {
         val ids = ids(ctx, SdayWidget::class.java)
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget)
-        applyOpacity(ctx, views)
+        applyOpacity(ctx, views, "upcoming")
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#list", 0))
         val list = data?.upcoming.orEmpty()
         views.setViewVisibility(R.id.empty, if (list.isEmpty()) View.VISIBLE else View.GONE)
@@ -152,7 +152,7 @@ object Widgets {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
         for (id in ids) {
             val views = RemoteViews(ctx.packageName, R.layout.widget_calendar)
-            applyOpacity(ctx, views)
+            applyOpacity(ctx, views, "calendar")
             views.setTextViewText(R.id.cal_month, if (month.year == today.year) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월")
             views.setTextViewText(R.id.cal_today, today.dayOfMonth.toString())
             views.setOnClickPendingIntent(R.id.cal_prev, shift(10, -1))
@@ -177,7 +177,7 @@ object Widgets {
         val ids = ids(ctx, StudyWidget::class.java)
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget_study)
-        applyOpacity(ctx, views)
+        applyOpacity(ctx, views, "study")
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 1))
         if (data == null) {
             views.setTextViewText(R.id.today, "—")
@@ -195,7 +195,7 @@ object Widgets {
         val ids = ids(ctx, TimerWidget::class.java)
         if (ids.isEmpty()) return null
         val views = RemoteViews(ctx.packageName, R.layout.widget_timer)
-        applyOpacity(ctx, views)
+        applyOpacity(ctx, views, "timer")
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 2))
         views.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(
             ctx, 3, Intent(ctx, TimerWidget::class.java).setAction(ACTION_REFRESH),
