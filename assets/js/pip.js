@@ -49,37 +49,41 @@ export function closePip() {
 /* ───── 1) 작은 창 ───── */
 const PIP_CSS = `
 :root { color-scheme: light dark; --ink: #1C2540; --pencil: #59627C; --sheet: #FFFFFF; --pen: #2C4BD1; --green: #1F8A5B; }
-@media (prefers-color-scheme: dark) { :root { --ink: #E6EAF3; --pencil: #A4ABBF; --sheet: #161B29; --pen: #8EA2FF; --green: #3FBF85; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink: #E6EAF3; --pencil: #A4ABBF; --sheet: #161B29; --pen: #8EA2FF; --green: #3FBF85; } }
+:root[data-theme="dark"] { --ink: #E6EAF3; --pencil: #A4ABBF; --sheet: #161B29; --pen: #8EA2FF; --green: #3FBF85; }
 * { box-sizing: border-box; margin: 0; }
 html, body { height: 100%; }
 body {
   font-family: 'SUIT Variable', 'SUIT', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   background: color-mix(in srgb, var(--c, var(--pen)) 10%, var(--sheet)); color: var(--ink);
-  display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px;
   box-shadow: inset 4px 0 0 var(--c, var(--pen)); user-select: none;
 }
 .top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--pencil); }
 .top .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--pen)); flex-shrink: 0; }
 .top .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.digits { font-size: clamp(32px, 22vw, 64px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.digits { font-size: clamp(26px, 15vw, 64px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 button {
-  font: 700 14px inherit; font-family: inherit; height: 34px; padding: 0 14px; border-radius: 8px; border: 0; cursor: pointer;
-  background: var(--pen); color: #fff;
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
+  display: grid; place-items: center; background: var(--pen); color: #fff;
 }
+button svg { width: 18px; height: 18px; fill: currentColor; }
+button.stop { background: var(--ink); color: var(--sheet); }
 button.rest { background: var(--green); }
 button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.phase { font-size: 12.5px; font-weight: 650; color: var(--pencil); }
 `;
 
 async function openDocPip() {
-  docWin = await window.documentPictureInPicture.requestWindow({ width: 280, height: 168 });
+  // 작게: 시간 + 과목 한 줄, 오른쪽 둥근 버튼
+  docWin = await window.documentPictureInPicture.requestWindow({ width: 250, height: 96 });
   const d = docWin.document;
   d.title = 'S-DAY 타이머';
   const style = d.createElement('style'); style.textContent = PIP_CSS; d.head.append(style);
   const font = document.querySelector('link[href*="SUIT"]');
   if (font) d.head.append(font.cloneNode());
-  d.body.innerHTML = '<div class="top"><i class="dot"></i><span class="what"></span></div><div class="digits"></div><div class="row"><span class="phase"></span><button type="button"></button></div>';
+  if (document.documentElement.dataset.theme) d.documentElement.dataset.theme = document.documentElement.dataset.theme;
+  d.body.innerHTML = '<div class="main"><div class="top"><i class="dot"></i><span class="what"></span></div><div class="digits"></div></div><button type="button"></button>';
   d.querySelector('button').addEventListener('click', () => {
     const s = api.get();
     if (s.phase === 'idle') api.start(); else if (s.phase === 'rest') api.endRest(); else api.stop();
@@ -96,17 +100,21 @@ function paintDoc(s) {
   d.body.style.setProperty('--c', s.color);
   d.querySelector('.what').textContent = s.label || '과목 없이 공부';
   d.querySelector('.digits').textContent = s.text;
-  d.querySelector('.phase').textContent = s.subLabel;
   const b = d.querySelector('button');
-  b.textContent = s.phase === 'idle' ? '시작' : s.phase === 'rest' ? '쉬는 시간 끝' : '끝내기';
-  b.className = s.phase === 'rest' ? 'rest' : '';
+  // ▶ 시작 · ❚❚ 끝내기 · 쉬는 시간이면 ⏭
+  const icon = s.phase === 'idle' ? 'M7 5.2v9.6l7.6-4.8z' : s.phase === 'rest' ? 'M5.5 5.2v9.6l6.6-4.8zM13.2 5h2.2v10h-2.2z' : 'M6.5 5h2.6v10H6.5zM10.9 5h2.6v10h-2.6z';
+  b.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="${icon}"/></svg>`;
+  const label = s.phase === 'idle' ? '시작' : s.phase === 'rest' ? '쉬는 시간 끝' : '끝내기';
+  b.title = label; b.setAttribute('aria-label', label);
+  b.className = s.phase === 'rest' ? 'rest' : s.phase === 'idle' ? '' : 'stop';
 }
 
 /* ───── 2) 영상 PiP ───── */
 async function openVideoPip() {
   if (!video) {
     canvas = document.createElement('canvas');
-    canvas.width = 480; canvas.height = 270;
+    // 가로로 길고 낮은 비율(약 2.4:1): 창 높이가 작아짐 (창 크기는 기기가 정하고, 손가락으로 더 줄일 수 있음)
+    canvas.width = 600; canvas.height = 250;
     cctx = canvas.getContext('2d');
     video = document.createElement('video');
     video.muted = true; video.playsInline = true; video.setAttribute('playsinline', '');
@@ -154,25 +162,23 @@ function resume() {
 
 function drawCanvas(s) {
   const W = canvas.width, H = canvas.height;
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = document.documentElement.dataset.theme;
+  const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   cctx.fillStyle = dark ? '#161B29' : '#FFFFFF';
   cctx.fillRect(0, 0, W, H);
   cctx.fillStyle = s.color; cctx.globalAlpha = 0.12; cctx.fillRect(0, 0, W, H); cctx.globalAlpha = 1;
-  cctx.fillRect(0, 0, 10, H);
+  cctx.fillRect(0, 0, 12, H);
   const font = "'SUIT Variable', -apple-system, 'Apple SD Gothic Neo', sans-serif";
+  // 과목 (위) + 시간 (크게)
   cctx.fillStyle = dark ? '#A4ABBF' : '#59627C';
-  cctx.font = `600 26px ${font}`;
+  cctx.font = `650 34px ${font}`;
   cctx.textBaseline = 'top';
-  const what = s.label || '과목 없이 공부';
-  cctx.fillText(what.length > 18 ? `${what.slice(0, 17)}…` : what, 36, 30);
-  cctx.fillStyle = dark ? '#E6EAF3' : '#1C2540';
-  cctx.font = `800 ${s.text.length > 5 ? 104 : 128}px ${font}`;
-  cctx.textBaseline = 'middle';
-  cctx.fillText(s.text, 32, H / 2 + 8);
-  cctx.fillStyle = s.phase === 'rest' ? '#1F8A5B' : (dark ? '#A4ABBF' : '#59627C');
-  cctx.font = `600 22px ${font}`;
-  cctx.textBaseline = 'bottom';
-  cctx.fillText(`${s.subLabel} · ❚❚ 누르면 ${s.phase === 'idle' ? '시작' : s.phase === 'rest' ? '쉬는 시간 끝' : '끝내기'}`, 36, H - 24);
+  const what = s.phase === 'rest' ? '쉬는 시간' : (s.label || '과목 없이 공부');
+  cctx.fillText(what.length > 16 ? `${what.slice(0, 15)}…` : what, 44, 26);
+  cctx.fillStyle = s.phase === 'rest' ? (dark ? '#3FBF85' : '#1F8A5B') : (dark ? '#E6EAF3' : '#1C2540');
+  cctx.font = `800 ${s.text.length > 5 ? 132 : 150}px ${font}`;
+  cctx.textBaseline = 'alphabetic';
+  cctx.fillText(s.text, 38, H - 30);
 }
 
 // 1초마다 (study.js의 tick에서) 부른다

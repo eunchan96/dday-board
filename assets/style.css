@@ -2250,3 +2250,4 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sat: #7FA6FF; } }
 :root[data-theme="dark"] { --sat: #7FA6FF; }
 .cal-dow.sat, .cal-day.sat .num { color: var(--sat); }
+.btn.flash-ok { color: var(--green) !important; border-color: color-mix(in srgb, var(--green) 40%, var(--rule)) !important; }

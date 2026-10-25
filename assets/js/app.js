@@ -48,6 +48,11 @@ function applyTheme() {
   const t = state.prefs.theme;
   if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
   else delete document.documentElement.dataset.theme;
+  // 폰의 위쪽 상태 표시줄 · 아래 내비게이션 바 색도 고른 화면에 맞춤 (자동이면 기기 설정대로)
+  const metas = $$('meta[name="theme-color"]');
+  const pick = { light: '#FFFFFF', dark: '#10141F' };
+  metas.forEach((m, i) => m.setAttribute('content', pick[t] || (i === 0 ? pick.light : pick.dark)));
+  $('meta[name="color-scheme"]')?.setAttribute('content', pick[t] ? t : 'light dark');
   $$('#themePicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.theme === t ? 'true' : 'false'));
 }
 
@@ -1261,15 +1266,30 @@ function openSettings(tab = 'colors') {
   loadLms(); loadPush(); loadCalendar(); loadWidget();
 }
 
-async function copyText(text, input, msgEl) {
+// 복사: 잘 되면 누른 버튼이 잠깐 "복사됨 ✓"으로 바뀜 (아래 안내 줄 없이). 막히면 글자를 골라 두고 안내
+async function copyText(text, input, msgEl, btn) {
   let ok = false;
   try { await navigator.clipboard.writeText(text); ok = true; } catch { /* 노션 안에서는 막힐 수 있음 */ }
   if (!ok) {
+    const prev = input.value;
     input.value = text; input.focus(); input.select();
     try { ok = document.execCommand('copy'); } catch { ok = false; }
+    if (ok && input.id === 'codeText') input.value = prev;
+  }
+  if (ok && btn) {
+    msgEl.textContent = '';
+    flashButton(btn, '복사됨');
+    return;
   }
   msgEl.className = ok ? 'msg ok' : 'msg';
   msgEl.textContent = ok ? '복사했어요' : '선택해 뒀어요. Ctrl+C(⌘+C)로 복사하세요';
+}
+function flashButton(btn, label) {
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  clearTimeout(btn._flash);
+  btn.textContent = `${label} ✓`;
+  btn.classList.add('flash-ok');
+  btn._flash = setTimeout(() => { btn.textContent = btn.dataset.label; btn.classList.remove('flash-ok'); delete btn.dataset.label; }, 1600);
 }
 
 function armTwice(btn, label, confirmLabel, action) {
@@ -1424,7 +1444,7 @@ function bind() {
   };
   $('#btnConnect').addEventListener('click', doConnect);
   $('#inCode').addEventListener('keydown', e => { if (e.key === 'Enter') doConnect(); });
-  $('#btnCopyNew').addEventListener('click', () => copyText(state.code, $('#newCodeText'), $('#copyNewMsg')));
+  $('#btnCopyNew').addEventListener('click', () => copyText(state.code, $('#newCodeText'), $('#copyNewMsg'), $('#btnCopyNew')));
   $('#btnNewCodeOk').addEventListener('click', () => $('#newCodeDialog').close());
 
   // 상단
@@ -1476,9 +1496,9 @@ function bind() {
   $('#btnNotices').addEventListener('click', openNotices);
   $('#noticesClose').addEventListener('click', () => $('#noticesDialog').close());
   $('#btnCalKey').addEventListener('click', makeCalendarKey);
-  $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg')));
+  $('#btnCalCopy').addEventListener('click', () => copyText($('#calUrl').value, $('#calUrl'), $('#calMsg'), $('#btnCalCopy')));
   $('#btnWidgetKey').addEventListener('click', makeWidgetKey);
-  $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg')));
+  $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg'), $('#btnWidgetCopy')));
   try { const v = storage.get('ddayboard.iosOpacity'); if (v) $('#iosOpacity').value = v; } catch { /* 무시 */ }
   $('#iosOpacity').addEventListener('change', e => { try { storage.set('ddayboard.iosOpacity', e.target.value); } catch { /* 무시 */ } });
   $('#iosCopy').addEventListener('click', e => {
@@ -1517,7 +1537,7 @@ function bind() {
     $('#codeText').value = codeShown ? state.code : mask(state.code);
     $('#btnShowCode').textContent = codeShown ? '숨기기' : '보기';
   });
-  $('#btnCopyCode').addEventListener('click', () => copyText(state.code, $('#codeText'), $('#copyMsg')));
+  $('#btnCopyCode').addEventListener('click', () => copyText(state.code, $('#codeText'), $('#copyMsg'), $('#btnCopyCode')));
   $$('#themePicker button').forEach(b => b.addEventListener('click', () => setPref('theme', b.dataset.theme)));
 
   $('#btnFeedSave').addEventListener('click', async () => {
@@ -1573,7 +1593,7 @@ function bind() {
       $('#importText').value = '';
     } catch (e) { msg.className = 'msg err'; msg.textContent = errText(e); }
   });
-  $('#btnExport').addEventListener('click', () => copyText(exportBackup(), $('#importText'), $('#importMsg')));
+  $('#btnExport').addEventListener('click', () => copyText(exportBackup(), $('#importText'), $('#importMsg'), $('#btnExport')));
   armTwice($('#btnDisconnect'), '이 기기 연결 해제', '한 번 더 누르면 해제돼요', () => {
     $('#settings').close();
     const code = state.code;

@@ -1577,9 +1577,14 @@ function renderFriends() {
         h('b', { class: 'code' }, p.friendCode),
         h('button', {
           type: 'button', class: 'btn sm', title: '내 코드 복사',
-          onclick: async () => {
-            try { await navigator.clipboard.writeText(p.friendCode); setFriendMsg('내 코드를 복사했어요'); }
-            catch { setFriendMsg(`내 코드: ${p.friendCode}`); }
+          onclick: async e => {
+            const b = e.currentTarget;
+            try {
+              await navigator.clipboard.writeText(p.friendCode);
+              // 아래 안내 줄 대신 버튼이 잠깐 "복사됨 ✓"
+              b.replaceChildren('복사됨 ✓'); b.classList.add('flash-ok');
+              setTimeout(() => { b.replaceChildren(copyIcon(), '복사'); b.classList.remove('flash-ok'); }, 1600);
+            } catch { setFriendMsg(`내 코드: ${p.friendCode}`); }
           },
         }, copyIcon(), '복사')),
       row('코드 새로 만들기', '이전 코드는 막혀요', newCodeBtn))),
