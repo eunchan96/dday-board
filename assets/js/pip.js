@@ -63,7 +63,7 @@ body {
 .top .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--pen)); flex-shrink: 0; }
 .top .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.digits { font-size: clamp(26px, 15vw, 64px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.digits { font-size: clamp(22px, 11vw, 46px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 button {
   flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
   display: grid; place-items: center; background: var(--pen); color: #fff;
@@ -76,7 +76,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 async function openDocPip() {
   // 작게: 시간 + 과목 한 줄, 오른쪽 둥근 버튼
-  docWin = await window.documentPictureInPicture.requestWindow({ width: 250, height: 96 });
+  docWin = await window.documentPictureInPicture.requestWindow({ width: 280, height: 158 });
   const d = docWin.document;
   d.title = 'S-DAY 타이머';
   const style = d.createElement('style'); style.textContent = PIP_CSS; d.head.append(style);
@@ -113,8 +113,8 @@ function paintDoc(s) {
 async function openVideoPip() {
   if (!video) {
     canvas = document.createElement('canvas');
-    // 가로로 길고 낮은 비율(약 2.4:1): 창 높이가 작아짐 (창 크기는 기기가 정하고, 손가락으로 더 줄일 수 있음)
-    canvas.width = 600; canvas.height = 250;
+    // 16:9 (창 크기는 기기가 정하고, 손가락으로 줄일 수 있음)
+    canvas.width = 480; canvas.height = 270;
     cctx = canvas.getContext('2d');
     video = document.createElement('video');
     video.muted = true; video.playsInline = true; video.setAttribute('playsinline', '');
@@ -166,19 +166,20 @@ function drawCanvas(s) {
   const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   cctx.fillStyle = dark ? '#161B29' : '#FFFFFF';
   cctx.fillRect(0, 0, W, H);
-  cctx.fillStyle = s.color; cctx.globalAlpha = 0.12; cctx.fillRect(0, 0, W, H); cctx.globalAlpha = 1;
+  const c = /^#|^rgb/.test(s.color || '') ? s.color : '#9AA1B5';   // CSS 변수 색은 캔버스가 못 읽음
+  cctx.fillStyle = c; cctx.globalAlpha = 0.12; cctx.fillRect(0, 0, W, H); cctx.globalAlpha = 1;
   cctx.fillRect(0, 0, 12, H);
   const font = "'SUIT Variable', -apple-system, 'Apple SD Gothic Neo', sans-serif";
   // 과목 (위) + 시간 (크게)
   cctx.fillStyle = dark ? '#A4ABBF' : '#59627C';
-  cctx.font = `650 34px ${font}`;
+  cctx.font = `650 28px ${font}`;
   cctx.textBaseline = 'top';
   const what = s.phase === 'rest' ? '쉬는 시간' : (s.label || '과목 없이 공부');
-  cctx.fillText(what.length > 16 ? `${what.slice(0, 15)}…` : what, 44, 26);
+  cctx.fillText(what.length > 18 ? `${what.slice(0, 17)}…` : what, 40, 44);
   cctx.fillStyle = s.phase === 'rest' ? (dark ? '#3FBF85' : '#1F8A5B') : (dark ? '#E6EAF3' : '#1C2540');
-  cctx.font = `800 ${s.text.length > 5 ? 132 : 150}px ${font}`;
-  cctx.textBaseline = 'alphabetic';
-  cctx.fillText(s.text, 38, H - 30);
+  cctx.font = `800 ${s.text.length > 5 ? 84 : 96}px ${font}`;
+  cctx.textBaseline = 'middle';
+  cctx.fillText(s.text, 36, H / 2 + 26);
 }
 
 // 1초마다 (study.js의 tick에서) 부른다
