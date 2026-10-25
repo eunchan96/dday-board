@@ -6,4 +6,6 @@
     <string name="study_widget_desc">오늘 공부 시간과 목표</string>
     <string name="timer_widget_name">S-DAY 타이머</string>
     <string name="timer_widget_desc">공부 중이면 흘러가는 타이머</string>
+    <string name="calendar_widget_name">S-DAY 캘린더</string>
+    <string name="calendar_widget_desc">이번 달 달력과 일정 있는 날</string>
 </resources>

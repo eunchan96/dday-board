@@ -42,6 +42,10 @@ abstract class BaseWidget : AppWidgetProvider() {
 class SdayWidget : BaseWidget()
 class StudyWidget : BaseWidget()
 class TimerWidget : BaseWidget()
+class CalendarWidget : BaseWidget() {
+    // 크기를 바꾸면 그 크기에 맞춰 다시 그림
+    override fun onAppWidgetOptionsChanged(ctx: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) = Widgets.render(ctx).let { }
+}
 
 object Widgets {
     const val ACTION_REFRESH = "kr.sday.widget.REFRESH"
@@ -57,10 +61,10 @@ object Widgets {
     )
 
     private fun ids(ctx: Context, cls: Class<*>) = AppWidgetManager.getInstance(ctx).getAppWidgetIds(ComponentName(ctx, cls))
-    fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java).any { ids(ctx, it).isNotEmpty() }
+    fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java, CalendarWidget::class.java).any { ids(ctx, it).isNotEmpty() }
 
     /** 배경 진하기 (앱에서 정한 값) */
-    private fun applyOpacity(ctx: Context, views: RemoteViews) =
+    internal fun applyOpacity(ctx: Context, views: RemoteViews) =
         views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx) * 255 / 100)
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
@@ -76,6 +80,7 @@ object Widgets {
         val nowMs = System.currentTimeMillis()
         renderUpcoming(ctx, data, message, nowMs)
         renderStudy(ctx, data, nowMs)
+        renderCalendar(ctx, data)
         return renderTimer(ctx, data, nowMs)
     }
 
@@ -108,6 +113,26 @@ object Widgets {
             views.setTextColor(r[3], ctx.getColor(if (task.missing || late) R.color.red else R.color.ink))
         }
         AppWidgetManager.getInstance(ctx).updateAppWidget(ids, views)
+    }
+
+    /* ───── 캘린더: 이번 달 달력, 일정 있는 날 아래에 점 (시험 빨강 · 과제 노랑 · 할 일 파랑) ───── */
+    private fun renderCalendar(ctx: Context, data: WidgetData?) {
+        val manager = AppWidgetManager.getInstance(ctx)
+        val ids = ids(ctx, CalendarWidget::class.java)
+        for (id in ids) {
+            val views = RemoteViews(ctx.packageName, R.layout.widget_calendar)
+            applyOpacity(ctx, views)
+            views.setOnClickPendingIntent(R.id.root, open(ctx, "#calendar", 4))
+            val opts = manager.getAppWidgetOptions(id)
+            val dm = ctx.resources.displayMetrics
+            val wDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250).coerceAtLeast(110)
+            val hDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 250).coerceAtLeast(110)
+            // 위젯 안쪽 여백(12dp씩)을 빼고, 비트맵은 최대 2배 밀도까지만 (메모리 제한)
+            val scale = minOf(dm.density, 2.5f)
+            val bmp = CalendarDraw.draw(ctx, ((wDp - 24) * scale).toInt(), ((hDp - 24) * scale).toInt(), scale, data?.month.orEmpty())
+            views.setImageViewBitmap(R.id.cal, bmp)
+            manager.updateAppWidget(id, views)
+        }
     }
 
     /* ───── 오늘 공부 ───── */

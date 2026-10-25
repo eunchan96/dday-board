@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:lineSpacingExtra="3dp"
-            android:text="S-DAY 설정 → 위젯에서 만든 주소를 붙여 넣고 저장하세요. 그다음 홈 화면을 길게 눌러 위젯 → S-DAY에서 오늘 공부 · 타이머 · 다가오는 일정 중 원하는 것을 따로 추가하면 돼요."
+            android:text="S-DAY 설정 → 위젯에서 만든 주소를 붙여 넣고 저장하세요. 그다음 홈 화면을 길게 눌러 위젯 → S-DAY에서 오늘 공부 · 타이머 · 다가오는 일정 · 캘린더 중 원하는 것을 따로 추가하면 돼요."
             android:textColor="@color/pencil"
             android:textSize="14sp" />
 

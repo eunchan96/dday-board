@@ -1,7 +1,7 @@
 // S-DAY 위젯 (아이폰 · Scriptable 앱)
 //
 // 위젯은 세 가지예요. 하나씩 따로 넣어요.
-//   오늘 공부 · 타이머 · 다가오는 일정
+//   오늘 공부 · 타이머 · 다가오는 일정 · 캘린더
 //
 // 넣는 법
 //  1) App Store에서 무료 앱 "Scriptable" 설치
@@ -15,7 +15,7 @@
 // 위젯은 15분쯤마다 새로 고쳐지고, 누르면 S-DAY가 열려요.
 
 const WIDGET_URL = '__WIDGET_URL__';
-const KIND = '__KIND__';            // study | timer | upcoming
+const KIND = '__KIND__';            // study | timer | upcoming | calendar
 const OPACITY_SET = '__OPACITY__';  // 배경 진하기 0~100 (%)
 const OPACITY = /^\d{1,3}$/.test(OPACITY_SET) ? Number(OPACITY_SET) : 100;
 const APP_URL = 'https://dday-board-pink.vercel.app/';
@@ -42,7 +42,7 @@ const KIND_COLOR = {
 function setup() {
   const p = ((typeof args !== 'undefined' && args.widgetParameter) || '').trim();
   const words = p.split(/[\s,]+/).filter(Boolean);
-  const KINDS = ['study', 'timer', 'upcoming'];
+  const KINDS = ['study', 'timer', 'upcoming', 'calendar'];
   const kind = words.find(x => KINDS.includes(x)) || (KINDS.includes(KIND) ? KIND : 'upcoming');
   const url = words.find(x => /^https:\/\//.test(x)) || WIDGET_URL;
   const n = words.find(x => /^\d{1,3}%?$/.test(x));
@@ -214,13 +214,61 @@ function upcomingWidget(w, d, now, fam) {
   w.addSpacer();
 }
 
+// 캘린더: 이번 달, 일정 있는 날 아래 점 (시험 빨강 · 과제 노랑 · 할 일 파랑)
+function calendarWidget(w, d, now, fam) {
+  const today = new Date(now);
+  const first = new Date(today.getFullYear(), today.getMonth(), 1);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const weeks = Math.ceil((first.getDay() + new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()) / 7);
+  const marks = {};
+  for (const m of d.month || []) (marks[m.d] = marks[m.d] || new Set()).add(m.kind);
+  const key = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+  if (LOCK.includes(fam)) { text(w, `${today.getMonth() + 1}월 ${today.getDate()}일`, 13, Color.white(), 'bold'); return; }
+  const big = fam === 'large';
+  const W = fam === 'small' ? 17 : 42, H = fam === 'small' ? 15 : big ? 40 : 14.5;
+  const num = fam === 'small' ? 9.5 : big ? 14 : 10;
+  text(w, `${today.getMonth() + 1}월`, big ? 15 : 12, C.ink, 'bold');
+  w.addSpacer(big ? 8 : 3);
+  const head = w.addStack();
+  '일월화수목금토'.split('').forEach((ch, i) => {
+    const c = head.addStack(); c.size = new Size(W, big ? 18 : 12); c.centerAlignContent();
+    const t = c.addText(ch); t.font = Font.mediumSystemFont(big ? 11 : 8); t.textColor = i === 0 ? C.red : C.faint;
+  });
+  for (let r = 0; r < weeks; r++) {
+    const row = w.addStack();
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start); day.setDate(start.getDate() + r * 7 + i);
+      const inMonth = day.getMonth() === today.getMonth();
+      const isToday = key(day) === key(today);
+      const cell = row.addStack(); cell.size = new Size(W, H); cell.layoutVertically(); cell.centerAlignContent();
+      const top = cell.addStack(); top.addSpacer();
+      const n = top.addStack(); n.centerAlignContent();
+      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = num * 0.8; n.size = new Size(num * 1.6, num * 1.6); }
+      const t = n.addText(String(day.getDate()));
+      t.font = isToday ? Font.boldSystemFont(num) : Font.mediumSystemFont(num);
+      t.textColor = isToday ? Color.white() : !inMonth ? C.rule : i === 0 ? C.red : C.ink;
+      top.addSpacer();
+      const ks = marks[key(day)];
+      if (ks) {
+        const dots = cell.addStack(); dots.addSpacer();
+        ['exam', 'assignment', 'todo'].filter(k => ks.has(k)).forEach((k, j) => {
+          if (j) dots.addSpacer(2);
+          const s2 = big ? 5 : 3.5;
+          const dd = dots.addStack(); dd.size = new Size(s2, s2); dd.cornerRadius = s2 / 2; dd.backgroundColor = KIND_COLOR[k];
+        });
+        dots.addSpacer();
+      }
+    }
+  }
+}
+
 function build(d, kind, opacity = 100) {
   const w = new ListWidget();
   const a = opacity / 100;
   w.backgroundColor = Color.dynamic(new Color('#FFFFFF', a), new Color('#161B29', a));
-  w.url = APP_URL + (kind === 'upcoming' ? '#list' : '#study');
+  w.url = APP_URL + (kind === 'upcoming' ? '#list' : kind === 'calendar' ? '#calendar' : '#study');
   const now = Date.now();
-  const fam = config.widgetFamily || (kind === 'upcoming' ? 'medium' : 'small');
+  const fam = config.widgetFamily || (kind === 'upcoming' ? 'medium' : kind === 'calendar' ? 'large' : 'small');
   const next = new Date(now + 15 * 60e3);
   if (!LOCK.includes(fam)) w.setPadding(16, 16, 16, 16);
 
@@ -236,6 +284,7 @@ function build(d, kind, opacity = 100) {
   w.refreshAfterDate = lt && lt.countdown && lt.date < next ? lt.date : next;
   if (kind === 'study') studyWidget(w, d, now, fam);
   else if (kind === 'timer') timerWidget(w, d, now, fam);
+  else if (kind === 'calendar') calendarWidget(w, d, now, fam);
   else upcomingWidget(w, d, now, fam);
   return w;
 }
@@ -246,6 +295,7 @@ async function main() {
   const w = build(d, kind, opacity);
   if (config.runsInWidget) Script.setWidget(w);
   else if (kind === 'upcoming') await w.presentMedium();
+  else if (kind === 'calendar') await w.presentLarge();
   else await w.presentSmall();
   Script.complete();
 }

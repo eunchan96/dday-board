@@ -31,6 +31,8 @@ data class WidgetData(
     val goalSec: Long,
     val timer: Timer?,
     val timerColor: String?,
+    /** 캘린더 위젯: 날짜(yyyy-MM-dd) → 그날 있는 일정 종류들 */
+    val month: Map<String, Set<String>> = emptyMap(),
     val stale: Boolean = false,
 )
 
@@ -107,7 +109,15 @@ object Api {
                 label = it.optString("label").ifBlank { it.optString("subject") },
             )
         }
+        val month = mutableMapOf<String, MutableSet<String>>()
+        o.optJSONArray("month")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val m = arr.getJSONObject(i)
+                month.getOrPut(m.optString("d")) { mutableSetOf() }.add(m.optString("kind", "assignment"))
+            }
+        }
         return WidgetData(
+            month = month,
             upcoming = tasks,
             todaySec = study.optLong("today", 0L),
             goalSec = study.optLong("goal", 0L),

@@ -919,7 +919,7 @@ async function loadWidget() {
   for (const b of $('#iosCopy').querySelectorAll('button')) b.disabled = !saved;
   $('#widgetSub').textContent = widgetExists
     ? (saved ? '폰에서 이 주소를 쓰면 돼요' : '만든 주소가 있어요. 이 기기에서 다시 보려면 새로 만드세요')
-    : '오늘 공부 · 타이머 · 다가오는 일정을 각각 위젯으로 넣어요';
+    : '오늘 공부 · 타이머 · 다가오는 일정 · 캘린더를 각각 위젯으로 넣어요';
   $('#btnWidgetKey').textContent = widgetExists ? '새로 만들기' : '주소 만들기';
 }
 async function makeWidgetKey() {

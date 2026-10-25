@@ -77,6 +77,7 @@ export const api = {
   friendAdd: (code, friendCode) => rpc('dday_friend_add', { p_code: code, p_friend_code: friendCode }),
   friendRemove: (code, friendCode) => rpc('dday_friend_remove', { p_code: code, p_friend_code: friendCode }),
   friendAccept: (code, friendCode) => rpc('dday_friend_accept', { p_code: code, p_friend_code: friendCode }),
+  friendAlias: (code, friendCode, alias) => rpc('dday_friend_alias', { p_code: code, p_friend_code: friendCode, p_alias: alias }),
   friendRequests: code => rpc('dday_friend_requests', { p_code: code }),
 };
 

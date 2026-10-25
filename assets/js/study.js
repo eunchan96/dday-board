@@ -365,7 +365,17 @@ function pipState() {
     subLabel: idle ? (isPomo() ? `${modeOf().focus}분 집중` : '스톱워치') : timer.phase === 'rest' ? '쉬는 시간' : '집중 중',
   };
 }
-initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => renderTopTimer() });
+initPip({ get: pipState, start, stop, endRest: () => toIdle(), onChange: () => { renderTopTimer(); renderPipBtn(); } });
+function renderPipBtn() {
+  if (!el.pipBtn) return;
+  el.pipBtn.hidden = timer.phase === 'idle' || !pipSupported() || pipOpen();
+}
+// 크롬: 탭을 벗어날 때 저절로 띄우기 (지원하는 경우, 소리가 나는 중일 때 등)
+try {
+  navigator.mediaSession?.setActionHandler?.('enterpictureinpicture', () => {
+    if (timer.phase !== 'idle' && !pipOpen()) togglePip().then(() => { renderTopTimer(); renderPipBtn(); });
+  });
+} catch { /* 지원 안 함 */ }
 // 사용자가 눌러서 시작할 때: 시작과 함께 타이머를 다른 창 위에 띄운다 (닫기는 직접)
 // 브라우저는 누른 순간에만 띄우기를 허락해서, 클릭 · 키 입력에서 바로 부른다
 function startByUser() {
@@ -487,6 +497,8 @@ function svgIcon(d, filled = false) {
   return s;
 }
 const playIcon = () => svgIcon(['M7 5.2v9.6l7.6-4.8z'], true);
+const pauseIcon = () => svgIcon(['M6.5 5h2.6v10H6.5zM10.9 5h2.6v10h-2.6z'], true);
+const skipIcon = () => svgIcon(['M5.5 5.2v9.6l6.6-4.8zM13.2 5h2.2v10h-2.2z'], true);
 const plusIcon = () => svgIcon(['M10 4.5v11M4.5 10h11']);
 const watchIcon = () => svgIcon(['M10 17a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM10 8v3l2 1.4M8.3 2.8h3.4M15 5.5l1.2-1.2']);
 const copyIcon = () => svgIcon(['M7 7h9v9H7zM4 13V4h9']);
@@ -514,7 +526,15 @@ function build(root) {
   el.what = h('div', { class: 'timer-what' });
   el.timerCard = h('section', { class: 'timer-card', 'aria-label': '타이머' },
     h('div', { class: 'timer-top' }, el.modes, ambientControl()),
-    h('div', { class: 'timer-face' }, el.phase, el.digits, h('div', { class: 'timer-bar' }, el.bar)),
+    h('div', { class: 'timer-face' }, el.phase,
+      // 시간 바로 오른쪽에 ▶ / ❚❚ (줄이 바뀌지 않게, 길어지면 글자를 줄임)
+      h('div', { class: 'timer-line' }, el.digits, el.mainBtn = h('button', { type: 'button', class: 'timer-go' }),
+        // 다른 기기에서 시작해 이 기기에 떠 있지 않을 때: 한 번 눌러 띄우기 (브라우저는 누를 때만 허락)
+        el.pipBtn = h('button', {
+          type: 'button', class: 'btn sm timer-pip', hidden: true, title: '타이머를 다른 창 위에 띄우기',
+          onclick: () => togglePip().then(ok => { if (!ok) ctx.toast('이 브라우저에서는 띄울 수 없어요'); renderPipBtn(); renderTopTimer(); }),
+        }, svgIcon(['M3 5.5h14v9H3z', 'M10.5 10h5v3.5h-5z']), '띄우기')),
+      h('div', { class: 'timer-bar' }, el.bar)),
     el.what);
 
   /* 오늘: 계획 */
@@ -587,6 +607,8 @@ function renderTopTimer() {
   const idle = timer.phase === 'idle';
   // 상단바의 다른 버튼과 같은 네모 버튼에 글자로
   const b = (text, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, onclick, title }, text);
+  // 오늘 탭에서는 타이머 칸에 버튼이 있으니 위쪽에는 두지 않음
+  if (studyView() === 'today' && !$('#viewStudy')?.hidden) { box.replaceChildren(); return; }
   const main = idle ? b('시작', '타이머 시작 (Space)', startByUser, 'primary')
     : timer.phase === 'rest' ? b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest')
     : b('끝내기', '끝내고 기록 (Space)', stop, 'primary');
@@ -632,6 +654,15 @@ function renderTimer() {
       onclick: () => selectWhat({ subject: '' }),
     }, xIcon()) : null) : null);
 
+  // ▶ 시작 · ❚❚ 끝내기 · 쉬는 시간이면 ⏭ 끝
+  const go = el.mainBtn;
+  const ph = timer.phase;
+  go.className = `timer-go ${ph}`;
+  go.replaceChildren(ph === 'idle' ? playIcon() : ph === 'rest' ? skipIcon() : pauseIcon());
+  const label = ph === 'idle' ? '시작 (Space)' : ph === 'rest' ? '쉬는 시간 끝' : '끝내고 기록 (Space)';
+  go.title = label; go.setAttribute('aria-label', label);
+  go.onclick = ph === 'idle' ? startByUser : ph === 'rest' ? toIdle : stop;
+  renderPipBtn();
   renderClock();
 }
 
@@ -643,6 +674,7 @@ function renderClock() {
   const el0 = idle ? 0 : elapsed();
   const shown = isPomo() ? Math.max(0, (idle ? modeOf().focus * 60000 : len) - el0) : el0;
   el.digits.textContent = clock(shown, !isPomo());
+  el.digits.classList.toggle('long', el.digits.textContent.length > 5);
   el.phase.textContent = idle ? (isPomo() ? `${modeOf().focus}분 집중 · ${modeOf().rest}분 휴식` : '스톱워치')
     : timer.phase === 'rest' ? '쉬는 시간'
     : !timer.running ? '멈춤'
@@ -1344,7 +1376,8 @@ const liveMinOf = r => (r.liveSince ? Math.max(0, Math.floor((Date.now() - new D
 
 // 친구 창은 설정 창처럼 탭: 랭킹 · 친구 신청 · 개인 설정
 let friendTab = 'rank';
-const FRIEND_TABS = ['rank', 'add', 'me'];
+const FRIEND_TABS = ['rank', 'list', 'add', 'me'];
+let friendEdit = null;            // 친구 목록에서 이름을 고치는 중인 친구 코드
 function setFriendTab(tab) {
   friendTab = FRIEND_TABS.includes(tab) ? tab : 'rank';
   friendMsg = { text: '', err: false };
@@ -1432,14 +1465,53 @@ function renderFriends() {
                 h('span', { class: 'f-nick' }, r.nickname, r.me ? h('span', { class: 'f-me' }, '나') : null),
                 r.liveSince ? h('span', { class: 'f-live' }, `공부 중 ${liveMinOf(r)}분`) : null),
               h('span', { class: 'f-bar' }, h('i', { style: { width: `${Math.max(v ? 3 : 0, (v / top) * 100)}%` } }))),
-            h('span', { class: 'f-time' }, fmtSpent(v)),
-            r.me ? h('span', { class: 'f-x' }) : h('button', {
-              type: 'button', class: 'btn icon ghost sm-icon f-x', title: '친구 끊기', 'aria-label': `${r.nickname} 친구 끊기`,
-              onclick: () => friendAction(async () => { study.friends = await api.friendRemove(state.code, r.code); }, `${r.nickname} 님과 친구를 끊었어요`),
-            }, xIcon()));
+            h('span', { class: 'f-time' }, fmtSpent(v)));
         })),
         rows.length === 1 ? h('p', { class: 'f-empty' }, '아직 친구가 없어요. ',
           h('button', { type: 'button', class: 'link', onclick: () => setFriendTab('add') }, '친구 신청'), '에서 코드로 신청해 보세요.') : null));
+    return;
+  }
+
+  /* ───── 친구 목록: 이름(나만 보는 별명) 고치기 · 친구 끊기 ───── */
+  if (friendTab === 'list') {
+    const list = study.friends.slice().sort((x, y) => x.nickname.localeCompare(y.nickname, 'ko'));
+    const item = f => {
+      if (friendEdit === f.code) {
+        const input = h('input', { type: 'text', maxlength: 20, value: f.alias || '', placeholder: f.realName || f.nickname, 'aria-label': `${f.realName || f.nickname} 이름` });
+        const save = () => friendAction(async () => {
+          study.friends = await api.friendAlias(state.code, f.code, input.value);
+          friendEdit = null;
+        }, input.value.trim() ? '이름을 바꿨어요' : '원래 닉네임으로 되돌렸어요');
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter' && !e.isComposing) save();
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); friendEdit = null; renderFriends(); }
+        });
+        setTimeout(() => input.focus(), 0);
+        return h('div', { class: 'set-row f-req f-edit' }, avatar(f.nickname),
+          h('div', { class: 'inline-form' }, input,
+            h('button', { type: 'button', class: 'btn sm primary', onclick: save }, '저장'),
+            h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { friendEdit = null; renderFriends(); } }, '취소')));
+      }
+      let armed = null;
+      const cut = h('button', { type: 'button', class: 'btn sm ghost danger-text' }, '끊기');
+      cut.addEventListener('click', () => {
+        if (!armed) { cut.textContent = '한 번 더'; armed = setTimeout(() => { armed = null; cut.textContent = '끊기'; }, 3000); return; }
+        clearTimeout(armed);
+        friendAction(async () => { study.friends = await api.friendRemove(state.code, f.code); }, `${f.nickname} 님과 친구를 끊었어요`);
+      });
+      return h('div', { class: 'set-row f-req' },
+        avatar(f.nickname, !!f.liveSince),
+        h('span', { class: 'f-req-name' }, f.nickname,
+          f.alias && f.realName && f.alias !== f.realName ? h('small', null, ` · ${f.realName}`) : null),
+        h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { friendEdit = f.code; friendMsg = { text: '', err: false }; renderFriends(); } }, '이름 바꾸기'),
+        cut);
+    };
+    fill(body, msg,
+      group(['친구', list.length ? h('span', { class: 'f-count plain' }, list.length) : null], h('div', { class: 'set-card' },
+        list.length ? list.map(item)
+          : h('div', { class: 'set-row' }, h('span', { class: 'set-sub' }, '아직 친구가 없어요'),
+            h('button', { type: 'button', class: 'btn sm', onclick: () => setFriendTab('add') }, '친구 신청')))),
+      list.length ? h('p', { class: 'help fine f-note' }, '바꾼 이름은 나에게만 보여요') : null);
     return;
   }
 
@@ -1532,16 +1604,23 @@ function renderLiveFriends() {
   if (!live.length) { el.liveFriends.replaceChildren(); return; }
   fill(el.liveFriends,
     h('h3', null, '지금 공부 중인 친구', h('span', { class: 'lf-count' }, live.length)),
-    h('ul', { class: 'lf-list' }, live.map(f => h('li', null,
+    // 한 명씩 오른쪽으로: 아이콘 · 이름 · 공부 중인 시간. 올리면(폰은 누르면) 오늘 공부한 시간
+    h('ul', { class: 'lf-list' }, live.map(f => h('li', {
+      tabindex: '0', dataset: { since: f.liveSince, today: f.today || 0 },
+      'aria-label': `${f.nickname} 공부 중`,
+    },
       h('span', { class: 'lf-icon', 'aria-hidden': 'true' }, personIcon()),
       h('span', { class: 'lf-name' }, f.nickname),
-      h('span', { class: 'lf-today' }, `오늘 ${fmtSpent((f.today || 0) + Math.floor((Date.now() - new Date(f.liveSince)) / 1000))}`),
-      h('span', { class: 'lf-timer', dataset: { since: f.liveSince } }, clock(Date.now() - new Date(f.liveSince), true))))));
+      h('span', { class: 'lf-timer' }, clock(Date.now() - new Date(f.liveSince), true)),
+      h('span', { class: 'lf-tip', role: 'tooltip' }, liveTip(f.today || 0, f.liveSince))))));
 }
-// 1초마다 친구 타이머 숫자만
+const liveTip = (today, since) => `오늘 ${fmtSpent(Number(today) + Math.floor((Date.now() - new Date(since)) / 1000))}`;
 function tickLiveFriends() {
   if (!el.liveFriends || el.liveFriends.hidden) return;
-  for (const t of el.liveFriends.querySelectorAll('.lf-timer')) t.textContent = clock(Math.max(0, Date.now() - new Date(t.dataset.since)), true);
+  for (const li of el.liveFriends.querySelectorAll('.lf-list li')) {
+    li.querySelector('.lf-timer').textContent = clock(Math.max(0, Date.now() - new Date(li.dataset.since)), true);
+    li.querySelector('.lf-tip').textContent = liveTip(li.dataset.today, li.dataset.since);
+  }
 }
 
 /* ───── 시작 ───── */

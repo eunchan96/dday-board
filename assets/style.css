@@ -2088,3 +2088,67 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 }
 .f-count[hidden] { display: none; }
 .ios-opacity { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pencil); margin-top: 8px; }
+
+/* 오늘 공부: D-day를 ▶ 바로 옆으로 (이름 | 공부한 시간 | D-day | ▶ | x) */
+.plan-list .plan > * { order: 3; }
+.plan-list .plan > .plan-name { order: 0; }
+.plan-list .plan > .plan-time { order: 1; }
+.plan-list .plan > .plan-dday { order: 2; justify-self: end; text-align: right; }
+.plan-list .plan, .plan.soon { grid-template-columns: minmax(0, 1fr) 72px 58px 30px 30px; }
+@media (max-width: 640px) { .plan-list .plan, .plan.soon { grid-template-columns: minmax(0, 1fr) 56px 50px 28px 28px; } }
+
+/* 타이머: 시간 바로 오른쪽에 ▶ / ❚❚, 한 줄 고정 (길어지면 글자를 줄임) */
+.timer-line { display: flex; align-items: center; gap: clamp(12px, 3cqi, 28px); flex-wrap: nowrap; container-type: inline-size; min-width: 0; }
+.timer-line .timer-digits { white-space: nowrap; flex: 0 1 auto; min-width: 0; font-size: min(136px, calc((100cqi - 84px) / 3.05)); }
+.timer-line .timer-digits.long { font-size: min(112px, calc((100cqi - 84px) / 4.3)); }
+.timer-go {
+  flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: var(--pen); color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--pen) 30%, transparent);
+}
+.timer-go svg { width: 28px; height: 28px; }
+.timer-go.idle svg { margin-left: 3px; }
+.timer-go.focus { background: var(--ink); color: var(--paper); box-shadow: none; }
+.timer-go.rest { background: var(--green); }
+.timer-go:hover { filter: brightness(1.06); }
+.timer-go:focus-visible { outline: 3px solid var(--pen); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .timer-go { width: 52px; height: 52px; }
+  .timer-go svg { width: 24px; height: 24px; }
+  .timer-line .timer-digits { font-size: min(76px, calc((100cqi - 68px) / 3.05)); }
+  .timer-line .timer-digits.long { font-size: min(64px, calc((100cqi - 68px) / 4.3)); }
+}
+
+/* 지금 공부 중인 친구: 오른쪽으로 한 명씩 (아이콘 · 이름 · 시간), 올리면 오늘 공부 시간 */
+.lf-list { flex-direction: row !important; flex-wrap: wrap; gap: 6px; border-top: 0 !important; padding: 4px 0 8px; }
+.lf-list::-webkit-scrollbar { display: none; }
+.lf-list li {
+  position: relative; display: flex !important; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 76px; max-width: 96px; padding: 10px 6px !important; border: 0 !important; border-radius: 12px; cursor: default; outline: none;
+}
+.lf-list li:hover, .lf-list li:focus-visible { background: var(--sheet-2); }
+.lf-list .lf-icon { width: 44px; height: 44px; }
+.lf-list .lf-icon svg { width: 22px; height: 22px; }
+.lf-list .lf-icon::after { width: 11px; height: 11px; right: 1px; bottom: 1px; }
+.lf-list .lf-name { font-size: 12.5px; max-width: 100%; text-align: center; }
+.lf-list .lf-timer { font-size: 13px; min-width: 0; text-align: center; }
+.lf-tip {
+  position: absolute; bottom: calc(100% - 2px); left: 50%; transform: translateX(-50%); z-index: 5;
+  padding: 5px 9px; border-radius: 7px; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 650; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity 120ms;
+}
+.lf-list li:hover .lf-tip, .lf-list li:focus .lf-tip { opacity: 1; }
+.lf-list .lf-today { display: none; }
+.f-count.plain { background: var(--sheet-2); color: var(--pencil); }
+.f-edit .inline-form { flex: 1; min-width: 0; }
+.f-edit .inline-form input { min-width: 0; }
+.f-note { margin: -10px 4px 0; }
+.danger-text { color: var(--red) !important; }
+.friend-list li { grid-template-columns: 22px 32px minmax(0, 1fr) auto !important; }
+@media (max-width: 640px) { .friend-list li { grid-template-columns: 18px 30px minmax(0, 1fr) auto !important; } }
+.timer-pip { flex-shrink: 0; gap: 6px; }
+.timer-pip[hidden] { display: none; }
+.timer-pip svg { width: 16px; height: 16px; }
+.timer-pip svg path:last-child { fill: currentColor; stroke: none; }
+.timer-line:has(.timer-pip:not([hidden])) .timer-digits { font-size: min(120px, calc((100cqi - 180px) / 3.05)); }
+.timer-line:has(.timer-pip:not([hidden])) .timer-digits.long { font-size: min(100px, calc((100cqi - 180px) / 4.3)); }

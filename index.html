@@ -103,7 +103,7 @@
         <span class="dot" id="noticeDot" hidden></span>
       </button>
       <button class="btn icon ghost" id="btnSettings" title="설정" aria-label="설정">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M3.5 14h13"/><circle cx="7.5" cy="6" r="2" class="fill-sheet"/><circle cx="12.5" cy="14" r="2" class="fill-sheet"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <button class="btn primary" id="btnNew" title="추가 (N: 과제, E: 시험, T: 할 일)">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11"/></svg><span class="new-label">추가</span>
@@ -337,7 +337,7 @@
       <div class="set-card">
         <div class="set-row stack">
           <div class="set-head">
-            <div class="set-text"><b>위젯 주소</b><span class="set-sub" id="widgetSub">오늘 공부 · 타이머 · 다가오는 일정을 각각 위젯으로 넣어요</span></div>
+            <div class="set-text"><b>위젯 주소</b><span class="set-sub" id="widgetSub">오늘 공부 · 타이머 · 다가오는 일정 · 캘린더를 각각 위젯으로 넣어요</span></div>
             <button class="btn sm" id="btnWidgetKey">주소 만들기</button>
           </div>
           <div id="widgetBox" hidden>
@@ -361,6 +361,7 @@
             <button class="btn sm" data-kind="study" data-name="S-DAY 공부" disabled>오늘 공부 복사</button>
             <button class="btn sm" data-kind="timer" data-name="S-DAY 타이머" disabled>타이머 복사</button>
             <button class="btn sm" data-kind="upcoming" data-name="S-DAY 일정" disabled>다가오는 일정 복사</button>
+            <button class="btn sm" data-kind="calendar" data-name="S-DAY 캘린더" disabled>캘린더 복사</button>
           </div>
           <ol class="help steps">
             <li>App Store에서 <b>Scriptable</b> 설치</li>
@@ -377,7 +378,7 @@
           <ol class="help steps">
             <li><b>앱 받기</b>에서 <b>S-DAY-widget.apk</b>를 내려받아 설치 (출처를 알 수 없는 앱 허용)</li>
             <li>앱을 열어 위젯 주소 붙여 넣기 → 저장 (배경 진하기도 앱에서)</li>
-            <li>홈 화면 길게 누르기 → 위젯 → <b>S-DAY 위젯</b>에서 오늘 공부 · 타이머 · 다가오는 일정 중 골라 각각 추가</li>
+            <li>홈 화면 길게 누르기 → 위젯 → <b>S-DAY 위젯</b>에서 오늘 공부 · 타이머 · 다가오는 일정 · 캘린더 중 골라 각각 추가</li>
           </ol>
         </div>
       </div>
@@ -506,6 +507,10 @@
     <button type="button" role="tab" data-tab="rank">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16.5V11M10 16.5V5M16 16.5V8.5"/></svg>
       <span>랭킹</span>
+    </button>
+    <button type="button" role="tab" data-tab="list">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 9a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6zM2.5 16.5c.5-2.8 2.4-4.4 5-4.4s4.5 1.6 5 4.4M13 4a2.6 2.6 0 0 1 0 5M15 12.4c1.4.6 2.3 2 2.6 4.1"/></svg>
+      <span>친구 목록</span>
     </button>
     <button type="button" role="tab" data-tab="add">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 16.5c.6-3 2.6-4.6 5.2-4.6s4.1 1 4.9 3M15.5 10v5M13 12.5h5"/></svg>
