@@ -248,15 +248,15 @@
           <div class="set-text"><b>연동 상태</b><span class="set-sub" id="lmsState"></span></div>
           <button class="btn sm" id="btnLmsNow" hidden>지금 가져오기</button>
         </div>
-        <div class="set-row stack" id="tokenBlock">
-          <div class="set-head">
-            <div class="set-text"><b>액세스 토큰</b><span class="set-sub" id="tokenSub">과제와 제출 파일을 하루 3번 가져와요</span></div>
-            <div class="set-actions">
-              <button class="btn sm" id="btnTokenChange" hidden>바꾸기</button>
-              <button class="btn sm danger ghost" id="btnTokenClear" hidden>해제</button>
-            </div>
+        <div class="set-row" id="tokenBlock">
+          <div class="set-text"><b>액세스 토큰</b><span class="set-sub" id="tokenSub">과제와 제출 파일을 하루 3번 가져와요</span></div>
+          <div class="set-actions">
+            <button class="btn sm" id="btnTokenChange">연결</button>
+            <button class="btn sm danger ghost" id="btnTokenClear" hidden>해제</button>
           </div>
-          <div class="inline-form" id="tokenForm">
+        </div>
+        <div class="set-row stack" id="tokenForm" hidden>
+          <div class="inline-form">
             <input type="password" id="tokenInput" placeholder="토큰 붙여 넣기" autocomplete="off" spellcheck="false">
             <button class="btn primary" id="btnTokenSave">연결</button>
           </div>
@@ -269,10 +269,10 @@
             </ol>
             <p class="help fine">토큰은 서버에 암호화해서 보관하고, 과제와 제출 기록을 읽는 데만 써요.</p>
           </details>
-          <p class="msg" id="tokenMsg" role="status"></p>
         </div>
+        <p class="msg pad" id="tokenMsg" role="status"></p>
         <details class="set-more" id="feedMore">
-          <summary>토큰 없이 연결하기</summary>
+          <summary><span class="sum-text"><b>토큰 없이 연결하기</b><span class="set-sub">캘린더 피드 · 북마클릿</span></span></summary>
           <div class="set-row stack">
             <div class="set-text"><b>캘린더 피드</b><span class="set-sub">최근 30일 과제만, 제출 정보 없이 가져와요</span></div>
             <div class="inline-form">
@@ -295,7 +295,7 @@
           </div>
         </details>
         <details class="set-more" id="originMore">
-          <summary>다른 학교 (Canvas)</summary>
+          <summary><span class="sum-text"><b>다른 학교 (Canvas)</b><span class="set-sub" id="originSum">canvas.ssu.ac.kr</span></span></summary>
           <div class="set-row stack">
             <div class="set-text"><b>학교 LMS 주소</b><span class="set-sub" id="originSub">Canvas를 쓰는 학교라면 그 학교 주소로 바꿔요</span></div>
             <div class="inline-form">
@@ -335,22 +335,19 @@
     <section class="set-group" data-tab="widget">
       <h3>폰 홈 화면 위젯</h3>
       <div class="set-card">
-        <div class="set-row stack">
-          <div class="set-head">
-            <div class="set-text"><b>위젯 주소</b><span class="set-sub" id="widgetSub">오늘 공부 · 타이머 · 다가오는 일정 · 캘린더를 각각 위젯으로 넣어요</span></div>
-            <button class="btn sm" id="btnWidgetKey">주소 만들기</button>
-          </div>
-          <div id="widgetBox" hidden>
-            <div class="inline-form">
-              <input type="text" id="widgetUrl" readonly aria-label="위젯 주소">
-              <button class="btn" id="btnWidgetCopy">복사</button>
-            </div>
-            <p class="help fine">이 주소를 아는 사람은 일정과 공부 시간을 볼 수 있어요. 새로 만들면 이전 주소는 막혀요.</p>
-          </div>
-          <p class="msg" id="widgetMsg" role="status"></p>
+        <div class="set-row">
+          <div class="set-text"><b>위젯 주소 <button type="button" class="info-btn" aria-controls="infoWidget" aria-expanded="false" aria-label="위젯 주소 설명" title="설명">i</button></b><span class="set-sub" id="widgetSub">위젯 4가지를 각각 넣어요</span></div>
+          <button class="btn sm" id="btnWidgetKey">주소 만들기</button>
         </div>
-        <div class="set-row stack">
-          <div class="set-text"><b>아이폰</b><span class="set-sub">무료 앱 Scriptable로 넣어요. 넣을 위젯마다 스크립트를 복사해요</span></div>
+        <p class="info-text in-card" id="infoWidget" hidden>이 주소를 아는 사람은 일정과 공부 시간을 볼 수 있어요. 새로 만들면 이전 주소는 막혀요.</p>
+        <div class="set-row" id="widgetBox" hidden>
+          <div class="set-text"><b>주소</b><input type="text" id="widgetUrl" class="url-plain" readonly aria-label="위젯 주소"></div>
+          <button class="btn sm" id="btnWidgetCopy">복사</button>
+        </div>
+        <p class="msg pad" id="widgetMsg" role="status"></p>
+        <details class="set-more" id="iosMore">
+          <summary><span class="sum-text"><b>아이폰</b><span class="set-sub">무료 앱 Scriptable로 넣어요</span></span></summary>
+          <div class="set-row stack">
           <label class="ios-opacity">배경 진하기
             <select id="iosOpacity" class="scope-select" aria-label="위젯 배경 진하기">
               <option value="100">100%</option><option value="80">80%</option><option value="60">60%</option>
@@ -369,10 +366,12 @@
             <li>Scriptable에서 <b>+</b> → 붙여 넣기 → 제목을 <b>S-DAY 공부</b>처럼</li>
             <li>홈 화면 길게 누르기 → <b>+</b> → Scriptable → 크기 고르기 → 위젯을 길게 눌러 <b>위젯 편집</b> → Script 고르기</li>
           </ol>
-        </div>
-        <div class="set-row stack">
-          <div class="set-head">
-            <div class="set-text"><b>안드로이드</b><span class="set-sub">위젯만 있는 작은 앱을 설치해요</span></div>
+          </div>
+        </details>
+        <details class="set-more" id="androidMore">
+          <summary><span class="sum-text"><b>안드로이드</b><span class="set-sub">위젯만 있는 작은 앱을 설치해요</span></span></summary>
+          <div class="set-row stack">
+          <div class="row-actions start">
             <a class="btn sm" id="widgetApk" href="https://github.com/eunchan96/dday-board/releases/download/android-widget/S-DAY-widget.apk" target="_blank" rel="noopener">앱 받기</a>
           </div>
           <ol class="help steps">
@@ -380,30 +379,27 @@
             <li>앱을 열어 위젯 주소 붙여 넣기 → 저장 (배경 진하기도 앱에서)</li>
             <li>홈 화면 길게 누르기 → 위젯 → <b>S-DAY 위젯</b>에서 오늘 공부 · 타이머 · 다가오는 일정 · 캘린더 중 골라 각각 추가</li>
           </ol>
-        </div>
+          </div>
+        </details>
       </div>
     </section>
     <section class="set-group" data-tab="cal">
       <h3>내 캘린더로 보내기</h3>
       <div class="set-card">
-        <div class="set-row stack">
-          <div class="set-head">
-            <div class="set-text"><b>캘린더 구독</b><span class="set-sub" id="calSub">구글 · 아이폰 캘린더에 과제와 시험이 함께 떠요</span></div>
-            <button class="btn sm" id="btnCalKey">주소 만들기</button>
-          </div>
-          <div id="calBox" hidden>
-            <div class="inline-form">
-              <input type="text" id="calUrl" readonly>
-              <button class="btn" id="btnCalCopy">복사</button>
-            </div>
-            <div class="row-actions start cal-links">
-              <a class="btn sm" id="calGoogle" target="_blank" rel="noopener">구글 캘린더에 추가</a>
-              <a class="btn sm" id="calApple">아이폰 · 맥 캘린더에 추가</a>
-            </div>
-            <p class="help fine">이 주소를 아는 사람은 일정을 볼 수 있어요. 새로 만들면 이전 주소는 막혀요.</p>
-          </div>
-          <p class="msg" id="calMsg" role="status"></p>
+        <div class="set-row">
+          <div class="set-text"><b>캘린더 구독 <button type="button" class="info-btn" aria-controls="infoCal" aria-expanded="false" aria-label="캘린더 구독 설명" title="설명">i</button></b><span class="set-sub" id="calSub">구글 · 아이폰 캘린더에 과제와 시험이 함께 떠요</span></div>
+          <button class="btn sm" id="btnCalKey">주소 만들기</button>
         </div>
+        <p class="info-text in-card" id="infoCal" hidden>구독하면 몇 시간마다 저절로 새로 고쳐져요. 이 주소를 아는 사람은 일정을 볼 수 있고, 새로 만들면 이전 주소는 막혀요.</p>
+        <div class="set-row" id="calBox" hidden>
+          <div class="set-text"><b>구독 주소</b><input type="text" id="calUrl" class="url-plain" readonly aria-label="구독 주소"></div>
+          <div class="set-actions">
+            <button class="btn sm" id="btnCalCopy">복사</button>
+            <a class="btn sm" id="calGoogle" target="_blank" rel="noopener">구글</a>
+            <a class="btn sm" id="calApple">아이폰 · 맥</a>
+          </div>
+        </div>
+        <p class="msg pad" id="calMsg" role="status"></p>
       </div>
     </section>
 
@@ -428,24 +424,22 @@
       <h3>이 기기</h3>
       <div class="set-card">
         <div class="set-row">
-          <div class="set-text"><b>화면</b></div>
+          <div class="set-text"><b>화면</b><span class="set-sub">자동 = 기기 설정</span></div>
           <div class="segmented" id="themePicker" role="radiogroup" aria-label="테마">
             <button role="radio" data-theme="system">자동</button>
             <button role="radio" data-theme="light">밝게</button>
             <button role="radio" data-theme="dark">어둡게</button>
           </div>
         </div>
-        <div class="set-row stack">
-          <div class="set-head">
-            <div class="set-text"><b>보드 코드</b><span class="set-sub">다른 기기에서 입력하면 같은 보드가 열려요</span></div>
+        <div class="set-row">
+          <div class="set-text"><b>보드 코드 <button type="button" class="info-btn" aria-controls="infoCode" aria-expanded="false" aria-label="보드 코드 설명" title="설명">i</button></b><input type="text" id="codeText" class="code-plain" readonly aria-label="보드 코드"></div>
+          <div class="set-actions">
+            <button class="btn sm" id="btnShowCode">보기</button>
+            <button class="btn sm" id="btnCopyCode">복사</button>
           </div>
-          <div class="inline-form">
-            <input type="text" id="codeText" class="code-input" readonly>
-            <button class="btn" id="btnShowCode">보기</button>
-            <button class="btn" id="btnCopyCode">복사</button>
-          </div>
-          <p class="msg" id="copyMsg" role="status"></p>
         </div>
+        <p class="info-text in-card" id="infoCode" hidden>다른 기기에서 이 코드를 넣으면 같은 보드가 열려요. 코드를 아는 사람은 보드를 고칠 수 있으니 조심해 주세요.</p>
+        <p class="msg pad" id="copyMsg" role="status"></p>
         <div class="set-row" id="installRow" hidden>
           <div class="set-text"><b>앱으로 설치</b><span class="set-sub" id="installHelp">홈 화면에서 바로 열려요</span></div>
           <button class="btn sm" id="btnInstall">설치</button>
@@ -460,7 +454,7 @@
     <section class="set-group" data-tab="device">
       <div class="set-card">
         <details class="set-more" id="backupMore">
-          <summary>백업</summary>
+          <summary><span class="sum-text"><b>백업</b><span class="set-sub">예전 위젯 백업 옮기기 · 복사</span></span></summary>
           <div class="set-row stack">
             <div class="set-text"><span class="set-sub">예전 위젯 백업 텍스트를 붙여 넣으면 옮겨 와요</span></div>
             <textarea id="importText" rows="3" spellcheck="false" placeholder='[{"id":"…","title":"…","due":"…"}]'></textarea>
@@ -472,7 +466,7 @@
           </div>
         </details>
         <details class="set-more" id="keysMore">
-          <summary>단축키</summary>
+          <summary><span class="sum-text"><b>단축키</b><span class="set-sub">키보드로 빠르게</span></span></summary>
           <div class="set-row">
             <p class="help keys"><kbd>N</kbd> 과제 <kbd>E</kbd> 시험 <kbd>T</kbd> 할 일 <kbd>/</kbd> 검색 <kbd>S</kbd> 일정 · 공부 <kbd>1</kbd><kbd>2</kbd> 탭 <kbd>Space</kbd> 타이머 <kbd>Esc</kbd> 닫기</p>
           </div>

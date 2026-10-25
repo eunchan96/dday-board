@@ -800,9 +800,9 @@ function renderLms() {
   $('#btnFeedClear').hidden = !feed;
   $('#btnFeedSave').textContent = feed ? '바꾸기' : '연동';
   $('#btnTokenClear').hidden = !token;
-  $('#btnTokenChange').hidden = !token || tokenEditing;
-  $('#tokenForm').hidden = token && !tokenEditing;
-  $('#tokenHelp').hidden = token && !tokenEditing;
+  // 토큰 칸은 한 줄: [연결] / [바꾸기]를 누르면 입력 칸이 아래에 펼쳐짐
+  $('#btnTokenChange').textContent = tokenEditing ? '닫기' : token ? '바꾸기' : '연결';
+  $('#tokenForm').hidden = !tokenEditing;
   $('#btnTokenSave').textContent = token ? '바꾸기' : '연결';
   $('#tokenSub').textContent = token ? `…${l.tokenHint} 연결됨` : '과제와 제출 파일을 하루 3번 가져와요';
   $('#bookmarkletSection').hidden = token;          // 토큰이 있으면 북마클릿은 필요 없음
@@ -810,6 +810,7 @@ function renderLms() {
   const origin = lmsOrigin();
   const host = origin.replace(/^https:\/\//, '');
   if (document.activeElement !== $('#originInput')) $('#originInput').value = host;
+  $('#originSum').textContent = host;
   $('#originSub').textContent = host === 'canvas.ssu.ac.kr' ? 'Canvas를 쓰는 학교라면 그 학교 주소로 바꿔요' : `${host} 에서 가져와요`;
   $('#tokenSettingsLink').href = `${origin}/profile/settings`;
   $('#plannerUrl').textContent = $('#plannerUrl').textContent.replace(/^https:\/\/[^/]+/, origin);
@@ -882,7 +883,7 @@ let calExists = false, calArmed = false;
 async function loadCalendar() {
   $('#calBox').hidden = true; $('#calMsg').textContent = ''; calArmed = false;
   try { calExists = !!(await api.calendarStatus(state.code)); } catch { calExists = false; }
-  $('#calSub').textContent = calExists ? '만든 주소가 있어요. 주소를 잃어버렸다면 새로 만드세요' : '구글 · 아이폰 캘린더에 과제와 시험이 함께 떠요';
+  $('#calSub').textContent = calExists ? '만든 주소가 있어요 · 잃어버렸으면 새로 만들기' : '구글 · 아이폰 캘린더에 과제와 시험이 떠요';
   $('#btnCalKey').textContent = calExists ? '새로 만들기' : '주소 만들기';
 }
 async function makeCalendarKey() {
@@ -918,8 +919,8 @@ async function loadWidget() {
   if (saved) $('#widgetUrl').value = saved;
   for (const b of $('#iosCopy').querySelectorAll('button')) b.disabled = !saved;
   $('#widgetSub').textContent = widgetExists
-    ? (saved ? '폰에서 이 주소를 쓰면 돼요' : '만든 주소가 있어요. 이 기기에서 다시 보려면 새로 만드세요')
-    : '오늘 공부 · 타이머 · 다가오는 일정 · 캘린더를 각각 위젯으로 넣어요';
+    ? (saved ? '폰에서 이 주소를 쓰면 돼요' : '만든 주소가 있어요 · 다시 보려면 새로 만들기')
+    : '오늘 공부 · 타이머 · 일정 · 캘린더 위젯';
   $('#btnWidgetKey').textContent = widgetExists ? '새로 만들기' : '주소 만들기';
 }
 async function makeWidgetKey() {
@@ -1551,7 +1552,7 @@ function bind() {
       msg.className = 'msg err'; msg.textContent = errText(e);
     } finally { btn.disabled = false; }
   });
-  $('#btnTokenChange').addEventListener('click', () => { tokenEditing = true; renderLms(); $('#tokenInput').focus(); });
+  $('#btnTokenChange').addEventListener('click', () => { tokenEditing = !tokenEditing; renderLms(); if (tokenEditing) $('#tokenInput').focus(); });
   $('#tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#btnTokenSave').click(); });
   armTwice($('#btnTokenClear'), '토큰 해제', '한 번 더 누르면 해제돼요', async () => {
     const msg = $('#tokenMsg');

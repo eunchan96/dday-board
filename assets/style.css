@@ -2175,3 +2175,67 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 #friendsDialog .btn, #friendsDialog .segmented button { font-size: 13px; }
 #friendsDialog input[type=text] { font-size: 14.5px; }
 #friendsDialog .inline-form .btn { min-width: 64px; }
+
+/* ═════ 설정: 항목 높이 맞춤 (한 줄 = 제목 + 짧은 설명 + 오른쪽 버튼) ═════ */
+#settings .set-card > .set-row:not(.stack):not(.slim), #settings .set-card > details > summary { min-height: 74px; }
+#settings .set-card > details > summary { padding-top: 12px; padding-bottom: 12px; }
+#settings .sum-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#settings .sum-text b { font-size: 14.5px; font-weight: 650; color: var(--ink); }
+#settings .sum-text .set-sub { font-weight: 500; }
+#settings .set-card > details[open] > summary { padding-bottom: 12px; }
+#settings .set-card > p.msg:empty, #settings .set-row > .msg:empty { display: none; }
+#settings .set-card > p.msg.pad:not(:empty) { padding: 0 18px 14px; margin: 0; }
+#settings .set-text b .info-btn { display: inline-grid; vertical-align: -3px; margin-left: 4px; width: 18px; height: 18px; font-size: 11px; }
+#settings .set-card > .info-text.in-card { margin: 0 18px 14px; }
+#settings .set-card > .info-text.in-card[hidden] { display: none; }
+#settings .set-row + .info-text.in-card { margin-top: -4px; }
+.code-plain, .url-plain {
+  all: unset; display: block; width: 100%; min-width: 0; margin-top: 2px; font-size: 12.5px; color: var(--pencil);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.code-plain { letter-spacing: 0.06em; font-weight: 600; }
+#settings .set-actions { flex-shrink: 0; flex-wrap: nowrap; }
+#settings #tokenForm { padding-top: 0; }
+#settings #tokenForm, #settings .set-card > details > .set-row.stack { border-top: 0; }
+@media (max-width: 640px) {
+  #settings .set-card > .set-row:not(.stack):not(.slim), #settings .set-card > details > summary { min-height: 64px; }
+  #settings #calBox { flex-wrap: wrap; }
+  #settings #calBox .set-actions { width: 100%; justify-content: flex-start; }
+}
+#settings .set-row > .set-text { flex: 1 1 0; min-width: 0; }
+@media (max-width: 640px) { #settings .set-card > .set-row:not(.stack) { flex-wrap: nowrap; } #settings #calBox { flex-wrap: wrap; } }
+
+/* 오늘 공부: 공부한 시간이 없는 줄은 이름(메모)이 D-day 바로 앞까지 */
+.plan-list .plan:has(> .plan-time:empty) > .plan-name { grid-column: 1 / span 2; }
+.plan-list .plan:has(> .plan-time:empty) > .plan-time { display: none; }
+.plan-name .plan-memo, .plan-name .plan-task { flex: 1 1 auto; }
+
+/* 타이머 버튼: 숫자 크기의 80%, 아이콘 크게, 숫자와 조금 더 띄움 */
+.timer-line { gap: clamp(18px, 4.5cqi, 40px); --dsz: min(136px, calc((100cqi - 40px) / 3.85)); }
+.timer-line:has(.timer-digits.long) { --dsz: min(112px, calc((100cqi - 40px) / 5.1)); }
+.timer-go { width: calc(var(--dsz) * 0.8); height: calc(var(--dsz) * 0.8); }
+.timer-go svg { width: 54%; height: 54%; }
+@media (max-width: 640px) {
+  .timer-line { --dsz: min(80px, calc((100cqi - 24px) / 3.85)); }
+  .timer-line:has(.timer-digits.long) { --dsz: min(68px, calc((100cqi - 24px) / 5.1)); }
+  .timer-go { width: calc(var(--dsz) * 0.8); height: calc(var(--dsz) * 0.8); }
+  .timer-go svg { width: 54%; height: 54%; }
+}
+
+/* 친구 코드도 본문과 같은 크기 */
+#friendsDialog .my-code .code { font-size: 14.5px; font-weight: 650; letter-spacing: 0.06em; }
+#settings input.code-plain, #settings input.url-plain {
+  height: auto !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: none !important;
+  box-shadow: none !important; border-radius: 0 !important; font-size: 12.5px !important; line-height: 1.4 !important; color: var(--pencil) !important; width: 100%;
+}
+#settings input.code-plain { letter-spacing: 0.06em !important; }
+/* 과목 탭의 목록 줄은 원래 높이 */
+#settings [data-tab="colors"] .set-card > .set-row { min-height: 0 !important; }
+#settings .set-text b .info-btn { width: 16px; height: 16px; font-size: 10.5px; vertical-align: 1px; line-height: 1; border-width: 1.3px; }
+#settings .set-text > b { line-height: 1.45; }
+#settings .set-row[hidden], #settings .info-text[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  #settings .set-card > details > summary { padding-left: 14px; padding-right: 14px; }
+  #settings .set-card > p.msg.pad:not(:empty) { padding: 0 14px 12px; }
+  #settings .set-card > .info-text.in-card { margin: 0 14px 12px; }
+}
