@@ -25,14 +25,16 @@ data class Timer(
     val label: String,
 )
 
+data class CalItem(val kind: String, val title: String, val done: Boolean)
+
 data class WidgetData(
     val upcoming: List<Task>,
     val todaySec: Long,
     val goalSec: Long,
     val timer: Timer?,
     val timerColor: String?,
-    /** 캘린더 위젯: 날짜(yyyy-MM-dd) → 그날 일정들 (종류, 이름) */
-    val month: Map<String, List<Pair<String, String>>> = emptyMap(),
+    /** 캘린더 위젯: 날짜(yyyy-MM-dd) → 그날 일정들 */
+    val month: Map<String, List<CalItem>> = emptyMap(),
     val stale: Boolean = false,
 )
 
@@ -46,6 +48,9 @@ object Store {
     /** 위젯 배경 진하기 0~100 (%) */
     fun opacity(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("opacity", 100)
     fun setOpacity(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("opacity", v.coerceIn(0, 100)).apply()
+    /** 캘린더 위젯에서 넘겨 본 달 (0 = 이번 달) */
+    fun calOffset(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("calOffset", 0)
+    fun setCalOffset(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("calOffset", v.coerceIn(-3, 6)).apply()
     fun cache(ctx: Context): String? = ctx.getSharedPreferences(PREFS, 0).getString(KEY_CACHE, null)
     fun setCache(ctx: Context, json: String) = ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_CACHE, json).apply()
 
@@ -109,11 +114,11 @@ object Api {
                 label = it.optString("label").ifBlank { it.optString("subject") },
             )
         }
-        val month = mutableMapOf<String, MutableList<Pair<String, String>>>()
+        val month = mutableMapOf<String, MutableList<CalItem>>()
         o.optJSONArray("month")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val m = arr.getJSONObject(i)
-                month.getOrPut(m.optString("d")) { mutableListOf() }.add(m.optString("kind", "assignment") to m.optString("title"))
+                month.getOrPut(m.optString("d")) { mutableListOf() }.add(CalItem(m.optString("kind", "assignment"), m.optString("title"), m.optBoolean("done", false)))
             }
         }
         return WidgetData(

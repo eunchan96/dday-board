@@ -13,4 +13,5 @@
     <color name="kind_exam">#E5484D</color>
     <color name="kind_assignment">#F0B000</color>
     <color name="kind_todo">#3D6BE0</color>
+    <color name="saturday">#2C6BE0</color>
 </resources>

@@ -131,6 +131,12 @@ export function renderList(root, tasks, ctx) {
 }
 
 /* ───── 캘린더 ───── */
+function chevron(d) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 20 20'); svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); svg.append(p);
+  return svg;
+}
 export function renderCalendar(root, tasks, ctx) {
   root.replaceChildren();
   const month = ctx.calMonth;                    // 해당 월 1일
@@ -150,14 +156,14 @@ export function renderCalendar(root, tasks, ctx) {
   const head = h('div', { class: 'cal-head' },
     h('span', { class: 'cal-head-side', 'aria-hidden': 'true' }),
     h('div', { class: 'cal-head-mid' },
-      h('button', { class: 'btn icon ghost', 'aria-label': '이전 달', onclick: () => ctx.onMonth(-1) }, '‹'),
+      h('button', { class: 'btn icon ghost cal-arrow', 'aria-label': '이전 달', title: '이전 달', onclick: () => ctx.onMonth(-1) }, chevron('M12.5 4.5L7 10l5.5 5.5')),
       h('h3', null, `${month.getFullYear()}년 ${month.getMonth() + 1}월`),
-      h('button', { class: 'btn icon ghost', 'aria-label': '다음 달', onclick: () => ctx.onMonth(1) }, '›')),
+      h('button', { class: 'btn icon ghost cal-arrow', 'aria-label': '다음 달', title: '다음 달', onclick: () => ctx.onMonth(1) }, chevron('M7.5 4.5L13 10l-5.5 5.5'))),
     h('button', { class: 'btn cal-today', onclick: () => ctx.onMonth(0) }, '오늘'),
   );
 
   const grid = h('div', { class: 'cal-grid', role: 'grid' },
-    WEEK.map((w, i) => h('div', { class: `cal-dow${i === 0 ? ' sun' : ''}`, role: 'columnheader' }, w)));
+    WEEK.map((w, i) => h('div', { class: `cal-dow${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}`, role: 'columnheader' }, w)));
 
   const weeks = Math.ceil((first.getDay() + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()) / 7);
   for (let i = 0; i < weeks * 7; i++) {
@@ -167,6 +173,7 @@ export function renderCalendar(root, tasks, ctx) {
     if (d.getMonth() !== month.getMonth()) cls.push('other');
     if (sameDay(d, today)) cls.push('today');
     if (d.getDay() === 0) cls.push('sun');
+    if (d.getDay() === 6) cls.push('sat');
     if (ctx.selectedDay && sameDay(d, ctx.selectedDay)) cls.push('selected');
 
     const pending = list.filter(t => !t.done).length;

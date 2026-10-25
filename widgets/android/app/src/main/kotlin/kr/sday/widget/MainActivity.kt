@@ -71,7 +71,7 @@ class MainActivity : Activity() {
         })
 
         findViewById<Button>(R.id.open).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Widgets.APP_URL)))
+            startActivity(Widgets.appIntent(this, Widgets.APP_URL))
         }
     }
 }

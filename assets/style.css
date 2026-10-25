@@ -620,7 +620,7 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
 .tag-rec { font-size: 11px; font-weight: 750; padding: 1px 7px; border-radius: 10px; background: var(--hl-yellow); color: var(--hl-ink); }
 .help.fine { font-size: 12px; margin-top: 6px; }
 .steps b { font-weight: 700; color: var(--ink); }
-#feedMore { margin-top: 14px; }
+#settings #feedMore { margin-top: 0; }
 #feedMore .inline-form { margin-top: 8px; }
 
 /* ───── 단순화 (상단 · 목록 · 설정) ───── */
@@ -2239,3 +2239,14 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
   #settings .set-card > p.msg.pad:not(:empty) { padding: 0 14px 12px; }
   #settings .set-card > .info-text.in-card { margin: 0 14px 12px; }
 }
+/* 카드 안 줄 사이 구분선: 사이에 설명 · 안내 문구가 끼어도 빠지지 않게 */
+#settings .set-card > :is(.set-row, details):not(:first-child) { border-top: 1px solid var(--rule); }
+#settings .set-card > details > .set-row { border-top: 0; }
+.cal-head .cal-arrow { width: 40px; height: 40px; }
+.cal-head .cal-arrow svg { width: 22px; height: 22px; stroke-width: 2; }
+@media (max-width: 640px) { .cal-head .cal-arrow { width: 36px; height: 36px; } .cal-head .cal-arrow svg { width: 20px; height: 20px; } }
+/* 토요일은 파랑 */
+:root { --sat: #2C6BE0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sat: #7FA6FF; } }
+:root[data-theme="dark"] { --sat: #7FA6FF; }
+.cal-dow.sat, .cal-day.sat .num { color: var(--sat); }

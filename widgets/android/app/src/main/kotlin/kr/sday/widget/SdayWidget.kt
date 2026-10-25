@@ -36,6 +36,12 @@ abstract class BaseWidget : AppWidgetProvider() {
     override fun onReceive(ctx: Context, intent: Intent) {
         super.onReceive(ctx, intent)
         if (intent.action == Widgets.ACTION_REFRESH) RefreshWorker.now(ctx)
+        // 캘린더 위젯의 ‹ › · 오늘: 보는 달만 바꿔 다시 그림 (인터넷 없이)
+        if (intent.action == Widgets.ACTION_CAL) {
+            val shift = intent.getIntExtra("shift", 0)
+            Store.setCalOffset(ctx, if (shift == 0) 0 else Store.calOffset(ctx) + shift)
+            Widgets.render(ctx)
+        }
     }
 }
 
@@ -49,6 +55,7 @@ class CalendarWidget : BaseWidget() {
 
 object Widgets {
     const val ACTION_REFRESH = "kr.sday.widget.REFRESH"
+    const val ACTION_CAL = "kr.sday.widget.CAL"
     const val APP_URL = "https://dday-board-pink.vercel.app/"
     private val MODES = mapOf("p25" to (25 to 5), "p50" to (50 to 10))
     private val ROWS = listOf(
@@ -68,9 +75,27 @@ object Widgets {
         views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx) * 255 / 100)
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
-        ctx, code, Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL + hash)),
+        ctx, code, appIntent(ctx, APP_URL + hash),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
+
+    /**
+     * 홈 화면에 설치한 S-DAY 앱(크롬이 만든 앱)이 있으면 그 앱으로, 없으면 브라우저로.
+     * 그 주소를 여는 앱 중 아무 사이트나 여는 브라우저가 아닌 것을 고른다.
+     */
+    fun appIntent(ctx: Context, url: String): Intent {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching {
+            val pm = ctx.packageManager
+            val browsers = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), 0)
+                .map { it.activityInfo.packageName }.toSet()
+            val app = pm.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_ALL)
+                .map { it.activityInfo.packageName }
+                .firstOrNull { it !in browsers && it != ctx.packageName }
+            if (app != null) intent.setPackage(app)
+        }
+        return intent
+    }
 
     /** 캐시된 내용(없으면 error 문구)으로 모든 위젯을 다시 그린다. 타이머가 끝나는 시각(ms)을 돌려줌 */
     fun render(ctx: Context, error: String? = null): Long? {
@@ -119,17 +144,29 @@ object Widgets {
     private fun renderCalendar(ctx: Context, data: WidgetData?) {
         val manager = AppWidgetManager.getInstance(ctx)
         val ids = ids(ctx, CalendarWidget::class.java)
+        if (ids.isEmpty()) return
+        val today = java.time.LocalDate.now(ZoneId.of("Asia/Seoul"))
+        val month = today.withDayOfMonth(1).plusMonths(Store.calOffset(ctx).toLong())
+        val shift = { code: Int, by: Int -> PendingIntent.getBroadcast(
+            ctx, code, Intent(ctx, CalendarWidget::class.java).setAction(ACTION_CAL).putExtra("shift", by),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
         for (id in ids) {
             val views = RemoteViews(ctx.packageName, R.layout.widget_calendar)
             applyOpacity(ctx, views)
-            views.setOnClickPendingIntent(R.id.root, open(ctx, "#calendar", 4))
+            views.setTextViewText(R.id.cal_month, if (month.year == today.year) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월")
+            views.setTextViewText(R.id.cal_today, today.dayOfMonth.toString())
+            views.setOnClickPendingIntent(R.id.cal_prev, shift(10, -1))
+            views.setOnClickPendingIntent(R.id.cal_next, shift(11, 1))
+            views.setOnClickPendingIntent(R.id.cal_today, shift(12, 0))
+            views.setOnClickPendingIntent(R.id.cal_add, open(ctx, "#new", 13))
+            views.setOnClickPendingIntent(R.id.cal, open(ctx, "#calendar", 4))
             val opts = manager.getAppWidgetOptions(id)
             val dm = ctx.resources.displayMetrics
             val wDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250).coerceAtLeast(110)
             val hDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 250).coerceAtLeast(110)
-            // 위젯 안쪽 여백(12dp씩)을 빼고, 비트맵은 최대 2배 밀도까지만 (메모리 제한)
+            // 위젯 안쪽 여백과 머리줄(40dp)을 빼고, 비트맵은 최대 2.5배 밀도까지만 (메모리 제한)
             val scale = minOf(dm.density, 2.5f)
-            val bmp = CalendarDraw.draw(ctx, ((wDp - 24) * scale).toInt(), ((hDp - 24) * scale).toInt(), scale, data?.month.orEmpty())
+            val bmp = CalendarDraw.draw(ctx, ((wDp - 16) * scale).toInt(), ((hDp - 54) * scale).toInt(), scale, month, today, data?.month.orEmpty())
             views.setImageViewBitmap(R.id.cal, bmp)
             manager.updateAppWidget(id, views)
         }

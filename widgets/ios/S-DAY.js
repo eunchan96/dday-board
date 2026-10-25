@@ -229,7 +229,8 @@ function calendarWidget(w, d, now, fam) {
   const W = '일월화수목금토';
   if (fam === 'small') {
     // 오늘부터 일정 있는 날을 차례로
-    const days = Object.keys(byDay).filter(k => k >= key(today)).sort().slice(0, 3);
+    const open = k => byDay[k].filter(it => !it.done);
+    const days = Object.keys(byDay).filter(k => k >= key(today) && open(k).length).sort().slice(0, 3);
     if (!days.length) { w.addSpacer(); text(w, '이번 달 남은 일정이 없어요', 12, C.faint, 'medium'); w.addSpacer(); return; }
     let lines = 0;
     for (const k of days) {
@@ -238,7 +239,7 @@ function calendarWidget(w, d, now, fam) {
       if (lines) w.addSpacer(5);
       text(w, k === key(today) ? '오늘' : `${dt.getMonth() + 1}/${dt.getDate()} ${W[dt.getDay()]}`, 10, C.pencil, 'bold');
       lines++;
-      for (const it of byDay[k]) {
+      for (const it of open(k)) {
         if (lines >= 5) break;
         w.addSpacer(2);
         const r = w.addStack(); r.centerAlignContent();
@@ -261,38 +262,59 @@ function calendarWidget(w, d, now, fam) {
     start = new Date(today); start.setDate(today.getDate() - today.getDay());
     weeks = 2;
   }
-  const CW = 42, CH = big ? Math.floor(270 / weeks) : 46;
-  const lines = Math.max(1, Math.floor((CH - 13) / 10));
-  text(w, `${today.getMonth() + 1}월`, big ? 14 : 12, C.ink, 'bold');
-  w.addSpacer(big ? 5 : 3);
-  const head = w.addStack();
+  const BLUE = dyn('#2C6BE0', '#7FA6FF');
+  const dayColor = i => (i === 0 ? C.red : i === 6 ? BLUE : C.ink);
+  const CW = 42, CH = big ? Math.floor(262 / weeks) : 40;
+  const LH = 12;                                   // 일정 한 줄 높이
+  const lines = Math.max(1, Math.floor((CH - 16) / (LH + 1)));
+  // 머리줄: 가운데 ○월, 오른쪽 + (추가) · 오늘(날짜가 든 네모)
+  const head = w.addStack(); head.centerAlignContent(); head.size = new Size(CW * 7, 24);
+  head.addSpacer(56);
+  head.addSpacer();
+  text(head, `${today.getMonth() + 1}월`, big ? 17 : 14, C.ink, 'bold');
+  head.addSpacer();
+  const add = head.addStack(); add.size = new Size(24, 24); add.centerAlignContent(); add.url = `${APP_URL}#new`;
+  text(add, '+', 18, C.ink, 'bold');
+  head.addSpacer(6);
+  const tb = head.addStack(); tb.size = new Size(24, 22); tb.centerAlignContent(); tb.cornerRadius = 5;
+  tb.borderWidth = 1.5; tb.borderColor = C.ink; tb.url = `${APP_URL}#calendar`;
+  text(tb, String(today.getDate()), 11, C.ink, 'bold');
+  w.addSpacer(big ? 4 : 2);
+  const dow = w.addStack();
   W.split('').forEach((ch, i) => {
-    const c = head.addStack(); c.size = new Size(CW, 12); c.centerAlignContent();
-    const t = c.addText(ch); t.font = Font.mediumSystemFont(8.5); t.textColor = i === 0 ? C.red : C.faint;
+    const c = dow.addStack(); c.size = new Size(CW, 15); c.centerAlignContent();
+    const t = c.addText(ch); t.font = Font.boldSystemFont(10); t.textColor = i === 0 ? C.red : i === 6 ? BLUE : C.faint;
   });
+  const TEXT_ON = { exam: Color.white(), todo: Color.white(), assignment: new Color('#3A2C00') };
   for (let r = 0; r < weeks; r++) {
     const row = w.addStack();
     for (let i = 0; i < 7; i++) {
       const day = new Date(start); day.setDate(start.getDate() + r * 7 + i);
       const inMonth = !big || day.getMonth() === today.getMonth();
       const isToday = key(day) === key(today);
-      const cell = row.addStack(); cell.size = new Size(CW, CH); cell.layoutVertically(); cell.topAlignContent?.();
-      cell.setPadding(2, 2, 0, 1);
-      const n = cell.addStack(); n.centerAlignContent();
-      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = 6; n.setPadding(0, 3, 0, 3); }
+      const cell = row.addStack(); cell.size = new Size(CW, CH); cell.layoutVertically();
+      cell.setPadding(2, 1, 0, 1);
+      // 날짜: 칸 가운데
+      const nr = cell.addStack(); nr.addSpacer();
+      const n = nr.addStack(); n.centerAlignContent();
+      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = 8; n.size = new Size(20, 16); }
       const t = n.addText(String(day.getDate()));
-      t.font = isToday ? Font.boldSystemFont(9) : Font.mediumSystemFont(9);
-      t.textColor = isToday ? Color.white() : !inMonth ? C.faint : i === 0 ? C.red : C.ink;
+      t.font = isToday ? Font.boldSystemFont(11.5) : Font.mediumSystemFont(11.5);
+      t.textColor = isToday ? Color.white() : !inMonth ? C.faint : dayColor(i);
+      nr.addSpacer();
+      // 일정: 한 줄씩, 줄 배경이 종류 색
       const items = byDay[key(day)] || [];
       const show = items.length > lines ? lines - 1 : items.length;
       items.slice(0, show).forEach(it => {
         cell.addSpacer(1);
-        const l = cell.addStack(); l.centerAlignContent();
-        const bar = l.addStack(); bar.size = new Size(2, 8); bar.cornerRadius = 1; bar.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
-        l.addSpacer(2);
-        const tt = l.addText(it.title); tt.font = Font.mediumSystemFont(7.5); tt.textColor = inMonth ? C.ink : C.faint; tt.lineLimit = 1;
+        const l = cell.addStack(); l.size = new Size(CW - 2, LH); l.cornerRadius = 3; l.setPadding(0, 2, 0, 1); l.centerAlignContent();
+        l.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
+        if (it.done || !inMonth) l.backgroundColor = C.rule;
+        const tt = l.addText(it.title); tt.font = Font.semiboldSystemFont(8.5); tt.lineLimit = 1;
+        tt.textColor = it.done || !inMonth ? C.pencil : (TEXT_ON[it.kind] || TEXT_ON.assignment);
+        l.addSpacer();
       });
-      if (show < items.length) { cell.addSpacer(1); text(cell, `+${items.length - show}`, 7.5, C.pencil, 'medium'); }
+      if (show < items.length) { cell.addSpacer(1); text(cell, `+${items.length - show}`, 8.5, C.pencil, 'bold'); }
       cell.addSpacer();
     }
   }
