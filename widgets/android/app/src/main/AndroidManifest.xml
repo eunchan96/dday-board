@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 홈 화면에 설치한 S-DAY 앱(WebAPK)을 찾으려고 (스토어에 올리지 않는 앱이라 써도 됨) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
 
     <!-- 설치한 S-DAY 앱(크롬이 만든 앱)과 브라우저를 구분하려고 -->
     <queries>

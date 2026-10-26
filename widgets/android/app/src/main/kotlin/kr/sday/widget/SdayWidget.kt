@@ -80,21 +80,41 @@ object Widgets {
     )
 
     /**
-     * 홈 화면에 설치한 S-DAY 앱(크롬이 만든 앱)이 있으면 그 앱으로, 없으면 브라우저로.
-     * 그 주소를 여는 앱 중 아무 사이트나 여는 브라우저가 아닌 것을 고른다.
+     * 홈 화면에 설치한 S-DAY 앱(크롬 · 삼성 인터넷이 만든 앱, WebAPK)이 있으면 그 앱으로, 없으면 브라우저로.
+     *  1) 그 주소를 여는 앱 중 아무 사이트나 여는 브라우저가 아닌 것
+     *  2) 없으면 설치된 앱 중 시작 주소가 S-DAY인 WebAPK (메타데이터로 확인)
+     * 찾은 앱이 주소를 바로 못 받으면 그 앱을 그냥 연다 (첫 화면)
      */
+    private var appPkg: String? = null
+    private var appPkgAt = 0L
     fun appIntent(ctx: Context, url: String): Intent {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching {
-            val pm = ctx.packageManager
-            val browsers = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), 0)
+        val pm = ctx.packageManager
+        val pkg = findApp(ctx) ?: return intent
+        intent.setPackage(pkg)
+        if (intent.resolveActivity(pm) != null) return intent
+        return pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    private fun findApp(ctx: Context): String? {
+        // 몇 분 동안은 찾은 결과를 다시 씀 (위젯을 그릴 때마다 찾지 않게)
+        if (System.currentTimeMillis() - appPkgAt < 5 * 60_000L) return appPkg
+        val pm = ctx.packageManager
+        val host = Uri.parse(APP_URL).host ?: ""
+        val found = runCatching {
+            val browsers = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), android.content.pm.PackageManager.MATCH_ALL)
                 .map { it.activityInfo.packageName }.toSet()
-            val app = pm.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_ALL)
+            pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL)), android.content.pm.PackageManager.MATCH_ALL)
                 .map { it.activityInfo.packageName }
                 .firstOrNull { it !in browsers && it != ctx.packageName }
-            if (app != null) intent.setPackage(app)
-        }
-        return intent
+                ?: pm.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA).firstOrNull { app ->
+                    val md = app.metaData ?: return@firstOrNull false
+                    val start = md.getString("org.chromium.webapk.shell_apk.startUrl") ?: md.getString("org.chromium.webapk.shell_apk.scope") ?: ""
+                    app.packageName != ctx.packageName && start.contains(host)
+                }?.packageName
+        }.getOrNull()
+        appPkg = found; appPkgAt = System.currentTimeMillis()
+        return found
     }
 
     /** 캐시된 내용(없으면 error 문구)으로 모든 위젯을 다시 그린다. 타이머가 끝나는 시각(ms)을 돌려줌 */
