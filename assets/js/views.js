@@ -185,10 +185,11 @@ export function renderCalendar(root, tasks, ctx) {
 
     list.slice(0, 3).forEach(t => {
       const lv = dday(t, ctx.now).level;
-      const label = isExam(t) ? `${timeRange(t).split('–')[0]} ${displayTitle(t)}` : t.title;
+      // 시험은 시작 시각을 앞에 (폰에서는 좁아서 시각은 빼고)
+      const label = isExam(t) ? [h('span', { class: 'pill-time' }, `${timeRange(t).split('–')[0]} `), displayTitle(t)] : t.title;
       const tip = [t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
       cell.append(h('span', {
-        class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''}`, title: tip,
+        class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''} k-${isExam(t) ? 'exam' : t.kind === 'todo' ? 'todo' : 'assignment'}${t.done ? ' is-done' : ''}`, title: tip,
         onclick: e => { e.stopPropagation(); ctx.onOpen(t); },
       },
         h('i', { style: { background: subjectColor(t.subject) } }),

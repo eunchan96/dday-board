@@ -2251,3 +2251,30 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 :root[data-theme="dark"] { --sat: #7FA6FF; }
 .cal-dow.sat, .cal-day.sat .num { color: var(--sat); }
 .btn.flash-ok { color: var(--green) !important; border-color: color-mix(in srgb, var(--green) 40%, var(--rule)) !important; }
+
+/* ═════ 폰 캘린더: 점 대신 일정 이름 (위젯처럼 종류 색 줄, 흰 글자, 끝낸 건 취소선) ═════ */
+:root { --k-exam: #E5484D; --k-assignment: #F0B000; --k-todo: #3D6BE0; }
+@media (max-width: 640px) {
+  .cal-day { min-height: 76px; padding: 2px 1px 3px; align-items: stretch; gap: 2px; }
+  .cal-day .num { align-self: center; width: 22px; height: 22px; font-size: 12px; }
+  .cal-dots { display: none !important; }
+  .cal-day .cal-pill {
+    display: block !important; pointer-events: none; padding: 0 2px; border-radius: 3px; box-shadow: none;
+    font-size: 9.5px; font-weight: 650; line-height: 14px; color: #fff !important; background: var(--k-assignment) !important;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cal-day .cal-pill i { display: none; }
+  .cal-day .cal-pill span { color: #fff !important; }
+  .cal-day .cal-pill.k-exam { background: var(--k-exam) !important; }
+  .cal-day .cal-pill.k-todo { background: var(--k-todo) !important; }
+  .cal-day .cal-pill.is-done span { text-decoration: line-through; }
+  .cal-day .cal-more { display: block !important; font-size: 9.5px; line-height: 12px; padding-left: 2px; color: var(--pencil); }
+}
+@media (max-width: 640px) { .cal-day .cal-pill .pill-time { display: none; } }
+.cal-pill .pill-time { overflow: visible !important; }
+/* 옆으로 밀어 탭을 넘길 때 살짝 따라 들어오는 움직임 */
+@keyframes swipe-in-l { from { transform: translateX(24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes swipe-in-r { from { transform: translateX(-24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+.app.swipe-left #view, .app.swipe-left #viewStudy { animation: swipe-in-l 180ms ease-out; }
+.app.swipe-right #view, .app.swipe-right #viewStudy { animation: swipe-in-r 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .app.swipe-left #view, .app.swipe-right #view, .app.swipe-left #viewStudy, .app.swipe-right #viewStudy { animation: none; } }

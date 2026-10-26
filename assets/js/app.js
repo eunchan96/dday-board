@@ -785,6 +785,36 @@ function toggleMode() {
   setView(state.prefs.mode === 'study' ? state.prefs.view : studyTab());
 }
 
+/* ───── 폰: 옆으로 밀어서 탭 넘기기 (목록 ⇔ 캘린더 ⇔ 공부 오늘 ⇔ 기록) ───── */
+const SWIPE_ORDER = ['list', 'calendar', 'study', 'records'];
+function initSwipe() {
+  let s = null;
+  // 가로로 움직이는 것(입력 칸, 타임라인, 가로 스크롤, 창, 펼친 목록) 위에서 시작한 건 넘기기로 치지 않음
+  const SKIP = 'input, textarea, select, [contenteditable], .tl-wrap, .editable, .yg-scroll, .segmented, .sp-pop, .amb-pop, .scope-pop, .flt-pop, dialog, .panel, .picker, [data-noswipe]';
+  document.addEventListener('touchstart', e => {
+    s = null;
+    if (e.touches.length !== 1 || !matchMedia('(max-width: 900px)').matches) return;
+    if (document.querySelector('dialog[open]') || !$('#panel').hidden || document.body.classList.contains('search-open')) return;
+    if (e.target.closest(SKIP)) return;
+    const t = e.touches[0];
+    s = { x: t.clientX, y: t.clientY, at: Date.now() };
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!s) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y, dt = Date.now() - s.at;
+    s = null;
+    if (dt > 700 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    const i = SWIPE_ORDER.indexOf(curHash());
+    const j = i + (dx < 0 ? 1 : -1);
+    if (i < 0 || j < 0 || j >= SWIPE_ORDER.length) return;
+    const main = $('.app');
+    main.classList.remove('swipe-left', 'swipe-right'); void main.offsetWidth;
+    main.classList.add(dx < 0 ? 'swipe-left' : 'swipe-right');
+    setView(SWIPE_ORDER[j]);
+  }, { passive: true });
+}
+
 /* ───── 상태 표시 ───── */
 let notice = null, noticeTimer = null;
 function renderStatus() {
@@ -1458,6 +1488,7 @@ function bind() {
   $$('.views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   $$('#modeBtn .ms-opt').forEach(o => o.addEventListener('click', () => { if ((o.dataset.m === 'study') !== (state.prefs.mode === 'study')) toggleMode(); }));
   $('#btnFriends').addEventListener('click', openFriends);
+  initSwipe();
   $('#friendsClose').addEventListener('click', () => $('#friendsDialog').close());
   // 창(설정 · 친구 · 공지 · 과목 수정 등) 바깥을 누르면 닫기
   // 창 안에서 누르기 시작해 바깥에서 뗀 경우(글자 고르기 등)는 닫지 않음

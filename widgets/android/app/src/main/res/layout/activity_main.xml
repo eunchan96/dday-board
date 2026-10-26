@@ -63,6 +63,13 @@
             android:layout_marginTop="16dp"
             android:textColor="@color/pencil"
             android:textSize="14sp" />
+        <TextView
+            android:id="@+id/open_target"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="@color/pencil"
+            android:textSize="13sp" />
 
         <TextView
             android:layout_width="match_parent"

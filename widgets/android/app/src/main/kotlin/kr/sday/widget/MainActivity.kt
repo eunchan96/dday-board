@@ -15,6 +15,12 @@ import kotlin.concurrent.thread
 /** 위젯 주소를 넣는 화면 (S-DAY 설정 → 위젯에서 복사한 주소) */
 class MainActivity : Activity() {
 
+    // 이 앱을 열 때마다 위젯 내용도 새로 받기
+    override fun onResume() {
+        super.onResume()
+        if (Store.url(this).isNotBlank()) RefreshWorker.now(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -22,6 +28,14 @@ class MainActivity : Activity() {
         val status = findViewById<TextView>(R.id.status)
         url.setText(Store.url(this))
         if (Store.url(this).isNotBlank()) status.text = "저장된 주소가 있어요. 홈 화면에 S-DAY 위젯을 추가하세요."
+        // 위젯을 누르면 어디로 열리는지 (설치한 S-DAY 앱을 찾았는지) 보여 줌
+        val target = findViewById<TextView>(R.id.open_target)
+        val app = Widgets.findApp(this)
+        target.text = when {
+            app != null -> "위젯을 누르면: 설치한 S-DAY 앱 ($app)"
+            packageManager.getLaunchIntentForPackage("com.sec.android.app.sbrowser") != null -> "위젯을 누르면: 삼성 인터넷 (설치한 S-DAY 앱을 찾지 못했어요)"
+            else -> "위젯을 누르면: 기본 브라우저 (설치한 S-DAY 앱을 찾지 못했어요)"
+        }
 
         findViewById<Button>(R.id.paste).setOnClickListener {
             val clip = (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).primaryClip

@@ -35,7 +35,16 @@ abstract class BaseWidget : AppWidgetProvider() {
 
     override fun onReceive(ctx: Context, intent: Intent) {
         super.onReceive(ctx, intent)
-        if (intent.action == Widgets.ACTION_REFRESH) RefreshWorker.now(ctx)
+        if (intent.action == Widgets.ACTION_REFRESH) {
+            val done = goAsync()
+            Widgets.setSyncing(ctx, true)
+            Thread {
+                val error = try { Api.fetch(ctx); null } catch (e: WidgetError) { e.message } catch (e: Exception) { "불러오지 못했어요" }
+                Widgets.setSyncing(ctx, false)
+                Widgets.render(ctx, error)
+                done.finish()
+            }.start()
+        }
         // 캘린더 위젯의 ‹ › · 오늘: 보는 달만 바꿔 다시 그림 (인터넷 없이)
         if (intent.action == Widgets.ACTION_CAL) {
             val shift = intent.getIntExtra("shift", 0)
@@ -75,46 +84,56 @@ object Widgets {
         views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx, kind) * 255 / 100)
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
-        ctx, code, appIntent(ctx, APP_URL + hash),
+        ctx, code, Intent(ctx, OpenActivity::class.java).putExtra("url", APP_URL + hash).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
+    /** 위젯마다 있는 새로 고침 버튼 */
+    private fun refresh(ctx: Context, code: Int) = PendingIntent.getBroadcast(
+        ctx, code, Intent(ctx, SdayWidget::class.java).setAction(ACTION_REFRESH),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+    @Volatile private var syncing = false
+    fun setSyncing(ctx: Context, on: Boolean) { syncing = on; if (on) render(ctx) }
+    private fun paintRefresh(views: RemoteViews) = views.setFloat(R.id.refresh, "setAlpha", if (syncing) 0.25f else 0.6f)
 
     /**
-     * 홈 화면에 설치한 S-DAY 앱(크롬 · 삼성 인터넷이 만든 앱, WebAPK)이 있으면 그 앱으로, 없으면 브라우저로.
-     *  1) 그 주소를 여는 앱 중 아무 사이트나 여는 브라우저가 아닌 것
-     *  2) 없으면 설치된 앱 중 시작 주소가 S-DAY인 WebAPK (메타데이터로 확인)
-     * 찾은 앱이 주소를 바로 못 받으면 그 앱을 그냥 연다 (첫 화면)
+     * 위젯을 눌렀을 때 열 곳 (누르는 순간에 찾음)
+     *  1) 홈 화면에 설치한 S-DAY 앱 (크롬 · 삼성 인터넷이 만든 WebAPK: 시작 주소 메타데이터로 확인)
+     *  2) 삼성 인터넷
+     *  3) 기본 브라우저
      */
-    private var appPkg: String? = null
-    private var appPkgAt = 0L
     fun appIntent(ctx: Context, url: String): Intent {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val view = { pkg: String? -> Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).also { if (pkg != null) it.setPackage(pkg) } }
         val pm = ctx.packageManager
-        val pkg = findApp(ctx) ?: return intent
-        intent.setPackage(pkg)
-        if (intent.resolveActivity(pm) != null) return intent
-        return pm.getLaunchIntentForPackage(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        findApp(ctx)?.let { pkg ->
+            val i = view(pkg)
+            if (i.resolveActivity(pm) != null) return i
+            pm.getLaunchIntentForPackage(pkg)?.let { return it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        }
+        for (pkg in SAMSUNG) {
+            val i = view(pkg)
+            if (i.resolveActivity(pm) != null) return i
+        }
+        return view(null)
     }
+    private val SAMSUNG = listOf("com.sec.android.app.sbrowser", "com.sec.android.app.sbrowser.beta")
 
-    private fun findApp(ctx: Context): String? {
-        // 몇 분 동안은 찾은 결과를 다시 씀 (위젯을 그릴 때마다 찾지 않게)
-        if (System.currentTimeMillis() - appPkgAt < 5 * 60_000L) return appPkg
+    /** 설치된 S-DAY 앱(WebAPK) 패키지 이름. 없으면 null */
+    fun findApp(ctx: Context): String? {
         val pm = ctx.packageManager
-        val host = Uri.parse(APP_URL).host ?: ""
-        val found = runCatching {
-            val browsers = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/")), android.content.pm.PackageManager.MATCH_ALL)
-                .map { it.activityInfo.packageName }.toSet()
-            pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL)), android.content.pm.PackageManager.MATCH_ALL)
+        val host = Uri.parse(APP_URL).host ?: return null
+        return runCatching {
+            // 시작 주소 · 범위 메타데이터가 S-DAY인 앱 (크롬 WebAPK)
+            pm.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA).firstOrNull { app ->
+                if (app.packageName == ctx.packageName) return@firstOrNull false
+                val md = app.metaData ?: return@firstOrNull false
+                md.keySet().any { k -> k.contains("webapk", ignoreCase = true) && (md.get(k)?.toString() ?: "").contains(host) }
+            }?.packageName
+            // 그 주소를 직접 받겠다고 한 앱 중 이름에 webapk가 들어간 것 (삼성 인터넷 등)
+            ?: pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL)), android.content.pm.PackageManager.MATCH_ALL)
                 .map { it.activityInfo.packageName }
-                .firstOrNull { it !in browsers && it != ctx.packageName }
-                ?: pm.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA).firstOrNull { app ->
-                    val md = app.metaData ?: return@firstOrNull false
-                    val start = md.getString("org.chromium.webapk.shell_apk.startUrl") ?: md.getString("org.chromium.webapk.shell_apk.scope") ?: ""
-                    app.packageName != ctx.packageName && start.contains(host)
-                }?.packageName
+                .firstOrNull { it.contains("webapk", ignoreCase = true) }
         }.getOrNull()
-        appPkg = found; appPkgAt = System.currentTimeMillis()
-        return found
     }
 
     /** 캐시된 내용(없으면 error 문구)으로 모든 위젯을 다시 그린다. 타이머가 끝나는 시각(ms)을 돌려줌 */
@@ -135,6 +154,7 @@ object Widgets {
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget)
         applyOpacity(ctx, views, "upcoming")
+        views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 20)); paintRefresh(views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#list", 0))
         val list = data?.upcoming.orEmpty()
         views.setViewVisibility(R.id.empty, if (list.isEmpty()) View.VISIBLE else View.GONE)
@@ -173,6 +193,7 @@ object Widgets {
         for (id in ids) {
             val views = RemoteViews(ctx.packageName, R.layout.widget_calendar)
             applyOpacity(ctx, views, "calendar")
+            views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 22)); paintRefresh(views)
             views.setTextViewText(R.id.cal_month, if (month.year == today.year) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월")
             views.setTextViewText(R.id.cal_today, today.dayOfMonth.toString())
             views.setOnClickPendingIntent(R.id.cal_prev, shift(10, -1))
@@ -198,6 +219,7 @@ object Widgets {
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget_study)
         applyOpacity(ctx, views, "study")
+        views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 21)); paintRefresh(views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 1))
         if (data == null) {
             views.setTextViewText(R.id.today, "—")
@@ -217,10 +239,7 @@ object Widgets {
         val views = RemoteViews(ctx.packageName, R.layout.widget_timer)
         applyOpacity(ctx, views, "timer")
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 2))
-        views.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(
-            ctx, 3, Intent(ctx, TimerWidget::class.java).setAction(ACTION_REFRESH),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        ))
+        views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 3)); paintRefresh(views)
         var timerEnd: Long? = null
         var shown = false
         val t = data?.timer
