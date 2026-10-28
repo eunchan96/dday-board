@@ -31,7 +31,7 @@ type Submission = {
   attachments?: Attachment[]; url?: string | null; missing?: boolean; excused?: boolean;
 };
 type Assignment = {
-  id: number; name?: string; due_at?: string | null; course_id?: number; submission?: Submission;
+  id: number; name?: string; due_at?: string | null; lock_at?: string | null; course_id?: number; submission?: Submission;
 };
 
 const courseName = (s?: string) => String(s ?? "").replace(/\s*\(\s*\d+\s*\)\s*$/, "").trim();
@@ -174,9 +174,25 @@ export async function fetchLectures(base: string, token: string, courses: Course
       items = d.flatMap((m: { module_items?: LxItem[] }) => Array.isArray(m?.module_items) ? m.module_items : []);
     } catch { continue; }
     for (const it of items) {
-      // 강의 영상(학습 항목)만. 과제 · 퀴즈는 과제 쪽에서 가져온다
+      const cd = it?.content_data ?? {};
+      // 학습 목록에만 기한이 적힌 과제 · 퀴즈 (Canvas 과제 목록에서 못 찾은 것만 나중에 더함)
+      if ((it?.content_type === 'assignment' || it?.content_type === 'quiz') && it.content_id) {
+        const due = typeof cd.due_at === 'string' ? cd.due_at : null;
+        const title = clean(it.title).slice(0, 200);
+        if (!due || !title || Math.abs(new Date(due).getTime() - now) > 120 * 864e5) continue;
+        out.push({
+          id: it.content_type === 'assignment' ? `canvas-${it.content_id}` : `canvas-lxq${it.content_id}`,
+          title,
+          subject: courseName(c.name).slice(0, 40),
+          due,
+          link: it.module_item_id ? `${base}/courses/${c.id}/modules/items/${it.module_item_id}` : `${base}/courses/${c.id}/modules`,
+          submitted: it.completed === true,
+          missing: false,
+        });
+        continue;
+      }
+      // 강의 영상(학습 항목)
       if (it?.content_type !== 'attendance_item' || !it.content_id) continue;
-      const cd = it.content_data ?? {};
       // 진도를 세지 않는 영상은 봤는지 알 수 없어서 넣지 않음
       if (cd.omit_progress === true) continue;
       const due = typeof cd.due_at === 'string' ? cd.due_at : null;
@@ -213,27 +229,71 @@ export async function fetchCanvasApi(origin: string, token: string): Promise<{ i
       continue;   // 과제 목록을 막아 둔 과목은 건너뜀
     }
     for (const a of list) {
-      if (!a?.id || !a.due_at) continue;
+      // 마감이 없고 '이용 기간'만 정해 둔 과제는 닫히는 시각을 마감으로 본다
+      const due = a?.due_at || (a?.lock_at && Date.parse(a.lock_at) > Date.now() ? a.lock_at : null);
+      if (!a?.id || !due) continue;
       const title = clean(a.name).slice(0, 200);
       if (!title) continue;
       items.set(`canvas-${a.id}`, {
         id: `canvas-${a.id}`,
         title,
         subject: courseName(c.name).slice(0, 40),
-        due: a.due_at,
+        due,
         link: `${base}/courses/${c.id}/assignments/${a.id}`,
         ...submissionInfo(a.submission),
       });
     }
   }
+  // 플래너: 나에게 적용되는 마감(반별 · 개인 연장 등 따로 정한 마감 포함). 과제 목록의 마감이 비었거나 다르면 이쪽을 따름
+  try {
+    const names = new Map([...active, ...past].map((c) => [c.id, courseName(c.name).slice(0, 40)]));
+    for (const p of await fetchPlanner(base, token)) {
+      const aid = p.plannable_type === "assignment" ? p.plannable_id : p.plannable?.assignment_id;
+      if (!aid || !p.plannable_date || !p.course_id || !names.has(p.course_id)) continue;
+      const id = `canvas-${aid}`;
+      const cur = items.get(id);
+      const sub = p.submissions || {};
+      if (cur) { cur.due = p.plannable_date; continue; }
+      const title = clean(p.plannable?.title).slice(0, 200);
+      if (!title) continue;
+      items.set(id, {
+        id, title, subject: names.get(p.course_id)!, due: p.plannable_date,
+        link: `${base}/courses/${p.course_id}/assignments/${aid}`,
+        submitted: !!sub.submitted, missing: !!sub.missing && !sub.excused,
+      });
+    }
+  } catch (e) {
+    if (e instanceof CanvasApiError && e.message === "token_invalid") throw e;
+    console.error("planner failed", e instanceof Error ? e.message : e);
+  }
   // 강의 영상은 지금 듣는 과목만 (실패해도 과제는 그대로)
   try {
-    for (const it of await fetchLectures(base, token, active)) if (!items.has(it.id)) items.set(it.id, it);
+    const seen = new Set([...items.values()].map((v) => `${v.subject}|${v.title}`));
+    for (const it of await fetchLectures(base, token, active)) {
+      if (items.has(it.id)) continue;
+      if (it.kind !== 'todo' && seen.has(`${it.subject}|${it.title}`)) continue;   // 퀴즈가 과제 목록에도 있으면 한 번만
+      items.set(it.id, it);
+    }
   } catch (e) {
     if (e instanceof CanvasApiError && e.message === 'token_invalid') throw e;
     console.error('lectures failed', e instanceof Error ? e.message : e);
   }
   return { items: [...items.values()], active };
+}
+
+/* ───── 플래너 (한 달 전 ~ 넉 달 뒤) ───── */
+type PlannerItem = {
+  plannable_id?: number; plannable_type?: string; plannable_date?: string | null; course_id?: number;
+  plannable?: { title?: string; assignment_id?: number };
+  submissions?: { submitted?: boolean; missing?: boolean; excused?: boolean } | false;
+};
+async function fetchPlanner(base: string, token: string): Promise<(PlannerItem & { submissions: { submitted?: boolean; missing?: boolean; excused?: boolean } })[]> {
+  const day = (ms: number) => new Date(Date.now() + ms).toISOString().slice(0, 10);
+  const list = await getAll<PlannerItem>(
+    `${base}/api/v1/planner/items?start_date=${day(-30 * 864e5)}&end_date=${day(120 * 864e5)}&per_page=100`, token, 10);
+  return list
+    .filter((p) => ["assignment", "quiz", "discussion_topic"].includes(p.plannable_type ?? ""))
+    .map((p) => ({ ...p, submissions: p.submissions || {} }));
 }
 
 /* ───── 공지 ───── */
@@ -254,12 +314,14 @@ export async function fetchAnnouncements(origin: string, token: string, courses:
   const base = origin.replace(/\/+$/, "");
   const names = new Map(courses.map((c) => [`course_${c.id}`, courseName(c.name)]));
   const start = new Date(Date.now() - 30 * 864e5).toISOString();
+  // end_date를 안 주면 Canvas가 start_date + 28일까지만 돌려줘서 최근 이틀 공지가 빠졌음
+  const end = new Date(Date.now() + 864e5).toISOString();
   const out: NoticeItem[] = [];
   // 한 번에 너무 많은 과목을 넣지 않게 10개씩
   for (let i = 0; i < courses.length; i += 10) {
     const codes = courses.slice(i, i + 10).map((c) => `context_codes[]=course_${c.id}`).join("&");
     const list = await getAll<Announcement>(
-      `${base}/api/v1/announcements?${codes}&start_date=${encodeURIComponent(start)}&per_page=50`, token, 3);
+      `${base}/api/v1/announcements?${codes}&start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}&per_page=50`, token, 3);
     for (const a of list) {
       if (!a?.id || !a.posted_at) continue;
       out.push({
