@@ -10,9 +10,18 @@ import android.text.TextPaint
 import android.text.TextUtils
 import java.time.LocalDate
 
-/** 캘린더 위젯의 달력 그림: 요일, 가운데 맞춘 날짜, 그날 일정 이름을 한 줄씩 (줄 배경이 종류 색, 글자 흰색, 끝낸 건 취소선) */
+/** 캘린더 위젯의 달력 그림: 요일, 가운데 맞춘 날짜, 그날 일정 이름을 한 줄씩 (줄 배경이 종류 파스텔 색, 끝낸 건 취소선) */
 object CalendarDraw {
     private fun kindColor(kind: String) = when (kind) { "exam" -> R.color.kind_exam; "todo" -> R.color.kind_todo; else -> R.color.kind_assignment }
+
+    /** 종류 색(기타는 정한 색). 파스텔 줄 배경 = 종류 색을 바탕색에 섞음, 글자 = 종류 색을 글자색에 섞음 */
+    fun baseColor(ctx: Context, kind: String, hex: String?): Int =
+        hex?.let { runCatching { android.graphics.Color.parseColor(it) }.getOrNull() } ?: ctx.getColor(kindColor(kind))
+
+    fun mix(a: Int, b: Int, t: Float): Int {
+        fun ch(sh: Int) = ((((a shr sh) and 255) * t + ((b shr sh) and 255) * (1 - t)).toInt().coerceIn(0, 255)) shl sh
+        return (0xFF shl 24) or ch(16) or ch(8) or ch(0)
+    }
 
     fun draw(ctx: Context, w: Int, h: Int, s: Float, month: LocalDate, today: LocalDate, items: Map<String, List<CalItem>>): Bitmap {
         val bmp = Bitmap.createBitmap(w.coerceAtLeast(50), h.coerceAtLeast(50), Bitmap.Config.ARGB_8888)
@@ -23,7 +32,7 @@ object CalendarDraw {
 
         val ink = ctx.getColor(R.color.ink); val faint = ctx.getColor(R.color.faint); val rule = ctx.getColor(R.color.rule)
         val pencil = ctx.getColor(R.color.pencil); val red = ctx.getColor(R.color.red); val pen = ctx.getColor(R.color.pen)
-        val blue = ctx.getColor(R.color.saturday)
+        val blue = ctx.getColor(R.color.saturday); val sheet = ctx.getColor(R.color.sheet)
         val dayColor = { i: Int -> when (i % 7) { 0 -> red; 6 -> blue; else -> ink } }
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -69,17 +78,18 @@ object CalendarDraw {
             val room = ((y0 + rowH - pad - y) / (lineH + gap)).toInt().coerceAtLeast(0)
             val show = if (list.size > room) (room - 1).coerceAtLeast(0) else list.size
             for (it in list.take(show)) {
-                // 지난 일정 · 다른 달도 종류 색 그대로, 글자는 모두 흰색. 끝낸 일정은 취소선
-                fill.color = ctx.getColor(kindColor(it.kind))
+                // 지난 일정 · 다른 달도 종류 색(파스텔) 그대로. 끝낸 일정은 흐리게 + 취소선
+                val base = baseColor(ctx, it.kind, it.color)
+                fill.color = mix(base, sheet, 0.42f); fill.alpha = if (it.done) 160 else 255
                 c.drawRoundRect(RectF(x0 + pad, y, x0 + colW - pad, y + lineH), 2.5f * s, 2.5f * s, fill)
-                item.color = 0xFFFFFFFF.toInt()
+                item.color = mix(base, ink, 0.5f); item.alpha = if (it.done) 170 else 255
                 item.isStrikeThruText = it.done
                 val text = TextUtils.ellipsize(it.title, item, colW - pad * 2 - 4f * s, TextUtils.TruncateAt.END)
                 c.drawText(text, 0, text.length, x0 + pad + 2f * s, y + lineH * 0.76f, item)
                 y += lineH + gap
             }
             if (show < list.size && room > 0) {
-                item.color = pencil; item.isStrikeThruText = false
+                item.color = pencil; item.alpha = 255; item.isStrikeThruText = false
                 c.drawText("+${list.size - show}", x0 + pad + 2f * s, y + lineH * 0.76f, item)
             }
         }

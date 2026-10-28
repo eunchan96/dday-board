@@ -10,8 +10,8 @@
     <color name="red">#D23F3F</color>
     <color name="exam">#7B4FD6</color>
     <color name="launcher_bg">#2C4BD1</color>
-    <color name="kind_exam">#E5484D</color>
-    <color name="kind_assignment">#F0B000</color>
-    <color name="kind_todo">#3D6BE0</color>
+    <color name="kind_exam">#F08A8D</color>
+    <color name="kind_assignment">#F2C55C</color>
+    <color name="kind_todo">#7FA2EE</color>
     <color name="saturday">#2C6BE0</color>
 </resources>

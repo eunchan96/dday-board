@@ -32,12 +32,25 @@ const C = {
   green: dyn('#1F8A5B', '#3FBF85'),
   red: dyn('#D23F3F', '#FF7A7A'),
 };
-// 일정 종류 색: 시험 빨강 · 과제 노랑 · 할 일 파랑
-const KIND_COLOR = {
-  exam: dyn('#E5484D', '#FF6B6B'),
-  assignment: dyn('#F0B000', '#FFD23F'),
-  todo: dyn('#3D6BE0', '#7C9BFF'),
+// 일정 종류 색(파스텔): 시험 빨강 · 과제 노랑 · 할 일 파랑, 기타는 정한 색
+const KIND_HEX = {
+  exam: ['#F08A8D', '#F58E91'],
+  assignment: ['#F2C55C', '#F2CD6A'],
+  todo: ['#7FA2EE', '#8FAAF5'],
 };
+// 두 색 섞기: t는 a의 비율
+function mixHex(a, b, t) {
+  const p = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return '#' + x.map((v, i) => Math.round(v * t + y[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
+}
+const baseHex = it => {
+  if (it.c && /^#[0-9A-Fa-f]{6}$/.test(it.c)) return [it.c, it.c];
+  return KIND_HEX[it.kind] || KIND_HEX.assignment;
+};
+const kindColor = it => { const [l, d] = baseHex(it); return dyn(l, d); };
+const pillBg = it => { const [l, d] = baseHex(it); return dyn(mixHex(l, '#FFFFFF', 0.42), mixHex(d, '#161B29', 0.42)); };
+const pillInk = it => { const [l, d] = baseHex(it); return dyn(mixHex(l, '#1C2540', 0.5), mixHex(d, '#E6EAF3', 0.5)); };
 
 function setup() {
   const p = ((typeof args !== 'undefined' && args.widgetParameter) || '').trim();
@@ -201,7 +214,7 @@ function upcomingWidget(w, d, now, fam) {
     const row = w.addStack(); row.centerAlignContent();
     const bar = row.addStack();
     bar.size = new Size(4, sub ? 30 : (fam === 'small' ? 15 : 18)); bar.cornerRadius = 2;
-    bar.backgroundColor = KIND_COLOR[t.kind] || KIND_COLOR.assignment;
+    bar.backgroundColor = kindColor(t);
     row.addSpacer(8);
     const col = row.addStack(); col.layoutVertically();
     text(col, titleOf(t), size, C.ink, 'medium');
@@ -245,7 +258,7 @@ function calendarWidget(w, d, now, fam) {
         if (lines >= 5) break;
         w.addSpacer(2);
         const r = w.addStack(); r.centerAlignContent();
-        const bar = r.addStack(); bar.size = new Size(3, 12); bar.cornerRadius = 1.5; bar.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
+        const bar = r.addStack(); bar.size = new Size(3, 12); bar.cornerRadius = 1.5; bar.backgroundColor = kindColor(it);
         r.addSpacer(5);
         text(r, it.title, 11.5, C.ink, 'medium');
         lines++;
@@ -309,10 +322,11 @@ function calendarWidget(w, d, now, fam) {
       items.slice(0, show).forEach(it => {
         cell.addSpacer(1);
         const l = cell.addStack(); l.size = new Size(CW - 2, LH); l.cornerRadius = 3; l.setPadding(0, 2, 0, 1); l.centerAlignContent();
-        // 지난 일정 · 다른 달도 종류 색 그대로, 글자는 흰색. 끝낸 일정은 취소선 (글자마다 긋는 선 문자)
-        l.backgroundColor = KIND_COLOR[it.kind] || KIND_COLOR.assignment;
+        // 지난 일정 · 다른 달도 종류 색(파스텔) 그대로. 끝낸 일정은 흐리게 + 취소선 (글자마다 긋는 선 문자)
+        l.backgroundColor = pillBg(it);
         const tt = l.addText(it.done ? strike(it.title) : it.title); tt.font = Font.semiboldSystemFont(8.5); tt.lineLimit = 1;
-        tt.textColor = Color.white();
+        tt.textColor = pillInk(it);
+        if (it.done) tt.textOpacity = 0.65;
         l.addSpacer();
       });
       if (show < items.length) { cell.addSpacer(1); text(cell, `+${items.length - show}`, 8.5, C.pencil, 'bold'); }

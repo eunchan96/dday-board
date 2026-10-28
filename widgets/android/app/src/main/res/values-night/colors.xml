@@ -9,8 +9,8 @@
     <color name="green">#3FBF85</color>
     <color name="red">#FF7A7A</color>
     <color name="exam">#B79BFF</color>
-    <color name="kind_exam">#FF6B6B</color>
-    <color name="kind_assignment">#FFD23F</color>
-    <color name="kind_todo">#7C9BFF</color>
+    <color name="kind_exam">#F58E91</color>
+    <color name="kind_assignment">#F2CD6A</color>
+    <color name="kind_todo">#8FAAF5</color>
     <color name="saturday">#7FA6FF</color>
 </resources>

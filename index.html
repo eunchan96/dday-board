@@ -142,6 +142,7 @@
       <button type="button" role="radio" data-kind="assignment">과제</button>
       <button type="button" role="radio" data-kind="exam">시험</button>
       <button type="button" role="radio" data-kind="todo">할 일</button>
+      <button type="button" role="radio" data-kind="etc">기타</button>
     </div>
     <div class="panel-tools">
       <button type="button" class="btn icon ghost study-start" id="fStudyBtn" title="이걸로 공부 시작" aria-label="이걸로 공부 시작" hidden>
@@ -157,6 +158,7 @@
   </header>
   <div class="panel-body">
     <p class="panel-note" id="panelNote" hidden></p>
+    <div class="etc-picker" id="etcPicker" hidden></div>
     <input type="text" class="title-input" id="fTitle" maxlength="200" autocomplete="off" placeholder="과제 이름" aria-label="이름">
     <div class="quick-dates exam-only" id="examNames" aria-label="시험 이름 빠른 선택"></div>
     <span id="fSubjectSlot"></span>

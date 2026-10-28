@@ -13,6 +13,7 @@ import {
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
+  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, ETC_DEFAULT_COLOR,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import {
@@ -38,6 +39,8 @@ const ui = {
   selectedDay: startOfDay(new Date()),
   editingId: null,
   kind: 'assignment',
+  etcType: null,                                   // 기타 일정의 종류 id
+  etcEdit: null,                                   // 기타 종류 추가 · 수정 중 { id|null, name, color }
 };
 
 const isEmbedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
@@ -98,6 +101,33 @@ function applyOrder(list) {
   setSubjectOrder(subjectOrder);
   storage.set(ORDER_KEY, JSON.stringify(subjectOrder));
 }
+// 과목 줄임말 · 기타 종류 (보드에 저장, 이 기기에도 기억해 두고 바로 그림)
+const SHORT_KEY = 'ddayboard.subjectShort', ETC_KEY = 'ddayboard.etcTypes';
+let shortMap = (() => { try { return JSON.parse(storage.get(SHORT_KEY) || '{}') || {}; } catch { return {}; } })();
+setSubjectShorts(shortMap);
+try { setEtcTypes(JSON.parse(storage.get(ETC_KEY) || '[]')); } catch { /* 처음 */ }
+function applyShorts(map) {
+  const next = map && typeof map === 'object' ? map : {};
+  const changed = JSON.stringify(next) !== JSON.stringify(shortMap);
+  shortMap = next; setSubjectShorts(next); storage.set(SHORT_KEY, JSON.stringify(next));
+  return changed;
+}
+function applyEtc(list) {
+  if (!Array.isArray(list)) return false;
+  const changed = JSON.stringify(list) !== JSON.stringify(etcTypes());
+  setEtcTypes(list); storage.set(ETC_KEY, JSON.stringify(list));
+  return changed;
+}
+async function saveShort(name, value) {
+  const v = value.trim().slice(0, 10);
+  if ((shortMap[name] || '') === (v === name ? '' : v)) return;
+  const prev = shortMap;
+  applyShorts(v && v !== name ? { ...shortMap, [name]: v } : Object.fromEntries(Object.entries(shortMap).filter(([k]) => k !== name)));
+  renderAll();
+  try { applyShorts(await api.setSubjectShort(state.code, name, v)); renderAll(); toast(v && v !== name ? `"${name}" 줄임말: ${v}` : `"${name}" 줄임말을 지웠어요`); }
+  catch (e) { applyShorts(prev); renderAll(); renderSubjectEditor(); toast(errText(e)); }
+}
+
 async function loadColors() {
   if (!state.code) return;
   try {
@@ -115,7 +145,8 @@ async function loadColors() {
     if (extra.length && state.tasks.length) api.setCustomSubjects(state.code, custom).catch(() => {});
     const groupsChanged = applyServerGroups(prefs.groups);
     applyColors(map); applyOrder(order);
-    if (changedAny || groupsChanged) { renderAll(); renderColors(); }
+    const extrasChanged = applyShorts(prefs.short) | applyEtc(prefs.etc);
+    if (changedAny || groupsChanged || extrasChanged) { renderAll(); renderColors(); }
   } catch { /* 다음에 다시 */ }
 }
 // 설정 → 과목 목록: 고른 보기(지금 · 분류 · 전체)의 과목. 순서는 하나로 저장하고 보이는 과목끼리만 바꾼다
@@ -293,6 +324,12 @@ function openSubjectEditor(name) {
 async function renameSubject(from, to) {
   try {
     await api.renameSubject(state.code, from, to);
+    // 줄임말도 새 이름으로 옮김
+    const short = subjectShortOf(from);
+    if (short) {
+      await api.setSubjectShort(state.code, from, '').catch(() => {});
+      if (!subjectShortOf(to)) await api.setSubjectShort(state.code, to, short).catch(() => {});
+    }
     colorOpen = to;
     if (state.prefs.subject === from) state.prefs.subject = to;
     await Promise.all([pull(), loadColors()]);
@@ -357,6 +394,14 @@ function renderSubjectEditor() {
           type: 'button', class: 'swatch', role: 'radio', 'aria-checked': cur === c.toUpperCase() ? 'true' : 'false',
           style: { '--s': c }, 'aria-label': `색 ${c}`, onclick: () => setColor(name, c),
         })))),
+    isNew ? null : (() => {
+      const inp = h('input', { type: 'text', class: 'sd-short', maxlength: 10, value: subjectShortOf(name), placeholder: name.slice(0, 4), 'aria-label': `${name} 줄임말`, autocomplete: 'off' });
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); inp.blur(); } });
+      inp.addEventListener('change', () => saveShort(name, inp.value));
+      return h('section', { class: 'sd-sec sd-row' },
+        h('div', null, h('h4', null, '줄임말'), h('p', { class: 'sd-note' }, '캘린더 · 위젯처럼 좁은 곳에서 대신 써요')),
+        inp);
+    })(),
     h('section', { class: 'sd-sec' },
       h('h4', null, '분류', h('span', { class: 'sd-note' }, !isNew && !members.length ? (implicit.length ? '마감 날짜로 정해짐' : '미분류') : '')),
       h('div', { class: 'sd-groups' },
@@ -630,7 +675,7 @@ function buildFilter(subjects, pendingAll) {
     onclick: () => { fltOpen = !fltOpen; renderRail(); },
   },
   h('svg-slot'),
-  h('i', { class: 'flt-dot' }), h('span', { class: 'flt-label' }, label),
+  cur === null ? null : h('i', { class: 'flt-dot' }), h('span', { class: 'flt-label' }, label),
   opts.length ? h('span', { class: 'flt-opts' }, opts.join(' · ')) : null);
   btn.querySelector('svg-slot').outerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/></svg>';
   const clear = cur !== null || opts.length ? h('button', {
@@ -644,7 +689,7 @@ function buildFilter(subjects, pendingAll) {
     const li = h('li', null, h('button', {
       type: 'button', class: 'flt-item', role: 'radio', 'aria-checked': on ? 'true' : 'false', style: { '--c': color },
       onclick: () => { fltOpen = false; setPref('subject', value); },
-    }, h('i', { class: 'flt-dot' }), h('span', { class: 'flt-name' }, name), h('span', { class: 'flt-count' }, count), h('span', { class: 'flt-check' })));
+    }, h('i', { class: color ? 'flt-dot' : 'flt-dot none' }), h('span', { class: 'flt-name' }, name), h('span', { class: 'flt-count' }, count), h('span', { class: 'flt-check' })));
     if (on) li.querySelector('.flt-check').innerHTML = CHECK_SVG;
     return li;
   };
@@ -653,7 +698,7 @@ function buildFilter(subjects, pendingAll) {
   const pop = fltOpen ? h('div', { class: 'flt-pop', role: 'dialog', 'aria-label': '필터' },
     h('div', { class: 'flt-sem' }, scopeChips(v => { fltOpen = false; setScope(v); })),
     h('ul', { class: 'flt-list', role: 'radiogroup', 'aria-label': '과목' },
-      subjRow('전체 과목', null, pendingAll, 'var(--ink)'),
+      subjRow('전체 과목', null, pendingAll, null),
       subjects.map(([name, c]) => subjRow(name || '과목 없음', name, c.pending, subjectColor(name)))),
     h('div', { class: 'flt-toggles' },
       toggle('시험만', state.prefs.kind === 'exam', v => setPref('kind', v ? 'exam' : null)),
@@ -898,14 +943,21 @@ function renderNoticeBtn() {
   $('#noticeDot').hidden = !unread;
   $('#btnNotices').title = unread ? `새 공지 ${unread}개` : '스마트캠퍼스 공지';
 }
-function openNotices() {
+function fillNotices() {
   const list = $('#noticeList');
   fill(list, notices.list.length ? notices.list.map(n => h('li', { class: n.read ? 'notice' : 'notice unread', style: { '--c': subjectColor(n.subject) } },
     h('div', { class: 'notice-meta' }, n.subject ? h('span', null, n.subject) : null, h('span', null, fmtAgo(new Date(n.postedAt)))),
     n.url ? h('a', { class: 'notice-title', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title) : h('b', { class: 'notice-title' }, n.title),
     n.preview ? h('p', { class: 'notice-preview' }, n.preview) : null,
   )) : h('li', { class: 'notice-empty' }, '최근 30일 공지가 없어요.'));
+}
+async function openNotices() {
+  fillNotices();
   $('#noticesDialog').showModal();
+  // 열 때마다 새로 불러옴 (서버에서 방금 가져온 공지까지)
+  const before = notices.list.map(n => n.id).join();
+  await loadNotices();
+  if ($('#noticesDialog').open && notices.list.map(n => n.id).join() !== before) fillNotices();
   if (notices.list.some(n => !n.read)) {
     api.noticesRead(state.code).catch(() => {});
     notices.list = notices.list.map(n => ({ ...n, read: true }));
@@ -1111,9 +1163,10 @@ function setKind(kind, { isNew }) {
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);
   $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
-  const name = exam ? '시험' : kind === 'todo' ? '할 일' : '과제';
+  const name = exam ? '시험' : kind === 'todo' ? '할 일' : kind === 'etc' ? '일정' : '과제';
   $('#panelTitle').textContent = isNew ? `새 ${name}` : `${name} 수정`;
-  $('#fTitle').placeholder = exam ? '시험 이름' : kind === 'todo' ? '할 일 (예: 3주차 강의 듣기)' : '과제 이름';
+  $('#fTitle').placeholder = exam ? '시험 이름' : kind === 'todo' ? '할 일 (예: 3주차 강의 듣기)' : kind === 'etc' ? '일정 이름 (비우면 종류 이름으로)' : '과제 이름';
+  renderEtcPicker();
   $('#fMemo').placeholder = exam ? '시험 범위, 준비물' : '메모';
   renderDoneBtn();
   // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
@@ -1125,6 +1178,70 @@ function setKind(kind, { isNew }) {
   }
   if (exam && !$('#fEnd').value) autoEnd(60);
   renderDurations();
+}
+
+/* ───── 기타 종류 고르기 · 추가 · 수정 (상세 패널 안) ───── */
+const ETC_PALETTE = [...new Set([ETC_DEFAULT_COLOR, ...SUBJECT_PALETTE])];
+function renderEtcPicker() {
+  const box = $('#etcPicker');
+  if (!box) return;
+  box.hidden = ui.kind !== 'etc' || $('#kindPicker').hidden;
+  if (box.hidden) { box.replaceChildren(); return; }
+  const list = etcTypes();
+  const edit = ui.etcEdit;
+  if (edit) {
+    const name = h('input', { type: 'text', class: 'etc-name', maxlength: 20, value: edit.name || '', placeholder: '종류 이름 (예: 휴강)', 'aria-label': '종류 이름', autocomplete: 'off' });
+    const msg = h('p', { class: 'msg err' });
+    const save = () => {
+      const n = name.value.trim();
+      if (!n) { msg.textContent = '이름을 적어 주세요'; name.focus(); return; }
+      if (list.some(e => e.name === n && e.id !== edit.id)) { msg.textContent = '이미 있는 종류예요'; name.select(); return; }
+      const id = edit.id || Math.random().toString(36).slice(2, 10);
+      const next = edit.id ? list.map(e => (e.id === id ? { id, name: n, color: edit.color } : e)) : [...list, { id, name: n, color: edit.color }];
+      ui.etcType = id; ui.etcEdit = null;
+      saveEtcTypes(next);
+    };
+    name.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ui.etcEdit = null; renderEtcPicker(); }
+    });
+    name.addEventListener('input', () => { edit.name = name.value; });
+    box.replaceChildren(h('div', { class: 'etc-edit', style: { '--e': edit.color } },
+      h('div', { class: 'etc-edit-top' }, h('i', { class: 'etc-dot' }), name),
+      h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': '종류 색' },
+        ETC_PALETTE.map(c => h('button', {
+          type: 'button', class: 'swatch', role: 'radio', 'aria-checked': edit.color.toUpperCase() === c.toUpperCase() ? 'true' : 'false',
+          style: { '--s': c }, 'aria-label': `색 ${c}`, onclick: () => { edit.color = c; edit.name = name.value; renderEtcPicker(); },
+        }))),
+      msg,
+      h('div', { class: 'etc-actions' },
+        edit.id ? h('button', { type: 'button', class: 'btn sm ghost danger-text', onclick: () => {
+          if (!confirm(`"${edit.name || '종류'}"를 지울까요? 이 종류로 만든 일정은 그냥 '기타'가 돼요.`)) return;
+          if (ui.etcType === edit.id) ui.etcType = null;
+          ui.etcEdit = null;
+          saveEtcTypes(list.filter(e => e.id !== edit.id));
+        } }, '지우기') : null,
+        h('button', { type: 'button', class: 'btn sm', onclick: () => { ui.etcEdit = null; renderEtcPicker(); } }, '취소'),
+        h('button', { type: 'button', class: 'btn sm primary', onclick: save }, edit.id ? '저장' : '추가'))));
+    requestAnimationFrame(() => { if (document.activeElement !== name) name.focus(); });
+    return;
+  }
+  const chip = e => h('button', {
+    type: 'button', class: 'etc-chip', role: 'radio', 'aria-checked': ui.etcType === e.id ? 'true' : 'false', style: { '--e': e.color },
+    onclick: () => { ui.etcType = ui.etcType === e.id ? null : e.id; renderEtcPicker(); },
+  }, h('i', { class: 'etc-dot' }), e.name);
+  const cur = list.find(e => e.id === ui.etcType);
+  box.replaceChildren(h('div', { class: 'etc-chips', role: 'radiogroup', 'aria-label': '기타 종류' },
+    list.map(chip),
+    cur ? h('button', { type: 'button', class: 'etc-chip ghost', title: `${cur.name} 수정`, onclick: () => { ui.etcEdit = { ...cur }; renderEtcPicker(); } }, '수정') : null,
+    h('button', { type: 'button', class: 'etc-chip ghost', onclick: () => { ui.etcEdit = { id: null, name: '', color: ETC_DEFAULT_COLOR }; renderEtcPicker(); } }, list.length ? '+ 종류' : '+ 종류 만들기 (예: 휴강)')));
+}
+async function saveEtcTypes(next) {
+  const prev = etcTypes();
+  setEtcTypes(next); storage.set(ETC_KEY, JSON.stringify(next));
+  renderEtcPicker(); renderAll();
+  try { const out = await api.setEtcTypes(state.code, next); setEtcTypes(out); storage.set(ETC_KEY, JSON.stringify(out)); renderAll(); }
+  catch (e) { setEtcTypes(prev); storage.set(ETC_KEY, JSON.stringify(prev)); renderEtcPicker(); renderAll(); toast(errText(e)); }
 }
 
 function openPanel(task, presetDay, kind) {
@@ -1148,7 +1265,9 @@ function openPanel(task, presetDay, kind) {
   $('#fLocation').value = task ? task.location || '' : '';
   $('#fEnd').value = task && task.endAt ? toTimeInput(new Date(task.endAt)) : '';
   refreshPickLabels();
-  setKind(task ? (isExam(task) ? 'exam' : task.kind === 'todo' ? 'todo' : 'assignment') : (kind || 'assignment'), { isNew: !task });
+  ui.etcType = task && task.kind === 'etc' ? task.etcType || null : null;
+  ui.etcEdit = null;
+  setKind(task ? (isExam(task) ? 'exam' : ['todo', 'etc'].includes(task.kind) ? task.kind : 'assignment') : (kind || 'assignment'), { isNew: !task });
   $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
   $('#fStudyBtn').hidden = !task || !!task.done || groupOf(task) === 'done';
   $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
@@ -1209,13 +1328,16 @@ function renderDoneBtn() {
   const done = $('#fDone').checked;
   btn.classList.toggle('is-done', done);
   const t = state.tasks.find(x => x.id === ui.editingId);
-  btn.textContent = done ? '완료 취소' : ((t && t.missing) || ui.kind === 'todo' ? '완료로 표시' : '제출 완료');
+  btn.textContent = done ? '완료 취소' : ((t && t.missing) || ui.kind === 'todo' || ui.kind === 'etc' ? '완료로 표시' : '제출 완료');
 }
 
 function savePanel() {
-  const title = $('#fTitle').value.trim();
+  let title = $('#fTitle').value.trim();
   const msg = $('#panelMsg');
   msg.className = 'msg err';
+  // 기타: 이름을 비우면 고른 종류 이름으로 (예: 휴강)
+  if (!title && ui.kind === 'etc') title = etcTypes().find(e => e.id === ui.etcType)?.name || '';
+  if (!title && ui.kind === 'etc') { msg.textContent = '일정 이름을 적거나 종류를 골라 주세요'; $('#fTitle').focus(); return; }
   if (!title) { msg.textContent = ui.kind === 'exam' ? '시험 이름을 적어 주세요' : ui.kind === 'todo' ? '할 일을 적어 주세요' : '과제명을 적어 주세요'; $('#fTitle').focus(); return; }
   if (!$('#fDate').value) { msg.textContent = '날짜를 골라 주세요'; $('#fDateBtn').focus(); return; }
   const due = new Date(`${$('#fDate').value}T${$('#fTime').value || '23:59'}`);
@@ -1229,7 +1351,8 @@ function savePanel() {
     endAt = end.toISOString();
   }
   const fields = {
-    kind: exam ? 'exam' : ui.kind === 'todo' ? 'todo' : 'assignment',
+    kind: exam ? 'exam' : ['todo', 'etc'].includes(ui.kind) ? ui.kind : 'assignment',
+    etcType: ui.kind === 'etc' ? ui.etcType || null : null,
     title: title.slice(0, 200),
     subject: subjPick.value.slice(0, 40),
     due: due.toISOString(),

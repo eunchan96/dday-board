@@ -14,6 +14,7 @@ data class Task(
     val due: Instant,
     val missing: Boolean,
     val color: String?,
+    val etcColor: String? = null,
 )
 
 data class Timer(
@@ -25,7 +26,7 @@ data class Timer(
     val label: String,
 )
 
-data class CalItem(val kind: String, val title: String, val done: Boolean)
+data class CalItem(val kind: String, val title: String, val done: Boolean, val color: String? = null)
 
 data class WidgetData(
     val upcoming: List<Task>,
@@ -105,6 +106,7 @@ object Api {
                         due = Instant.parse(t.getString("due")),
                         missing = t.optBoolean("missing", false),
                         color = if (t.isNull("color")) null else t.optString("color"),
+                        etcColor = if (t.isNull("c")) null else t.optString("c"),
                     )
                 )
             }
@@ -125,7 +127,7 @@ object Api {
         o.optJSONArray("month")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val m = arr.getJSONObject(i)
-                month.getOrPut(m.optString("d")) { mutableListOf() }.add(CalItem(m.optString("kind", "assignment"), m.optString("title"), m.optBoolean("done", false)))
+                month.getOrPut(m.optString("d")) { mutableListOf() }.add(CalItem(m.optString("kind", "assignment"), m.optString("title"), m.optBoolean("done", false), if (m.isNull("c")) null else m.optString("c")))
             }
         }
         return WidgetData(

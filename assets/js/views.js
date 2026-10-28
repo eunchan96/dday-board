@@ -2,7 +2,7 @@
 
 import {
   h, dday, fmtDate, fmtShort, fmtDuration, displayTitle, groupOf, GROUPS, subjectColor,
-  startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange,
+  startOfDay, addDays, sameDay, dayKey, WEEK, isExam, examOver, timeRange, shortSubject, etcLabel, etcColor,
 } from './util.js';
 
 const ICON_STAR = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg>';
@@ -58,6 +58,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   const meta = h('div', { class: 'meta' },
     exam ? h('span', { class: 'exam-word' }, '시험') : null,
     t.kind === 'todo' ? h('span', { class: 'todo-word' }, '할 일') : null,
+    t.kind === 'etc' ? h('span', { class: 'etc-word', style: { '--e': etcColor(t) } }, etcLabel(t)) : null,
     !compact && t.subject && displayTitle(t) === t.title ? h('span', { class: 'subj' }, t.subject) : null,
     exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, fmtShort(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
@@ -184,22 +185,17 @@ export function renderCalendar(root, tasks, ctx) {
     }, h('span', { class: 'num' }, d.getDate()));
 
     list.slice(0, 3).forEach(t => {
-      const lv = dday(t, ctx.now).level;
-      // 시험은 시작 시각을 앞에 (폰에서는 좁아서 시각은 빼고)
-      const label = isExam(t) ? [h('span', { class: 'pill-time' }, `${timeRange(t).split('–')[0]} `), displayTitle(t)] : t.title;
-      const tip = [t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
+      // 시험은 시작 시각을 앞에 (폰에서는 좁아서 시각은 빼고), 과목은 줄임말로
+      const label = isExam(t) ? [h('span', { class: 'pill-time' }, `${timeRange(t).split('–')[0]} `), displayTitle(t, true)] : t.title;
+      const tip = [t.kind === 'etc' ? etcLabel(t) : null, t.subject, t.title, isExam(t) ? timeRange(t) : null, t.location].filter(Boolean).join(' · ');
+      const k = isExam(t) ? 'exam' : t.kind === 'todo' ? 'todo' : t.kind === 'etc' ? 'etc' : 'assignment';
       cell.append(h('span', {
-        class: `cal-pill ${lv}${isExam(t) ? ' exam' : ''} k-${isExam(t) ? 'exam' : t.kind === 'todo' ? 'todo' : 'assignment'}${t.done ? ' is-done' : ''}`, title: tip,
+        class: `cal-pill k-${k}${t.done ? ' is-done' : ''}`, title: tip,
+        style: t.kind === 'etc' ? { '--e': etcColor(t) } : null,
         onclick: e => { e.stopPropagation(); ctx.onOpen(t); },
-      },
-        h('i', { style: { background: subjectColor(t.subject) } }),
-        h('span', null, label)));
+      }, h('span', null, label)));
     });
     if (list.length > 3) cell.append(h('span', { class: 'cal-more' }, `+${list.length - 3}개`));
-    if (list.length) {
-      cell.append(h('span', { class: 'cal-dots', 'aria-hidden': 'true' },
-        list.slice(0, 4).map(t => h('i', { style: { background: t.done ? 'var(--pencil-2)' : subjectColor(t.subject) } }))));
-    }
     grid.append(cell);
   }
 

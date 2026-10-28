@@ -412,8 +412,6 @@ a.lms-tag:hover { color: var(--pen); border-color: var(--pen); }
   .next-line { font-size: 18px; }
   .row { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 11px 4px; }
   .cal-day { min-height: 54px; padding: 3px; align-items: center; }
-  .cal-day .cal-pill, .cal-day .cal-more { display: none; }
-  .cal-dots { display: flex; justify-content: center; }
   .panel { top: auto; width: 100%; max-height: 92vh; border-left: 0; border-top: 1px solid var(--rule); border-radius: 14px 14px 0 0; animation-name: sheet-in; }
   @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
   .field-row { grid-template-columns: 1fr 108px; }
@@ -1520,6 +1518,7 @@ svg.filled { fill: currentColor; stroke: none; }
 .flt-btn.on { border-color: color-mix(in srgb, var(--pen) 45%, var(--rule)); background: color-mix(in srgb, var(--pen) 6%, var(--sheet)); }
 .flt-btn[aria-expanded="true"] { border-color: var(--pen); box-shadow: 0 0 0 3px var(--pen-soft); }
 .flt-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.flt-dot.none { visibility: hidden; }
 .flt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flt-opts { flex-shrink: 0; font-size: 12.5px; font-weight: 650; color: var(--pen); }
 .flt-clear { width: 34px; height: 34px; }
@@ -2252,29 +2251,66 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 .cal-dow.sat, .cal-day.sat .num { color: var(--sat); }
 .btn.flash-ok { color: var(--green) !important; border-color: color-mix(in srgb, var(--green) 40%, var(--rule)) !important; }
 
-/* ═════ 폰 캘린더: 점 대신 일정 이름 (위젯처럼 종류 색 줄, 흰 글자, 끝낸 건 취소선) ═════ */
-:root { --k-exam: #E5484D; --k-assignment: #F0B000; --k-todo: #3D6BE0; }
-@media (max-width: 640px) {
-  .cal-day { min-height: 76px; padding: 2px 1px 3px; align-items: stretch; gap: 2px; }
-  .cal-day .num { align-self: center; width: 22px; height: 22px; font-size: 12px; }
-  .cal-dots { display: none !important; }
-  .cal-day .cal-pill {
-    display: block !important; pointer-events: none; padding: 0 2px; border-radius: 3px; box-shadow: none;
-    font-size: 9.5px; font-weight: 650; line-height: 14px; color: #fff !important; background: var(--k-assignment) !important;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .cal-day .cal-pill i { display: none; }
-  .cal-day .cal-pill span { color: #fff !important; }
-  .cal-day .cal-pill.k-exam { background: var(--k-exam) !important; }
-  .cal-day .cal-pill.k-todo { background: var(--k-todo) !important; }
-  .cal-day .cal-pill.is-done span { text-decoration: line-through; }
-  .cal-day .cal-more { display: block !important; font-size: 9.5px; line-height: 12px; padding-left: 2px; color: var(--pencil); }
+/* ═════ 캘린더: 넓을 때도 좁을 때와 같은 모양 — 종류 색(파스텔) 줄에 일정 이름, 끝낸 건 취소선 ═════ */
+:root { --k-exam: #E5484D; --k-assignment: #E0A100; --k-todo: #3D6BE0; }
+.cal-day { align-items: stretch; gap: 2px; }
+.cal-day .num { align-self: center; }
+.cal-dots { display: none !important; }
+.cal-day .cal-pill {
+  --k: var(--k-assignment);
+  display: block; padding: 0 5px; border-radius: 4px; box-shadow: none;
+  font-size: 12px; font-weight: 650; line-height: 19px;
+  background: color-mix(in srgb, var(--k) 24%, var(--sheet));
+  color: color-mix(in srgb, var(--k) 62%, var(--ink));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-@media (max-width: 640px) { .cal-day .cal-pill .pill-time { display: none; } }
+.cal-day .cal-pill span { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-day .cal-pill.k-exam { --k: var(--k-exam); }
+.cal-day .cal-pill.k-todo { --k: var(--k-todo); }
+.cal-day .cal-pill.k-etc { --k: var(--e, #9AA0AA); }
+.cal-day .cal-pill.is-done { opacity: 0.62; }
+.cal-day .cal-pill.is-done span { text-decoration: line-through; }
+.cal-day .cal-pill:hover { background: color-mix(in srgb, var(--k) 34%, var(--sheet)); }
+.cal-day .cal-more { display: block; font-size: 11px; line-height: 14px; padding-left: 3px; color: var(--pencil); }
+@media (max-width: 640px) {
+  .cal-day { min-height: 76px; padding: 2px 1px 3px; }
+  .cal-day .num { width: 22px; height: 22px; font-size: 12px; }
+  .cal-day .cal-pill { pointer-events: none; padding: 0 2px; border-radius: 3px; font-size: 9.5px; line-height: 14px; }
+  .cal-day .cal-more { font-size: 9.5px; line-height: 12px; padding-left: 2px; }
+  .cal-day .cal-pill .pill-time { display: none; }
+}
 .cal-pill .pill-time { overflow: visible !important; }
+.etc-word { color: color-mix(in srgb, var(--e) 70%, var(--ink)); font-weight: 700; }
 /* 옆으로 밀어 탭을 넘길 때 살짝 따라 들어오는 움직임 */
 @keyframes swipe-in-l { from { transform: translateX(24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @keyframes swipe-in-r { from { transform: translateX(-24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 .app.swipe-left #view, .app.swipe-left #viewStudy { animation: swipe-in-l 180ms ease-out; }
 .app.swipe-right #view, .app.swipe-right #viewStudy { animation: swipe-in-r 180ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .app.swipe-left #view, .app.swipe-right #view, .app.swipe-left #viewStudy, .app.swipe-right #viewStudy { animation: none; } }
+
+/* 공지 창: 머리는 그대로, 목록만 스크롤 */
+#noticesDialog[open] { display: flex; flex-direction: column; max-height: min(720px, calc(100dvh - 48px)); }
+#noticesDialog .settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* 기타 종류 고르기 (상세 패널) */
+.kind-picker button { min-width: 60px; }
+@media (max-width: 420px) { .kind-picker button { min-width: 0; padding: 0 10px; } }
+.etc-picker { margin: -2px 0 2px; }
+.etc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.etc-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px;
+  border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.etc-chip:hover { background: var(--sheet-2); }
+.etc-chip[aria-checked="true"] { border-color: color-mix(in srgb, var(--e) 70%, var(--ink)); background: color-mix(in srgb, var(--e) 22%, var(--sheet)); }
+.etc-chip.ghost { color: var(--pencil); border-style: dashed; }
+.etc-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--e); flex-shrink: 0; }
+.etc-edit { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--rule); border-radius: var(--radius-m); background: var(--sheet-2); }
+.etc-edit-top { display: flex; align-items: center; gap: 10px; }
+.etc-edit-top .etc-dot { width: 14px; height: 14px; }
+.etc-name { flex: 1; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 14px; }
+.etc-edit .swatches { padding: 0; }
+.etc-edit .msg:empty { display: none; }
+.etc-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.etc-actions .danger-text { margin-right: auto; }
+.sd-short { width: 112px; height: 34px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 14px; text-align: center; }

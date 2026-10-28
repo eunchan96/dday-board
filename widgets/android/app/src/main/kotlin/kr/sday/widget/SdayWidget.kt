@@ -164,8 +164,7 @@ object Widgets {
             val task = list.getOrNull(i)
             if (task == null) { views.setViewVisibility(r[0], View.GONE); return@forEachIndexed }
             views.setViewVisibility(r[0], View.VISIBLE)
-            val kindColor = when (task.kind) { "exam" -> R.color.kind_exam; "todo" -> R.color.kind_todo; else -> R.color.kind_assignment }
-            views.setInt(r[1], "setColorFilter", ctx.getColor(kindColor))
+            views.setInt(r[1], "setColorFilter", CalendarDraw.baseColor(ctx, task.kind, task.etcColor))
             // 시험은 "중간고사"처럼 이름만 있는 경우가 많아 과목을 앞에 붙임 (접두어는 없음)
             val title = if (task.kind == "exam" && task.subject.isNotBlank() && !task.title.contains(task.subject)) "${task.subject} ${task.title}" else task.title
             views.setTextViewText(r[2], title)

@@ -23,8 +23,8 @@ export function fmtDate(d, withTime = true) {
   return withTime ? `${base} ${pad(d.getHours())}:${pad(d.getMinutes())}` : base;
 }
 // 시험은 "중간고사"만으로는 무슨 과목인지 모르니 과목명을 앞에 붙인다
-export function displayTitle(t) {
-  if (t.kind === 'exam' && t.subject && !t.title.includes(t.subject)) return `${t.subject} ${t.title}`;
+export function displayTitle(t, short = false) {
+  if (t.kind === 'exam' && t.subject && !t.title.includes(t.subject)) return `${short ? shortSubject(t.subject) : t.subject} ${t.title}`;
   return t.title;
 }
 
@@ -100,6 +100,7 @@ export function dday(task, now = new Date()) {
   if (isExam(task) && ms < 0) {
     return examOver(task, now) ? { label: '끝남', level: 'done', ms } : { label: '시험 중', level: 'urgent', ms };
   }
+  if (ms < 0 && task.kind === 'etc') return { label: '지남', level: 'done', ms };   // 기타(휴강 등)는 지나면 끝난 일정
   if (ms < 0) return { label: task.missing ? '미제출' : '지남', level: 'over', ms };
   const diff = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
   return {
@@ -124,7 +125,7 @@ export function groupOf(task, now = new Date()) {
   if (task.done) return 'done';
   const due = new Date(task.due);
   if (isExam(task) && due < now) return examOver(task, now) ? 'done' : 'today';   // 지난 시험은 완료 쪽으로
-  if (due < now) return 'over';
+  if (due < now) return task.kind === 'etc' ? 'done' : 'over';
   const today = startOfDay(now);
   const d = startOfDay(due);
   if (sameDay(d, today)) return 'today';
@@ -165,6 +166,21 @@ export function subjectColor(name) {
   for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
   return SUBJECT_COLORS[h % SUBJECT_COLORS.length];
 }
+
+// 과목 줄임말 (설정 → 과목에서 정함). 캘린더처럼 좁은 곳에서 과목 이름 대신
+let subjectShortMap = {};
+export function setSubjectShorts(map) { subjectShortMap = map && typeof map === 'object' ? map : {}; }
+export const subjectShortOf = name => (name && subjectShortMap[name]) || '';
+export const shortSubject = name => subjectShortOf(name) || name || '';
+
+// '기타' 종류: [{ id, name, color }] (보드에 저장)
+let etcList = [];
+export const ETC_DEFAULT_COLOR = '#9AA0AA';
+export function setEtcTypes(list) { etcList = Array.isArray(list) ? list.filter(e => e && e.id && e.name) : []; }
+export const etcTypes = () => etcList.slice();
+export const etcTypeOf = t => (t && t.kind === 'etc' ? etcList.find(e => e.id === t.etcType) || null : null);
+export const etcLabel = t => etcTypeOf(t)?.name || '기타';
+export const etcColor = t => etcTypeOf(t)?.color || ETC_DEFAULT_COLOR;
 
 // 안전한 DOM 생성: h('div', { class: 'x', onclick: fn }, '텍스트', child)
 export function h(tag, attrs, ...children) {
