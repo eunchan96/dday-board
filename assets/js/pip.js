@@ -11,6 +11,16 @@ let api = null;
 let docWin = null;                 // Document PiP 창
 let video = null, canvas = null, cctx = null, stream = null;
 let lastKey = '';
+// 사용자가 띄운 뒤 아직 끄지 않았는데 창이 사라졌는지 (폰 브라우저가 백그라운드에서 닫는 경우)
+let wanted = false, closedByUs = false, lostWhileWanted = false;
+const onLeave = () => { if (wanted && !closedByUs) lostWhileWanted = true; closedByUs = false; };
+/** 타이머가 도는 중에 창이 저절로 닫혔으면 한 번만 true */
+export function pipWasClosed() {
+  if (!lostWhileWanted || pipOpen()) return false;
+  lostWhileWanted = false;
+  return true;
+}
+export function pipForget() { wanted = false; lostWhileWanted = false; }
 
 export function initPip(options) { api = options; }
 
@@ -26,6 +36,7 @@ export const pipOpen = () => !!(docWin && !docWin.closed) || !!(video && (docume
 
 export async function togglePip() {
   if (pipOpen()) { closePip(); return true; }
+  wanted = true; lostWhileWanted = false;
   try {
     if (hasDocPip()) await openDocPip();
     else if (hasVideoPip()) await openVideoPip();
@@ -38,6 +49,7 @@ export async function togglePip() {
 }
 
 export function closePip() {
+  closedByUs = true; wanted = false;
   if (docWin && !docWin.closed) docWin.close();
   docWin = null;
   if (video) {
@@ -89,7 +101,7 @@ async function openDocPip() {
     if (s.phase === 'idle') api.start(); else if (s.phase === 'rest') api.endRest(); else api.stop();
     renderPip(true);
   });
-  docWin.addEventListener('pagehide', () => { docWin = null; api.onChange?.(); });
+  docWin.addEventListener('pagehide', () => { docWin = null; onLeave(); api.onChange?.(); });
   lastKey = '';
   renderPip(true);
   api.onChange?.();
@@ -130,8 +142,8 @@ async function openVideoPip() {
       toggle();
       resume();
     });
-    video.addEventListener('leavepictureinpicture', () => api.onChange?.());
-    video.addEventListener('webkitpresentationmodechanged', () => api.onChange?.());
+    video.addEventListener('leavepictureinpicture', () => { onLeave(); api.onChange?.(); });
+    video.addEventListener('webkitpresentationmodechanged', () => { if (video.webkitPresentationMode !== 'picture-in-picture') onLeave(); api.onChange?.(); });
   }
   playArmed = false;
   await video.play();

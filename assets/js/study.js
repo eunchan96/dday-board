@@ -9,7 +9,7 @@ import { api, errText } from './api.js';
 import { subjectPicker, taskSubjects, rememberSubject } from './subject-picker.js';
 import { ambientControl } from './ambient.js';
 import { inScope } from './groups.js';
-import { initPip, togglePip, pipSupported, pipOpen, renderPip } from './pip.js';
+import { initPip, togglePip, pipSupported, pipOpen, renderPip, pipWasClosed } from './pip.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
   subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects, hiddenInList,
@@ -220,6 +220,7 @@ let pushTimerT = null;
 function changed() {
   timer.updatedAt = Date.now();
   saveTimer();
+  syncTimerNotice();
   clearTimeout(pushTimerT);
   pushTimerT = setTimeout(pushTimer, 300);
 }
@@ -240,6 +241,7 @@ export async function pullTimer() {
   const wasFocus = timer.phase === 'focus';
   for (const k of TIMER_FIELDS) if (k in remote) timer[k] = remote[k];
   saveTimer();
+  syncTimerNotice();
   if (wasFocus && timer.phase !== 'focus') loadStudy();          // 다른 기기에서 끝낸 공부 기록 받아 오기
   tick(); render(); ctx.onTimer();
 }
@@ -290,6 +292,41 @@ if (timer.phase !== 'idle' && !timer.running) {
   else Object.assign(timer, { phase: 'idle', running: false, segStart: null, acc: 0, sessStart: null });
 }
 
+/* ───── 폰: 알림 창에 공부 중 타이머를 계속 띄워 둠 (끝내기 버튼 포함) ─────
+   페이지가 백그라운드에서 멈춰도 알림은 남아 있어서, 타이머를 켜 둔 걸 잊지 않게 한다.
+   알림 허용이 된 폰에서만 (PC는 화면에 PiP · 상단 표시가 있음) */
+let noticeKey = null;
+const hm = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+function syncTimerNotice() {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+  if (!matchMedia('(pointer: coarse)').matches) return;
+  const on = timer.phase !== 'idle' && timer.running;
+  const key = on ? [timer.phase, timer.segStart, timer.acc, timer.mode, timer.label, timer.subject].join('|') : 'off';
+  if (key === noticeKey) return;
+  noticeKey = key;
+  navigator.serviceWorker.ready.then(async reg => {
+    if (!on) { (await reg.getNotifications({ tag: 'sday-timer' })).forEach(n => n.close()); return; }
+    const what = timer.label || timer.subject || '공부';
+    const endMs = timer.segStart + (phaseLength() - timer.acc);
+    const rest = timer.phase === 'rest';
+    const title = rest ? '쉬는 시간' : `공부 중 · ${what}`;
+    const body = rest ? `${hm(endMs)}까지 쉬어요`
+      : isPomo() ? `${modeOf().focus}분 집중 · ${hm(endMs)}에 끝나요`
+      : `${hm(timer.sessStart || timer.segStart)}부터 공부 중`;
+    await reg.showNotification(title, {
+      body, tag: 'sday-timer', renotify: false, silent: true, requireInteraction: true,
+      timestamp: timer.sessStart || timer.segStart,
+      icon: 'assets/icons/icon-192.png?v=s2', badge: 'assets/icons/badge-96.png',
+      data: { url: './#study', type: 'timer' },
+      actions: [{ action: 'stop', title: rest ? '쉬는 시간 끝' : '끝내기' }],
+    });
+  }).catch(() => {});
+}
+// 알림의 끝내기 버튼 (서비스 워커가 보냄)
+export function stopFromNotice() {
+  if (timer.phase === 'focus') stop(); else if (timer.phase === 'rest') toIdle();
+}
+
 // 1초마다: 시간이 다 된 단계를 넘기고 화면 숫자만 바꾼다
 function tick() {
   tickLiveFriends();
@@ -326,7 +363,14 @@ function tick() {
   ctx.onTimer();
 }
 setInterval(tick, 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  tick();
+  syncTimerNotice();
+  // 띄워 둔 타이머 창을 폰이 닫아 버렸으면(오래 켜 두면 브라우저가 닫는 경우가 있음) 다시 띄울 수 있게
+  if (timer.phase !== 'idle' && pipWasClosed()) ctx.toast('떠 있던 타이머 창이 닫혔어요', '다시 띄우기', () => togglePip().then(() => render()), 10000);
+});
+syncTimerNotice();
 
 function beep() {
   try {

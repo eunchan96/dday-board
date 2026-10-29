@@ -23,7 +23,7 @@ import {
 } from './groups.js';
 import { subjectPicker, taskSubjects, rememberSubject, customSubjects, setCustomSubjects, forgetSubject, addCustomSubject } from './subject-picker.js';
 import { initScrollbar } from './scrollbar.js';
-import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
+import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends, stopFromNotice } from './study.js';
 
 const SYNC_INTERVAL = 30000;
 
@@ -1884,6 +1884,7 @@ function bind() {
   navigator.serviceWorker?.addEventListener('message', e => {
     if (e.data && e.data.type === 'open-task') { pendingTaskId = e.data.id; openTaskFromHash(); }
     if (e.data && e.data.type === 'open-view') setView(e.data.view);
+    if (e.data && e.data.type === 'timer-stop') stopFromNotice();
   });
 }
 
@@ -1904,6 +1905,13 @@ function openTaskFromHash() {
     const day = nw[2] ? new Date(`${nw[2]}T00:00:00`) : null;
     history.replaceState(null, '', `#${curHash()}`);
     setTimeout(() => openPanel(null, day && !isNaN(day) ? day : null, kind), 0);
+    return true;
+  }
+  // 알림의 끝내기 (앱이 닫혀 있었을 때)
+  if (location.hash === '#timer-stop') {
+    history.replaceState(null, '', '#study');
+    setView('study');
+    setTimeout(stopFromNotice, 0);
     return true;
   }
   // 캘린더 위젯에서 날짜를 두 번 누름: 그 날짜를 고른 캘린더 (#day=2026-11-03)

@@ -1,7 +1,7 @@
 // 앱 화면 파일만 캐시해서 오프라인에서도 열리게 한다.
 // 과제 데이터(Supabase 호출)는 캐시하지 않는다. 항상 네트워크 우선.
 
-const CACHE = 'dday-shell-v61';
+const CACHE = 'dday-shell-v62';
 const SHELL = [
   './',
   'index.html',
@@ -67,6 +67,23 @@ self.addEventListener('push', e => {
 
 // 알림을 누르면 열려 있는 창을 앞으로 가져오고, 없으면 새로 연다
 self.addEventListener('notificationclick', e => {
+  // 공부 타이머 알림: 끝내기 버튼은 앱에 끝내라고 알리고, 알림을 누르면 공부 화면 (알림은 앱이 정리)
+  if (e.notification.tag === 'sday-timer') {
+    const stop = e.action === 'stop';
+    if (stop) e.notification.close();
+    e.waitUntil((async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const win = wins.find(w => new URL(w.url).origin === self.location.origin);
+      if (win) {
+        if (stop) win.postMessage({ type: 'timer-stop' });
+        await win.focus().catch(() => {});
+        win.postMessage({ type: 'open-view', view: 'study' });
+        return;
+      }
+      await self.clients.openWindow(new URL(stop ? './#timer-stop' : './#study', self.location.href).href);
+    })());
+    return;
+  }
   e.notification.close();
   const url = new URL(e.notification.data?.url || './', self.location.href);
   const id = (url.hash.match(/^#task=(.+)$/) || [])[1];
