@@ -2316,3 +2316,33 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 .sd-short { width: 112px; height: 34px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 14px; text-align: center; }
 .etc-hide { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pencil); cursor: pointer; }
 .etc-hide input { width: 16px; height: 16px; accent-color: var(--pen); }
+
+/* ═════ 캘린더 다듬기: 둥근 카드 한 장, 옅은 칸 선, 오늘은 채운 원, 고른 날은 옅은 바탕 ═════ */
+.cal-grid {
+  border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--sheet);
+}
+.cal-dow {
+  border: 0; border-bottom: 1px solid var(--rule); padding: 9px 0 8px; text-align: center;
+  font-size: 12px; font-weight: 650; color: var(--pencil); letter-spacing: 0.02em;
+}
+.cal-day {
+  --line: color-mix(in srgb, var(--rule) 65%, transparent);
+  border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  padding: 6px 5px 6px; transition: background-color 120ms;
+}
+.cal-grid > .cal-day:nth-child(7n) { border-right: 0; }
+.cal-grid > .cal-day:nth-last-child(-n+7) { border-bottom: 0; }
+.cal-day:hover { background: color-mix(in srgb, var(--ink) 3%, var(--sheet)); }
+.cal-day.other { background: none; }
+.cal-day.other .num, .cal-day.other .cal-pill, .cal-day.other .cal-more { opacity: 0.4; }
+.cal-day .num { font-size: 13px; font-weight: 600; border-radius: 50%; margin-bottom: 1px; }
+.cal-day.today .num { border: 0; background: var(--pen); color: #fff !important; font-weight: 750; }
+.cal-day.selected { box-shadow: none; background: color-mix(in srgb, var(--pen) 7%, var(--sheet)); }
+.cal-day.selected:not(.today) .num { box-shadow: inset 0 0 0 1.5px var(--pen); color: var(--pen); }
+.cal-day .cal-pill { border-radius: 5px; padding: 0 6px; line-height: 20px; font-weight: 600; }
+@media (max-width: 640px) {
+  .cal-grid { border-radius: 12px; }
+  .cal-dow { padding: 7px 0 6px; font-size: 11.5px; }
+  .cal-day { padding: 3px 2px 4px; }
+  .cal-day .cal-pill { border-radius: 3px; padding: 0 3px; line-height: 15px; }
+}

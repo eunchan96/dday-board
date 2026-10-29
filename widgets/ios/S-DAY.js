@@ -226,7 +226,7 @@ function upcomingWidget(w, d, now, fam) {
     const first = k !== prev; prev = k;
     if (shown) w.addSpacer(first ? 6 : 3);
     const row = w.addStack(); row.centerAlignContent();
-    const col = row.addStack(); col.size = new Size(fam === 'small' ? 34 : 40, 0); col.centerAlignContent();
+    const col = row.addStack(); col.size = new Size(fam === 'small' ? 34 : 38, 0); col.centerAlignContent(); col.setPadding(0, fam === 'small' ? 2 : 6, 0, 0);
     if (first) {
       const dt = new Date(`${k}T00:00:00`);
       text(col, W[dt.getDay()], size, k === todayKey ? C.pen : dt.getDay() === 0 ? C.red : C.ink, 'bold');
@@ -234,7 +234,7 @@ function upcomingWidget(w, d, now, fam) {
       text(col, String(dt.getDate()), size - 1, C.faint, 'medium');
     }
     col.addSpacer();
-    row.addSpacer(4);
+    row.addSpacer(2);
     if (t.none) { text(row, '일정이 없어요', size, C.faint, 'medium'); row.addSpacer(); shown++; continue; }
     const bar = row.addStack(); bar.size = new Size(3.5, 15); bar.cornerRadius = 1.75; bar.backgroundColor = kindColor(t);
     row.addSpacer(7);
