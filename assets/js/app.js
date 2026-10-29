@@ -22,6 +22,7 @@ import {
   implicitGroupIds, scopeValue, scopeIds, scopeLabel, scopeSub, isInactive, setInactive, isUnsorted, NONE,
 } from './groups.js';
 import { subjectPicker, taskSubjects, rememberSubject, customSubjects, setCustomSubjects, forgetSubject, addCustomSubject } from './subject-picker.js';
+import { initScrollbar } from './scrollbar.js';
 import { initStudy, onShowStudy, render as renderStudy, startFor, timerSummary, handleKey as studyKey, loadStudy, openFriends } from './study.js';
 
 const SYNC_INTERVAL = 30000;
@@ -641,9 +642,12 @@ function renderRail() {
     h('span', null, label));
 
   // 좁은 화면: 칩 대신 필터 버튼 하나 → 펼치면 과목 고르기 + 보기 옵션
-  const flt = buildFilter(subjects, pendingAll);
+  // 폰: 필터는 상단(목록 · 캘린더 옆)에 아이콘으로, 넓은 화면은 지금처럼 왼쪽에
+  const top = matchMedia('(max-width: 640px)').matches;
+  const flt = buildFilter(subjects, pendingAll, { icon: top });
+  $('#fltSlot')?.replaceChildren(...(top ? [flt] : []));
   rail.replaceChildren(
-    flt,
+    top ? '' : flt,
     h('div', null, list),
     h('div', { class: 'toggles' },
       h('label', { class: 'check-row' },
@@ -658,7 +662,7 @@ function renderRail() {
 /* ───── 좁은 화면 필터 ───── */
 let fltOpen = false;
 const CHECK_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 10.5l3 3 6-7"/></svg>';
-function buildFilter(subjects, pendingAll) {
+function buildFilter(subjects, pendingAll, { icon = false } = {}) {
   const cur = state.prefs.subject;
   const opts = [
     state.prefs.kind === 'exam' ? '시험만' : null,
@@ -670,14 +674,18 @@ function buildFilter(subjects, pendingAll) {
   const semText = otherSem ? scopeLabel() : null;
   // 분류를 골랐으면 그 이름만 (과목까지 골랐으면 "분류 · 과목"), 안 골랐으면 전체 과목
   const label = cur === null ? (semText || '전체 과목') : [semText, cur || '과목 없음'].filter(Boolean).join(' · ');
+  const active = cur !== null || opts.length || otherSem;
+  // 폰 상단: 글자 없이 아이콘만 (필터를 쓰는 중이면 파란 점)
   const btn = h('button', {
-    type: 'button', class: `flt-btn${cur !== null || opts.length || otherSem ? ' on' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
+    type: 'button', class: `flt-btn${active ? ' on' : ''}${icon ? ' icon-only' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
     'aria-haspopup': 'dialog', style: { '--c': cur === null ? 'var(--ink)' : subjectColor(cur) },
+    title: icon ? `필터: ${[label, ...opts].join(' · ')}` : null, 'aria-label': icon ? `필터: ${[label, ...opts].join(' · ')}` : null,
     onclick: () => { fltOpen = !fltOpen; renderRail(); },
   },
   h('svg-slot'),
-  cur === null ? null : h('i', { class: 'flt-dot' }), h('span', { class: 'flt-label' }, label),
-  opts.length ? h('span', { class: 'flt-opts' }, opts.join(' · ')) : null);
+  icon ? (active ? h('i', { class: 'flt-on-dot' }) : null) : [
+    cur === null ? null : h('i', { class: 'flt-dot' }), h('span', { class: 'flt-label' }, label),
+    opts.length ? h('span', { class: 'flt-opts' }, opts.join(' · ')) : null]);
   btn.querySelector('svg-slot').outerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/></svg>';
   const clear = cur !== null || opts.length ? h('button', {
     type: 'button', class: 'btn icon ghost flt-clear', title: '필터 지우기', 'aria-label': '필터 지우기',
@@ -696,7 +704,7 @@ function buildFilter(subjects, pendingAll) {
   };
   const toggle = (label, on, onchange) => h('label', { class: 'flt-toggle' },
     h('span', null, label), h('input', { type: 'checkbox', role: 'switch', checked: on, onchange: e => onchange(e.target.checked) }));
-  const pop = fltOpen ? h('div', { class: 'flt-pop', role: 'dialog', 'aria-label': '필터' },
+  const pop = fltOpen ? h('div', { class: `flt-pop${icon ? ' right' : ''}`, role: 'dialog', 'aria-label': '필터' },
     h('div', { class: 'flt-sem' }, scopeChips(v => { fltOpen = false; setScope(v); })),
     h('ul', { class: 'flt-list', role: 'radiogroup', 'aria-label': '과목' },
       subjRow('전체 과목', null, pendingAll, null),
@@ -704,12 +712,15 @@ function buildFilter(subjects, pendingAll) {
     h('div', { class: 'flt-toggles' },
       toggle('시험만', state.prefs.kind === 'exam', v => setPref('kind', v ? 'exam' : null)),
       toggle('중요한 것만', !!state.prefs.starredOnly, v => setPref('starredOnly', v)),
-      toggle('완료 숨기기', !!state.prefs.hideDone, v => setPref('hideDone', v)))) : null;
-  return h('div', { class: 'flt-bar' }, h('div', { class: 'flt-row' }, btn, clear), pop);
+      toggle('완료 숨기기', !!state.prefs.hideDone, v => setPref('hideDone', v))),
+    icon && clear ? h('button', { type: 'button', class: 'flt-reset', onclick: () => clear.click() }, '필터 지우기') : null) : null;
+  return h('div', { class: 'flt-bar' }, h('div', { class: 'flt-row' }, btn, icon ? null : clear), pop);
 }
 document.addEventListener('pointerdown', e => {
   if (fltOpen && !e.target.closest('.flt-bar')) { fltOpen = false; renderRail(); }
 }, true);
+// 폰 ↔ 넓은 화면으로 바뀌면 필터 자리를 옮김
+matchMedia('(max-width: 640px)').addEventListener('change', () => { fltOpen = false; renderRail(); });
 document.addEventListener('keydown', e => {
   if (fltOpen && e.key === 'Escape') { fltOpen = false; renderRail(); $('.flt-btn')?.focus(); }
 });
@@ -1904,6 +1915,7 @@ $('#btnInstall').addEventListener('click', async () => {
 /* ───── 시작 ───── */
 bind();
 initPickers();
+initScrollbar();
 applyTheme();
 const hashView = location.hash.slice(1);
 // 예전 버전은 공부를 view='study'로 저장했음

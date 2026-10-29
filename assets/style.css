@@ -2347,5 +2347,34 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
   .cal-day .cal-pill { border-radius: 3px; padding: 0 3px; line-height: 15px; }
 }
 
-/* 스크롤바가 생기고 없어질 때 화면이 옆으로 밀리지 않게 자리를 늘 비워 둠 */
-html { scrollbar-gutter: stable; }
+/* PC: 페이지 스크롤바를 화면 위에 겹치는 얇은 막대로 (scrollbar.js) — 생기고 없어질 때 화면이 밀리지 않고 오른쪽 빈 띠도 없음 */
+html.ov-scrollbar { scrollbar-width: none; }
+html.ov-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
+.ov-track { position: fixed; top: 0; right: 0; bottom: 0; width: 12px; z-index: 70; pointer-events: none; }
+.ov-thumb {
+  position: absolute; top: 0; right: 3px; width: 6px; border-radius: 3px; pointer-events: auto;
+  background: color-mix(in srgb, var(--ink) 30%, transparent); opacity: 0;
+  transition: opacity 250ms, width 120ms, right 120ms;
+}
+.ov-track.show .ov-thumb { opacity: 1; }
+.ov-thumb:hover, .ov-track.drag .ov-thumb { width: 8px; right: 2px; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+@media (prefers-reduced-motion: reduce) { .ov-thumb { transition: none; } }
+/* 창 안 스크롤(설정 · 목록 등)은 얇게 */
+@media (pointer: fine) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 25%, transparent) transparent; } }
+
+/* 폰: 필터 버튼을 목록 · 캘린더 옆 아이콘으로 */
+.flt-slot { display: none; }
+@media (max-width: 640px) {
+  /* 목록 · 캘린더와 같은 줄: 같은 칸에 겹쳐 두고 필터는 오른쪽 끝, 탭은 그만큼 비켜 줌 */
+  .flt-slot { display: block; grid-column: 1 / -1; grid-row: 3; justify-self: end; }
+  .flt-slot:empty { display: none; }
+  .topbar:has(.flt-slot:not(:empty)) #planViews { grid-column: 1 / -1; grid-row: 3; margin-right: 48px; }
+  .study-mode .flt-slot { display: none; }
+  .rail { display: none; }
+  .flt-slot .flt-btn.icon-only { position: relative; width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 9px; }
+  .flt-slot .flt-btn.icon-only svg { width: 18px; height: 18px; color: var(--ink); }
+  .flt-on-dot { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--pen); box-shadow: 0 0 0 2px var(--sheet); }
+  .flt-pop.right { left: auto; right: 0; width: min(320px, calc(100vw - 28px)); }
+}
+.flt-reset { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 11px 16px; border-top: 1px solid var(--rule); font-size: 14px; font-weight: 650; color: var(--red); text-align: center; cursor: pointer; }
+.flt-reset:hover { background: var(--sheet-2); }
