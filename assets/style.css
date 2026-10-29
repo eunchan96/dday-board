@@ -2407,3 +2407,21 @@ html.ov-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
   .flt-slot .flt-sem { display: flex; }
   .flt-slot .flt-pop { width: 340px; }
 }
+
+/* 상세 패널: 스마트캠퍼스 표시는 이름 아래 한 줄로 */
+#panelNote { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -6px 0 2px; padding: 0; background: none; font-size: 12.5px; }
+#panelNote[hidden] { display: none; }
+#panelNote .pn-src { color: var(--pencil); font-weight: 600; }
+#panelNote a { display: inline-flex; align-items: center; gap: 4px; color: var(--pen); font-weight: 650; text-decoration: none; }
+#panelNote a:hover { text-decoration: underline; text-underline-offset: 3px; }
+#panelNote a svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.kind-picker.locked button:disabled { cursor: not-allowed; opacity: 0.55; }
+.kind-picker.locked button[aria-checked="true"]:disabled { opacity: 1; }
+/* 제출 기록 상자: 위 여백 없이 */
+.submission .sub-head { margin: 0; font-size: 13.5px; }
+/* 바텀시트 · 패널이 열려 있으면 뒤 화면은 스크롤되지 않게 */
+html.sheet-open, html.sheet-open body { overflow: hidden; }
+.panel-body { overscroll-behavior: contain; }
+.submission .sub-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.submission .sub-open { font-size: 12.5px; font-weight: 650; color: var(--pen); text-decoration: none; }
+.submission .sub-open:hover { text-decoration: underline; text-underline-offset: 3px; }

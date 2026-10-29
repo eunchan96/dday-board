@@ -1185,7 +1185,7 @@ function setKind(kind, { isNew }) {
   ui.kind = kind;
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);
-  $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind ? 'true' : 'false'));
+  $$('#kindPicker button').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind || (kind === 'todo' && b.dataset.kind === 'etc') ? 'true' : 'false'));
   const name = exam ? '시험' : kind === 'todo' ? '할 일' : kind === 'etc' ? '일정' : '과제';
   $('#panelTitle').textContent = isNew ? `새 ${name}` : `${name} 수정`;
   $('#fTitle').placeholder = exam ? '시험 이름' : kind === 'todo' ? '할 일 (예: 3주차 강의 듣기)' : kind === 'etc' ? '일정 이름 (비우면 종류 이름으로)' : '과제 이름';
@@ -1298,7 +1298,11 @@ function openPanel(task, presetDay, kind) {
   ui.etcType = task && task.kind === 'etc' ? task.etcType || null : null;
   ui.etcEdit = null;
   setKind(task ? (isExam(task) ? 'exam' : ['todo', 'etc'].includes(task.kind) ? task.kind : 'assignment') : (kind || 'assignment'), { isNew: !task });
-  $('#kindPicker').hidden = !!(task && task.source === 'canvas');   // 스마트캠퍼스 과제는 종류 고정
+  // 스마트캠퍼스 과제도 종류(과제 · 시험 · 기타)를 바꿀 수 있음. 강의 영상은 동기화가 영상으로 다뤄서 '기타'로 고정
+  const lockKind = !!(task && isLecture(task));
+  $('#kindPicker').hidden = false;
+  $('#kindPicker').classList.toggle('locked', lockKind);
+  $$('#kindPicker button').forEach(b => { b.disabled = lockKind; b.title = lockKind ? '스마트캠퍼스 강의 영상은 종류를 바꿀 수 없어요' : ''; });
   $('#fStudyBtn').hidden = !task || !!task.done || groupOf(task) === 'done';
   $('#examNames').replaceChildren(...EXAM_NAMES.map(n => h('button', {
     type: 'button', onclick: () => { $('#fTitle').value = n; $('#fTitle').focus(); },
@@ -1307,8 +1311,11 @@ function openPanel(task, presetDay, kind) {
   const note = $('#panelNote');
   if (task && task.source === 'canvas') {
     note.hidden = false;
-    fill(note, task.kind === 'todo' ? '스마트캠퍼스 강의' : '스마트캠퍼스 과제',
-      task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '열기') : null);
+    // 이름 아래 한 줄: 어디서 왔는지 + 스마트캠퍼스에서 열기
+    const ext = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7 9"/></svg>';
+    const a = task.link ? h('a', { href: task.link, target: '_blank', rel: 'noopener noreferrer' }, '스마트캠퍼스에서 열기') : null;
+    if (a) a.insertAdjacentHTML('beforeend', ext);
+    fill(note, h('span', { class: 'pn-src' }, task.kind === 'todo' ? '스마트캠퍼스 강의 영상' : '스마트캠퍼스 과제'), a);
   } else note.hidden = true;
 
   // 스마트캠퍼스에 제출한 기록
@@ -1316,8 +1323,11 @@ function openPanel(task, presetDay, kind) {
   if (task && (task.submittedAt || task.submission)) {
     const files = task.submission?.files || [];
     sub.hidden = false;
-    fill(sub, 
-      h('p', { class: 'sub-head' }, task.submittedAt ? `${fmtDate(new Date(task.submittedAt))} 제출` : '제출함'),
+    fill(sub,
+      h('div', { class: 'sub-top' },
+        h('p', { class: 'sub-head' }, task.submittedAt ? `${fmtDate(new Date(task.submittedAt))} 제출` : '제출함'),
+        // 파일은 스마트캠퍼스 로그인이 있어야 받을 수 있어서, 받는 곳(과제 화면)으로 보냄
+        task.link && files.length ? h('a', { class: 'sub-open', href: task.link, target: '_blank', rel: 'noopener noreferrer', title: '스마트캠퍼스 과제 화면에서 제출한 파일을 받을 수 있어요' }, '파일 받기') : null),
       files.length ? h('ul', null, files.map(f => h('li', null,
         h('span', { class: 'fname' }, f.name), f.size != null ? h('span', { class: 'fsize' }, fmtSize(f.size)) : null))) : null,
       task.submission?.url ? h('p', null, '제출한 링크: ', h('a', { href: task.submission.url, target: '_blank', rel: 'noopener noreferrer' }, task.submission.url)) : null,
@@ -1332,12 +1342,14 @@ function openPanel(task, presetDay, kind) {
 
   $('#scrim').hidden = false;
   $('#panel').hidden = false;
+  document.documentElement.classList.add('sheet-open');
   if (task) $('#panel').focus(); else $('#fTitle').focus();
 }
 
 function closePanel() {
   closePicker(false);
   $('#panel').hidden = true;
+  document.documentElement.classList.remove('sheet-open');
   $('#scrim').hidden = true;
   ui.editingId = null;
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
@@ -1378,8 +1390,9 @@ function savePanel() {
   let endAt = null;
   if (exam && $('#fEnd').value) {
     const end = new Date(`${$('#fDate').value}T${$('#fEnd').value}`);
-    if (end <= due) { msg.textContent = '끝나는 시각이 시작보다 빨라요'; $('#fEndBtn').focus(); return; }
-    endAt = end.toISOString();
+    // 자동으로 채운 끝 시각이 하루를 넘겨 잘렸으면(예: 23:59 시작) 끝 시각 없이 저장
+    if (end <= due && !ui.endAuto) { msg.textContent = '끝나는 시각이 시작보다 빨라요'; $('#fEndBtn').focus(); return; }
+    endAt = end > due ? end.toISOString() : null;
   }
   const fields = {
     kind: exam ? 'exam' : ['todo', 'etc'].includes(ui.kind) ? ui.kind : 'assignment',
@@ -1933,6 +1946,8 @@ $('#btnInstall').addEventListener('click', async () => {
 
 /* ───── 시작 ───── */
 bind();
+// 바텀시트 뒤 어두운 곳을 끌어도 뒤 화면이 움직이지 않게
+$('#scrim').addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 initPickers();
 initScrollbar();
 applyTheme();
