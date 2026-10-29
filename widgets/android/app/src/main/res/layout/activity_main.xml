@@ -75,7 +75,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
-            android:text="위젯 배경 진하기"
+            android:text="위젯 배경 · 화면 모드"
             android:textColor="@color/ink"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -83,7 +83,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="위젯마다 따로 정해요. 왼쪽 끝은 완전히 투명해요."
+            android:text="위젯마다 따로 정해요. 진하기 왼쪽 끝은 완전히 투명해요. 어둡게 해도 진하기는 그대로예요."
             android:textColor="@color/pencil"
             android:textSize="13sp" />
         <!-- 위젯 종류마다 막대 하나씩 (MainActivity가 채움) -->

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 다가오는 일정 (새로 고침은 오른쪽 아래, 맨 아랫줄만 비워 둠): 색 막대(시험 빨강 · 과제 노랑 · 할 일 파랑) · 이름(+과목) · D-day -->
+<!-- 다가오는 일정 (앞으로 2주): 첫 열 요일(같은 날은 한 번만) · 색 막대 · 짧은 이름 한 줄. 많으면 스크롤 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
@@ -11,323 +11,28 @@
         android:importantForAccessibility="no"
         android:scaleType="fitXY"
         android:src="@drawable/widget_bg" />
-    <LinearLayout
+    <ListView
+        android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
+        android:clipToPadding="false"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:listSelector="@android:color/transparent"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="30dp"
+        android:scrollbars="none" />
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:paddingStart="16dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="30dp">
-        <TextView
-            android:id="@+id/empty"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingTop="4dp"
-            android:text="불러오는 중…"
-            android:textColor="@color/faint"
-            android:textSize="13sp" />
-            <LinearLayout
-                android:id="@+id/row0"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar0"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title0"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub0"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday0"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-            <LinearLayout
-                android:id="@+id/row1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar1"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title1"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub1"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday1"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-            <LinearLayout
-                android:id="@+id/row2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar2"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title2"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub2"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday2"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-            <LinearLayout
-                android:id="@+id/row3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar3"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title3"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub3"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday3"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-            <LinearLayout
-                android:id="@+id/row4"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar4"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title4"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub4"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday4"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-            <LinearLayout
-                android:id="@+id/row5"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:visibility="gone">
-                <ImageView
-                    android:id="@+id/bar5"
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="18dp"
-                    android:importantForAccessibility="no"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/bar" />
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:id="@+id/title5"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/ink"
-                        android:textSize="13sp" />
-                    <TextView
-                        android:id="@+id/sub5"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/faint"
-                        android:textSize="10.5sp"
-                        android:visibility="gone" />
-                </LinearLayout>
-                <TextView
-                    android:id="@+id/dday5"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/ink"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-    </LinearLayout>
+        android:paddingTop="14dp"
+        android:text="불러오는 중…"
+        android:textColor="@color/faint"
+        android:textSize="13sp" />
     <ImageView
         android:id="@+id/refresh"
         android:layout_width="30dp"

@@ -609,9 +609,9 @@ function renderTopTimer() {
   const pip = pipNeeded() ? pipButton() : null;
   // 오늘 탭에서는 타이머 칸에 버튼이 있으니 위쪽에는 띄우기만
   if (studyView() === 'today' && !$('#viewStudy')?.hidden) { box.replaceChildren(...[pip].filter(Boolean)); return; }
-  // 기록 탭에서는 시작 버튼을 두지 않음 (돌고 있을 때 끝내기 버튼만)
+  // 기록 탭에서는 시작 · 끝내기 버튼을 두지 않음 (띄우기만)
   const onRecords = studyView() === 'records' && !$('#viewStudy')?.hidden;
-  if (idle && onRecords) { box.replaceChildren(...[pip].filter(Boolean)); return; }
+  if (onRecords) { box.replaceChildren(...[pip].filter(Boolean)); return; }
   const main = idle ? b('시작', '타이머 시작 (Space)', startByUser, 'primary')
     : timer.phase === 'rest' ? b('쉬는 시간 끝', '쉬는 시간 끝내기', toIdle, 'rest')
     : b('끝내기', '끝내고 기록 (Space)', stop, 'primary');

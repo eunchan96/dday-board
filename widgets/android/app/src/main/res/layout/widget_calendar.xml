@@ -91,12 +91,24 @@
                     android:textStyle="bold" />
             </LinearLayout>
         </FrameLayout>
-        <ImageView
-            android:id="@+id/cal"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:contentDescription="달력"
-            android:scaleType="fitCenter" />
+            android:layout_weight="1">
+            <ImageView
+                android:id="@+id/cal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="달력"
+                android:scaleType="fitCenter"
+                android:visibility="@integer/vis_day" />
+            <ImageView
+                android:id="@+id/cal_night"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="달력"
+                android:scaleType="fitCenter"
+                android:visibility="@integer/vis_night" />
+        </FrameLayout>
     </LinearLayout>
 </FrameLayout>

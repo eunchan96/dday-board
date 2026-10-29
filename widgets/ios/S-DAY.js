@@ -18,10 +18,13 @@ const WIDGET_URL = '__WIDGET_URL__';
 const KIND = '__KIND__';            // study | timer | upcoming | calendar
 const OPACITY_SET = '__OPACITY__';  // 배경 진하기 0~100 (%)
 const OPACITY = /^\d{1,3}$/.test(OPACITY_SET) ? Number(OPACITY_SET) : 100;
+const THEME_SET = '__THEME__';      // system | light | dark (위젯마다 스크립트를 따로 복사하니 위젯별로 정할 수 있음)
+const THEME = ['light', 'dark'].includes(THEME_SET) ? THEME_SET : 'system';
 const APP_URL = 'https://dday-board-pink.vercel.app/';
 const MODES = { watch: null, p25: { focus: 25, rest: 5 }, p50: { focus: 50, rest: 10 } };
 
-const dyn = (light, dark) => Color.dynamic(new Color(light), new Color(dark));
+// 밝게 · 어둡게로 고정했으면 그 색만, 아니면 아이폰 화면 모드를 따라감 (a = 불투명도)
+const dyn = (light, dark, a = 1) => THEME === 'light' ? new Color(light, a) : THEME === 'dark' ? new Color(dark, a) : Color.dynamic(new Color(light, a), new Color(dark, a));
 const C = {
   bg: dyn('#FFFFFF', '#161B29'),
   ink: dyn('#1C2540', '#E6EAF3'),
@@ -187,7 +190,10 @@ function timerWidget(w, d, now, fam) {
   w.addSpacer();
 }
 
-// 다가오는 일정: 색 막대(종류) · 이름 · D-day 한 줄씩
+// 다가오는 일정 (앞으로 2주): 첫 열 요일(같은 날은 한 번만) · 색 막대 · 짧은 이름 한 줄
+const W = ['일', '월', '화', '수', '목', '금', '토'];
+const labelOf = t => t.label || titleOf(t);
+const dayOf = t => t.d || (() => { const x = new Date(t.due); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; })();
 function upcomingWidget(w, d, now, fam) {
   const list = d.upcoming || [];
   const nowD = new Date(now);
@@ -200,30 +206,39 @@ function upcomingWidget(w, d, now, fam) {
       w.addSpacer();
       return;
     }
-    list.slice(0, fam === 'accessoryInline' ? 1 : 3).forEach(t => text(w, `${dday(t, nowD).text}  ${titleOf(t)}`, 12, Color.white(), 'medium'));
+    list.slice(0, fam === 'accessoryInline' ? 1 : 3).forEach(t => {
+      const dt = new Date(t.due);
+      text(w, `${W[dt.getDay()]}  ${labelOf(t)}`, 12, Color.white(), 'medium');
+    });
     return;
   }
-  const max = fam === 'small' ? 3 : fam === 'medium' ? 3 : 7;
-  const items = list.slice(0, max);
-  if (!items.length) { w.addSpacer(); text(w, '남은 일정이 없어요', 13, C.faint, 'medium'); w.addSpacer(); return; }
-  const size = fam === 'small' ? 12 : 13.5;
-  items.forEach((t, i) => {
-    if (i) w.addSpacer(fam === 'large' ? 10 : 7);
-    // 과제 · 할 일은 과목을 아래 작은 글씨로 (시험은 이름 앞에 이미 있음)
-    const sub = t.kind !== 'exam' && t.subject ? t.subject : '';
+  if (!list.length) { w.addSpacer(); text(w, '2주 안에 남은 일정이 없어요', 13, C.faint, 'medium'); w.addSpacer(); return; }
+  // 위젯은 스크롤이 안 돼서 들어가는 만큼만 (넘치면 맨 아래 +n)
+  const lines = fam === 'small' ? 5 : fam === 'medium' ? 5 : 12;
+  const size = fam === 'small' ? 12 : 13;
+  const todayKey = dayOf({ due: nowD.toISOString() });
+  let shown = 0, prev = null;
+  for (const t of list) {
+    if (shown >= lines - (list.length > lines ? 1 : 0)) break;
+    const k = dayOf(t);
+    const first = k !== prev; prev = k;
+    if (shown) w.addSpacer(first ? 6 : 3);
     const row = w.addStack(); row.centerAlignContent();
-    const bar = row.addStack();
-    bar.size = new Size(4, sub ? 30 : (fam === 'small' ? 15 : 18)); bar.cornerRadius = 2;
-    bar.backgroundColor = kindColor(t);
-    row.addSpacer(8);
-    const col = row.addStack(); col.layoutVertically();
-    text(col, titleOf(t), size, C.ink, 'medium');
-    if (sub) { col.addSpacer(1); text(col, sub, size - 2.5, C.faint, 'medium'); }
-    row.addSpacer();
+    const col = row.addStack(); col.size = new Size(fam === 'small' ? 20 : 34, 0); col.layoutVertically();
+    if (first) {
+      const dt = new Date(`${k}T00:00:00`);
+      const isToday = k === todayKey;
+      text(col, W[dt.getDay()], size, isToday ? C.pen : dt.getDay() === 0 ? C.red : C.ink, 'bold');
+      if (fam !== 'small') text(col, `${dt.getMonth() + 1}/${dt.getDate()}`, 9.5, C.faint, 'medium');
+    }
     row.addSpacer(6);
-    const dd = dday(t, nowD);
-    text(row, dd.text, size, dd.late || t.missing ? C.red : C.ink, 'bold');
-  });
+    const bar = row.addStack(); bar.size = new Size(3.5, 15); bar.cornerRadius = 1.75; bar.backgroundColor = kindColor(t);
+    row.addSpacer(7);
+    text(row, labelOf(t), size, t.missing ? C.red : C.ink, 'medium');
+    row.addSpacer();
+    shown++;
+  }
+  if (list.length > shown) { w.addSpacer(4); text(w, `+${list.length - shown}개 더`, 10.5, C.faint, 'medium'); }
   w.addSpacer();
 }
 
@@ -338,7 +353,7 @@ function calendarWidget(w, d, now, fam) {
 function build(d, kind, opacity = 100) {
   const w = new ListWidget();
   const a = opacity / 100;
-  w.backgroundColor = Color.dynamic(new Color('#FFFFFF', a), new Color('#161B29', a));
+  w.backgroundColor = dyn('#FFFFFF', '#161B29', a);
   w.url = APP_URL + (kind === 'upcoming' ? '#list' : kind === 'calendar' ? '#calendar' : '#study');
   const now = Date.now();
   const fam = config.widgetFamily || (kind === 'upcoming' ? 'medium' : kind === 'calendar' ? 'large' : 'small');

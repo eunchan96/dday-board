@@ -42,6 +42,12 @@
             </intent-filter>
         </activity>
 
+        <!-- 다가오는 일정 위젯의 스크롤 목록 -->
+        <service
+            android:name=".UpcomingService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <receiver
             android:name=".StudyWidget"
             android:exported="false"

@@ -13,7 +13,7 @@ import {
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
-  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, ETC_DEFAULT_COLOR,
+  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, savedEtcTypes, ETC_DEFAULT_COLOR, VIDEO_TYPE,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import {
@@ -114,7 +114,7 @@ function applyShorts(map) {
 }
 function applyEtc(list) {
   if (!Array.isArray(list)) return false;
-  const changed = JSON.stringify(list) !== JSON.stringify(etcTypes());
+  const changed = JSON.stringify(list) !== JSON.stringify(savedEtcTypes());
   setEtcTypes(list); storage.set(ETC_KEY, JSON.stringify(list));
   return changed;
 }
@@ -668,7 +668,8 @@ function buildFilter(subjects, pendingAll) {
   // 폰에서는 보기(지금 · 분류 · 전체) 고르기도 이 필터 안에 (상단바가 좁아서)
   const otherSem = scopeValue() !== 'current';
   const semText = otherSem ? scopeLabel() : null;
-  const label = [semText, cur === null ? '전체 과목' : (cur || '과목 없음')].filter(Boolean).join(' · ');
+  // 분류를 골랐으면 그 이름만 (과목까지 골랐으면 "분류 · 과목"), 안 골랐으면 전체 과목
+  const label = cur === null ? (semText || '전체 과목') : [semText, cur || '과목 없음'].filter(Boolean).join(' · ');
   const btn = h('button', {
     type: 'button', class: `flt-btn${cur !== null || opts.length || otherSem ? ' on' : ''}`, 'aria-expanded': fltOpen ? 'true' : 'false',
     'aria-haspopup': 'dialog', style: { '--c': cur === null ? 'var(--ink)' : subjectColor(cur) },
@@ -1030,7 +1031,8 @@ async function copyIosScript(kind, name) {
     const src = await (await fetch('widgets/ios/S-DAY.js', { cache: 'no-store' })).text();
     const code = src.replace("'__WIDGET_URL__'", JSON.stringify($('#widgetUrl').value).replace(/"/g, "'"))
       .replace("'__KIND__'", `'${kind}'`)
-      .replace("'__OPACITY__'", `'${$('#iosOpacity').value}'`);
+      .replace("'__OPACITY__'", `'${$('#iosOpacity').value}'`)
+      .replace("'__THEME__'", `'${$('#iosTheme').value}'`);
     let ok = false;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { /* 노션 안에서는 막힐 수 있음 */ }
     if (!ok) {
@@ -1190,7 +1192,8 @@ function renderEtcPicker() {
   const list = etcTypes();
   const edit = ui.etcEdit;
   if (edit) {
-    const name = h('input', { type: 'text', class: 'etc-name', maxlength: 20, value: edit.name || '', placeholder: '종류 이름 (예: 휴강)', 'aria-label': '종류 이름', autocomplete: 'off' });
+    const fixed = edit.id === VIDEO_TYPE.id;        // 영상 시청은 강의 영상에 쓰는 종류라 이름 · 삭제는 그대로
+    const name = h('input', { type: 'text', class: 'etc-name', maxlength: 20, value: edit.name || '', placeholder: '종류 이름 (예: 휴강)', 'aria-label': '종류 이름', autocomplete: 'off', disabled: fixed });
     const msg = h('p', { class: 'msg err' });
     const save = () => {
       const n = name.value.trim();
@@ -1215,7 +1218,7 @@ function renderEtcPicker() {
         }))),
       msg,
       h('div', { class: 'etc-actions' },
-        edit.id ? h('button', { type: 'button', class: 'btn sm ghost danger-text', onclick: () => {
+        edit.id && !fixed ? h('button', { type: 'button', class: 'btn sm ghost danger-text', onclick: () => {
           if (!confirm(`"${edit.name || '종류'}"를 지울까요? 이 종류로 만든 일정은 그냥 '기타'가 돼요.`)) return;
           if (ui.etcType === edit.id) ui.etcType = null;
           ui.etcEdit = null;
@@ -1237,7 +1240,7 @@ function renderEtcPicker() {
     h('button', { type: 'button', class: 'etc-chip ghost', onclick: () => { ui.etcEdit = { id: null, name: '', color: ETC_DEFAULT_COLOR }; renderEtcPicker(); } }, list.length ? '+ 종류' : '+ 종류 만들기 (예: 휴강)')));
 }
 async function saveEtcTypes(next) {
-  const prev = etcTypes();
+  const prev = savedEtcTypes();
   setEtcTypes(next); storage.set(ETC_KEY, JSON.stringify(next));
   renderEtcPicker(); renderAll();
   try { const out = await api.setEtcTypes(state.code, next); setEtcTypes(out); storage.set(ETC_KEY, JSON.stringify(out)); renderAll(); }
@@ -1655,6 +1658,8 @@ function bind() {
   $('#btnWidgetCopy').addEventListener('click', () => copyText($('#widgetUrl').value, $('#widgetUrl'), $('#widgetMsg'), $('#btnWidgetCopy')));
   try { const v = storage.get('ddayboard.iosOpacity'); if (v) $('#iosOpacity').value = v; } catch { /* 무시 */ }
   $('#iosOpacity').addEventListener('change', e => { try { storage.set('ddayboard.iosOpacity', e.target.value); } catch { /* 무시 */ } });
+  try { const v = storage.get('ddayboard.iosTheme'); if (v) $('#iosTheme').value = v; } catch { /* 무시 */ }
+  $('#iosTheme').addEventListener('change', e => { try { storage.set('ddayboard.iosTheme', e.target.value); } catch { /* 무시 */ } });
   $('#iosCopy').addEventListener('click', e => {
     const b = e.target.closest('button[data-kind]');
     if (b) copyIosScript(b.dataset.kind, b.dataset.name);

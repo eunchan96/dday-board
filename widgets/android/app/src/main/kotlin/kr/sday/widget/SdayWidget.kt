@@ -67,21 +67,18 @@ object Widgets {
     const val ACTION_CAL = "kr.sday.widget.CAL"
     const val APP_URL = "https://dday-board-pink.vercel.app/"
     private val MODES = mapOf("p25" to (25 to 5), "p50" to (50 to 10))
-    private val ROWS = listOf(
-        arrayOf(R.id.row0, R.id.bar0, R.id.title0, R.id.dday0, R.id.sub0),
-        arrayOf(R.id.row1, R.id.bar1, R.id.title1, R.id.dday1, R.id.sub1),
-        arrayOf(R.id.row2, R.id.bar2, R.id.title2, R.id.dday2, R.id.sub2),
-        arrayOf(R.id.row3, R.id.bar3, R.id.title3, R.id.dday3, R.id.sub3),
-        arrayOf(R.id.row4, R.id.bar4, R.id.title4, R.id.dday4, R.id.sub4),
-        arrayOf(R.id.row5, R.id.bar5, R.id.title5, R.id.dday5, R.id.sub5),
-    )
 
     private fun ids(ctx: Context, cls: Class<*>) = AppWidgetManager.getInstance(ctx).getAppWidgetIds(ComponentName(ctx, cls))
     fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java, CalendarWidget::class.java).any { ids(ctx, it).isNotEmpty() }
 
-    /** 배경 진하기 (앱에서 정한 값) */
-    internal fun applyOpacity(ctx: Context, views: RemoteViews, kind: String) =
+    /** 배경 진하기(앱에서 정한 값)와 화면 모드. 밝게 · 어둡게로 정했으면 배경과 새로 고침 아이콘도 그 색으로 */
+    internal fun applyOpacity(ctx: Context, views: RemoteViews, kind: String): Palette {
         views.setInt(R.id.bg, "setImageAlpha", Store.opacity(ctx, kind) * 255 / 100)
+        val pal = Palette.of(ctx, kind)
+        pal.paint(views, R.id.bg, "setColorFilter", R.color.sheet)
+        pal.paint(views, R.id.refresh, "setColorFilter", R.color.faint)
+        return pal
+    }
 
     private fun open(ctx: Context, hash: String, code: Int) = PendingIntent.getActivity(
         ctx, code, Intent(ctx, OpenActivity::class.java).putExtra("url", APP_URL + hash).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -118,21 +115,25 @@ object Widgets {
     }
     private val SAMSUNG = listOf("com.sec.android.app.sbrowser", "com.sec.android.app.sbrowser.beta")
 
+    /** S-DAY 주소를 열 수 있다고 한 앱들 (브라우저 포함) */
+    fun handlers(ctx: Context, url: String = APP_URL): List<String> = runCatching {
+        ctx.packageManager.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse(url)), android.content.pm.PackageManager.MATCH_ALL)
+            .map { it.activityInfo.packageName }.distinct()
+    }.getOrDefault(emptyList())
+
     /** 설치된 S-DAY 앱(WebAPK) 패키지 이름. 없으면 null */
     fun findApp(ctx: Context): String? {
         val pm = ctx.packageManager
         val host = Uri.parse(APP_URL).host ?: return null
         return runCatching {
-            // 시작 주소 · 범위 메타데이터가 S-DAY인 앱 (크롬 WebAPK)
+            // 1) 시작 주소 · 범위 메타데이터가 S-DAY인 앱 (크롬 WebAPK)
             pm.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA).firstOrNull { app ->
                 if (app.packageName == ctx.packageName) return@firstOrNull false
                 val md = app.metaData ?: return@firstOrNull false
-                md.keySet().any { k -> k.contains("webapk", ignoreCase = true) && (md.get(k)?.toString() ?: "").contains(host) }
+                md.keySet().any { k -> (md.get(k)?.toString() ?: "").contains(host) }
             }?.packageName
-            // 그 주소를 직접 받겠다고 한 앱 중 이름에 webapk가 들어간 것 (삼성 인터넷 등)
-            ?: pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse(APP_URL)), android.content.pm.PackageManager.MATCH_ALL)
-                .map { it.activityInfo.packageName }
-                .firstOrNull { it.contains("webapk", ignoreCase = true) }
+            // 2) S-DAY 주소는 받는데 다른 주소(example.com)는 안 받는 앱 = 브라우저가 아닌 S-DAY 앱
+                ?: (handlers(ctx) - handlers(ctx, "https://example.com/").toSet() - ctx.packageName).firstOrNull()
         }.getOrNull()
     }
 
@@ -148,35 +149,28 @@ object Widgets {
         return renderTimer(ctx, data, nowMs)
     }
 
-    /* ───── 다가오는 일정 ───── */
+    /* ───── 다가오는 일정: 앞으로 2주, 요일별로 묶은 목록(스크롤) ───── */
     private fun renderUpcoming(ctx: Context, data: WidgetData?, message: String, nowMs: Long) {
+        val manager = AppWidgetManager.getInstance(ctx)
         val ids = ids(ctx, SdayWidget::class.java)
         if (ids.isEmpty()) return
-        val views = RemoteViews(ctx.packageName, R.layout.widget)
-        applyOpacity(ctx, views, "upcoming")
-        views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 20)); paintRefresh(views)
-        views.setOnClickPendingIntent(R.id.root, open(ctx, "#list", 0))
-        val list = data?.upcoming.orEmpty()
-        views.setViewVisibility(R.id.empty, if (list.isEmpty()) View.VISIBLE else View.GONE)
-        views.setTextViewText(R.id.empty, if (data == null) message else "남은 일정이 없어요")
-        val now = Instant.ofEpochMilli(nowMs)
-        ROWS.forEachIndexed { i, r ->
-            val task = list.getOrNull(i)
-            if (task == null) { views.setViewVisibility(r[0], View.GONE); return@forEachIndexed }
-            views.setViewVisibility(r[0], View.VISIBLE)
-            views.setInt(r[1], "setColorFilter", CalendarDraw.baseColor(ctx, task.kind, task.etcColor))
-            // 시험은 "중간고사"처럼 이름만 있는 경우가 많아 과목을 앞에 붙임 (접두어는 없음)
-            val title = if (task.kind == "exam" && task.subject.isNotBlank() && !task.title.contains(task.subject)) "${task.subject} ${task.title}" else task.title
-            views.setTextViewText(r[2], title)
-            // 과제 · 할 일은 과목을 아래 작은 글씨로 (시험은 이름 앞에 이미 있음)
-            val sub = if (task.kind != "exam") task.subject else ""
-            views.setTextViewText(r[4], sub)
-            views.setViewVisibility(r[4], if (sub.isBlank()) View.GONE else View.VISIBLE)
-            val (label, late) = dday(task, now)
-            views.setTextViewText(r[3], label)
-            views.setTextColor(r[3], ctx.getColor(if (task.missing || late) R.color.red else R.color.ink))
+        for (id in ids) {
+            val views = RemoteViews(ctx.packageName, R.layout.widget)
+            val pal = applyOpacity(ctx, views, "upcoming")
+            views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 20)); paintRefresh(views)
+            views.setOnClickPendingIntent(R.id.root, open(ctx, "#list", 0))
+            // 목록: 줄마다 같은 곳(#list)을 연다
+            views.setRemoteAdapter(R.id.list, Intent(ctx, UpcomingService::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .also { it.data = Uri.parse(it.toUri(Intent.URI_INTENT_SCHEME)) })
+            views.setPendingIntentTemplate(R.id.list, PendingIntent.getActivity(
+                ctx, 30, Intent(ctx, OpenActivity::class.java).putExtra("url", APP_URL + "#list").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or (if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)))
+            views.setEmptyView(R.id.list, R.id.empty)
+            views.setTextViewText(R.id.empty, if (data == null) message else "2주 안에 남은 일정이 없어요")
+            pal.text(views, R.id.empty, R.color.faint)
+            manager.updateAppWidget(id, views)
         }
-        AppWidgetManager.getInstance(ctx).updateAppWidget(ids, views)
+        manager.notifyAppWidgetViewDataChanged(ids, R.id.list)
     }
 
     /* ───── 캘린더: 이번 달 달력, 일정 있는 날 아래에 점 (시험 빨강 · 과제 노랑 · 할 일 파랑) ───── */
@@ -191,7 +185,11 @@ object Widgets {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
         for (id in ids) {
             val views = RemoteViews(ctx.packageName, R.layout.widget_calendar)
-            applyOpacity(ctx, views, "calendar")
+            val pal = applyOpacity(ctx, views, "calendar")
+            pal.text(views, R.id.cal_month, R.color.ink)
+            pal.text(views, R.id.cal_today, R.color.ink)
+            for (icon in intArrayOf(R.id.cal_prev, R.id.cal_next, R.id.cal_add)) pal.paint(views, icon, "setColorFilter", R.color.ink)
+            if (pal.forced) views.setInt(R.id.cal_today, "setBackgroundResource", if (pal.isDark) R.drawable.today_box_dark else R.drawable.today_box_light)
             views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 22)); paintRefresh(views)
             views.setTextViewText(R.id.cal_month, if (month.year == today.year) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월")
             views.setTextViewText(R.id.cal_today, today.dayOfMonth.toString())
@@ -200,14 +198,25 @@ object Widgets {
             views.setOnClickPendingIntent(R.id.cal_today, shift(12, 0))
             views.setOnClickPendingIntent(R.id.cal_add, open(ctx, "#new", 13))
             views.setOnClickPendingIntent(R.id.cal, open(ctx, "#calendar", 4))
+            views.setOnClickPendingIntent(R.id.cal_night, open(ctx, "#calendar", 4))
             val opts = manager.getAppWidgetOptions(id)
             val dm = ctx.resources.displayMetrics
             val wDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250).coerceAtLeast(110)
             val hDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 250).coerceAtLeast(110)
             // 위젯 안쪽 여백과 머리줄(40dp)을 빼고, 비트맵은 최대 2.5배 밀도까지만 (메모리 제한)
             val scale = minOf(dm.density, 2.5f)
-            val bmp = CalendarDraw.draw(ctx, ((wDp - 16) * scale).toInt(), ((hDp - 54) * scale).toInt(), scale, month, today, data?.month.orEmpty())
-            views.setImageViewBitmap(R.id.cal, bmp)
+            val bw = ((wDp - 16) * scale).toInt(); val bh = ((hDp - 54) * scale).toInt()
+            val items = data?.month.orEmpty()
+            if (pal.forced) {
+                // 밝게 · 어둡게로 정함: 그 모드 그림 하나만
+                views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(pal.now, bw, bh, scale, month, today, items))
+                views.setViewVisibility(R.id.cal, View.VISIBLE)
+                views.setViewVisibility(R.id.cal_night, View.GONE)
+            } else {
+                // 폰 설정 따라: 밝은 그림 · 어두운 그림을 둘 다 넣어 두면 화면 모드가 바뀌어도 바로 맞는 쪽이 보임
+                views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(Palette.themed(ctx, false), bw, bh, scale, month, today, items))
+                views.setImageViewBitmap(R.id.cal_night, CalendarDraw.draw(Palette.themed(ctx, true), bw, bh, scale, month, today, items))
+            }
             manager.updateAppWidget(id, views)
         }
     }
@@ -217,7 +226,9 @@ object Widgets {
         val ids = ids(ctx, StudyWidget::class.java)
         if (ids.isEmpty()) return
         val views = RemoteViews(ctx.packageName, R.layout.widget_study)
-        applyOpacity(ctx, views, "study")
+        val pal = applyOpacity(ctx, views, "study")
+        pal.text(views, R.id.label, R.color.pencil)
+        pal.text(views, R.id.today, R.color.ink)
         views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 21)); paintRefresh(views)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 1))
         if (data == null) {
@@ -236,7 +247,10 @@ object Widgets {
         val ids = ids(ctx, TimerWidget::class.java)
         if (ids.isEmpty()) return null
         val views = RemoteViews(ctx.packageName, R.layout.widget_timer)
-        applyOpacity(ctx, views, "timer")
+        val pal = applyOpacity(ctx, views, "timer")
+        pal.text(views, R.id.timer_label, R.color.pencil)
+        pal.text(views, R.id.timer, R.color.ink)
+        pal.text(views, R.id.idle, R.color.faint)
         views.setOnClickPendingIntent(R.id.root, open(ctx, "#study", 2))
         views.setOnClickPendingIntent(R.id.refresh, refresh(ctx, 3)); paintRefresh(views)
         var timerEnd: Long? = null
@@ -246,9 +260,9 @@ object Widgets {
             val elapsed = t.acc + nowMs - t.segStart
             val mode = MODES[t.mode]
             val color = when {
-                t.phase == "rest" -> ctx.getColor(R.color.green)
-                data.timerColor != null -> runCatching { Color.parseColor(data.timerColor) }.getOrDefault(ctx.getColor(R.color.pen))
-                else -> ctx.getColor(R.color.pen)
+                t.phase == "rest" -> pal.color(R.color.green)
+                data.timerColor != null -> runCatching { Color.parseColor(data.timerColor) }.getOrDefault(pal.color(R.color.pen))
+                else -> pal.color(R.color.pen)
             }
             views.setInt(R.id.timer_dot, "setColorFilter", color)
             views.setTextViewText(R.id.timer_label, if (t.phase == "rest") "쉬는 시간" else t.label.ifBlank { "공부 중" })
@@ -267,7 +281,7 @@ object Widgets {
             }
         }
         if (!shown) {
-            views.setInt(R.id.timer_dot, "setColorFilter", ctx.getColor(R.color.rule))
+            pal.paint(views, R.id.timer_dot, "setColorFilter", R.color.rule, always = true)
             views.setTextViewText(R.id.timer_label, "타이머")
             views.setChronometer(R.id.timer, SystemClock.elapsedRealtime(), null, false)
         }
@@ -280,19 +294,5 @@ object Widgets {
     private fun spent(sec: Long): String {
         val m = sec / 60; val h = m / 60; val mm = m % 60
         return when { h > 0 && mm > 0 -> "${h}시간 ${mm}분"; h > 0 -> "${h}시간"; else -> "${mm}분" }
-    }
-
-    /** D-day 글자와 지났는지 */
-    private fun dday(t: Task, now: Instant): Pair<String, Boolean> {
-        val ms = Duration.between(now, t.due).toMillis()
-        if (t.kind == "exam" && ms < 0) return "시험 중" to false
-        if (ms < 0) return "지남" to true
-        if (ms < 24 * 3600_000L) {
-            val h = ms / 3600_000L
-            return (if (h > 0) "${h}시간" else "${maxOf(1, ms / 60_000L)}분") to false
-        }
-        val zone = ZoneId.systemDefault()
-        val days = ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), t.due.atZone(zone).toLocalDate())
-        return (if (days == 0L) "D-DAY" else "D-$days") to false
     }
 }

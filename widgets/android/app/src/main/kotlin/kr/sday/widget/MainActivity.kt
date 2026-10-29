@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
+import android.view.View
 import kotlin.concurrent.thread
 
 /** 위젯 주소를 넣는 화면 (S-DAY 설정 → 위젯에서 복사한 주소) */
@@ -31,11 +32,13 @@ class MainActivity : Activity() {
         // 위젯을 누르면 어디로 열리는지 (설치한 S-DAY 앱을 찾았는지) 보여 줌
         val target = findViewById<TextView>(R.id.open_target)
         val app = Widgets.findApp(this)
+        val handlers = Widgets.handlers(this).filter { it != packageName }
+        val names = handlers.joinToString(", ") { pkg -> runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg) }
         target.text = when {
             app != null -> "위젯을 누르면: 설치한 S-DAY 앱 ($app)"
             packageManager.getLaunchIntentForPackage("com.sec.android.app.sbrowser") != null -> "위젯을 누르면: 삼성 인터넷 (설치한 S-DAY 앱을 찾지 못했어요)"
             else -> "위젯을 누르면: 기본 브라우저 (설치한 S-DAY 앱을 찾지 못했어요)"
-        }
+        } + if (names.isNotBlank()) "\nS-DAY 주소를 열 수 있는 앱: $names" else ""
 
         findViewById<Button>(R.id.paste).setOnClickListener {
             val clip = (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).primaryClip
@@ -90,7 +93,17 @@ class MainActivity : Activity() {
                     override fun onStopTrackingTouch(b: SeekBar) {}
                 })
             }
-            box.addView(label); box.addView(bar)
+            // 화면 모드: 폰 설정 따라 · 밝게 · 어둡게 (위젯마다)
+            val group = android.widget.RadioGroup(this).apply { orientation = android.widget.RadioGroup.HORIZONTAL }
+            for ((value, text) in listOf("system" to "폰 설정 따라", "light" to "밝게", "dark" to "어둡게")) {
+                val rb = android.widget.RadioButton(this).apply {
+                    id = View.generateViewId(); this.text = text; textSize = 13f; setTextColor(getColor(R.color.pencil))
+                    isChecked = Store.theme(this@MainActivity, kind) == value
+                    setOnCheckedChangeListener { _, on -> if (on) { Store.setTheme(this@MainActivity, kind, value); Widgets.render(this@MainActivity) } }
+                }
+                group.addView(rb)
+            }
+            box.addView(label); box.addView(bar); box.addView(group)
         }
 
         findViewById<Button>(R.id.open).setOnClickListener {

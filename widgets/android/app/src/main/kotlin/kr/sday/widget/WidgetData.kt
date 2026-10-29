@@ -15,6 +15,10 @@ data class Task(
     val missing: Boolean,
     val color: String?,
     val etcColor: String? = null,
+    /** 짧은 이름: 과목(줄임말) + 종류 (예: 데이터베이스 과제) */
+    val label: String = title,
+    /** 마감 날짜 yyyy-MM-dd (한국 시간) */
+    val day: String = "",
 )
 
 data class Timer(
@@ -56,6 +60,12 @@ object Store {
     }
     fun setOpacity(ctx: Context, kind: String, v: Int) =
         ctx.getSharedPreferences(PREFS, 0).edit().putInt("opacity_$kind", v.coerceIn(0, 100)).apply()
+    /** 위젯마다 화면 모드: system(폰 설정 따라) · light · dark */
+    fun theme(ctx: Context, kind: String): String =
+        ctx.getSharedPreferences(PREFS, 0).getString("theme_$kind", "system")?.takeIf { it in THEMES } ?: "system"
+    fun setTheme(ctx: Context, kind: String, v: String) =
+        ctx.getSharedPreferences(PREFS, 0).edit().putString("theme_$kind", if (v in THEMES) v else "system").apply()
+    val THEMES = listOf("system", "light", "dark")
     /** 캘린더 위젯에서 넘겨 본 달 (0 = 이번 달) */
     fun calOffset(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("calOffset", 0)
     fun setCalOffset(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("calOffset", v.coerceIn(-3, 6)).apply()
@@ -107,6 +117,8 @@ object Api {
                         missing = t.optBoolean("missing", false),
                         color = if (t.isNull("color")) null else t.optString("color"),
                         etcColor = if (t.isNull("c")) null else t.optString("c"),
+                        label = t.optString("label").ifBlank { t.optString("title") },
+                        day = t.optString("d"),
                     )
                 )
             }

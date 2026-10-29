@@ -174,13 +174,34 @@ export const subjectShortOf = name => (name && subjectShortMap[name]) || '';
 export const shortSubject = name => subjectShortOf(name) || name || '';
 
 // '기타' 종류: [{ id, name, color }] (보드에 저장)
+// '영상 시청'(id video)은 늘 있는 종류: 스마트캠퍼스 강의 영상이 이 종류로 보인다 (색만 바꿀 수 있음)
 let etcList = [];
 export const ETC_DEFAULT_COLOR = '#9AA0AA';
+export const VIDEO_TYPE = { id: 'video', name: '영상 시청', color: '#2E9E74' };
 export function setEtcTypes(list) { etcList = Array.isArray(list) ? list.filter(e => e && e.id && e.name) : []; }
-export const etcTypes = () => etcList.slice();
-export const etcTypeOf = t => (t && t.kind === 'etc' ? etcList.find(e => e.id === t.etcType) || null : null);
+export const savedEtcTypes = () => etcList.slice();
+export const etcTypes = () => (etcList.some(e => e.id === VIDEO_TYPE.id) ? etcList.slice() : [...etcList, { ...VIDEO_TYPE }]);
+// 스마트캠퍼스에서 가져온 강의 영상 (할 일로 저장되지만 '영상 시청'으로 보여 줌)
+export const isLecture = t => !!t && t.kind === 'todo' && t.source === 'canvas';
+export const etcTypeOf = t => {
+  if (isLecture(t)) return etcTypes().find(e => e.id === VIDEO_TYPE.id);
+  return t && t.kind === 'etc' ? etcTypes().find(e => e.id === t.etcType) || null : null;
+};
 export const etcLabel = t => etcTypeOf(t)?.name || '기타';
 export const etcColor = t => etcTypeOf(t)?.color || ETC_DEFAULT_COLOR;
+// 캘린더 · 위젯처럼 좁은 곳의 이름: 과목(줄임말) + 종류 — 데이터베이스 과제 · 데이터베이스 휴강 · 데이터베이스 영상 시청
+// 시험은 과목 + 시험 이름, 직접 넣은 할 일은 이름 그대로, 과목이 없으면 이름 그대로
+export function shortLabel(t) {
+  const subj = t.subject ? shortSubject(t.subject) : '';
+  if (t.kind === 'exam') {
+    if (!t.subject) return t.title;
+    return t.title.includes(t.subject) ? t.title.replace(t.subject, subj) : `${subj} ${t.title}`;
+  }
+  if (!subj) return t.title;
+  if (isLecture(t) || t.kind === 'etc') return `${subj} ${etcLabel(t)}`;
+  if (t.kind === 'todo') return t.title;
+  return `${subj} 과제`;
+}
 
 // 안전한 DOM 생성: h('div', { class: 'x', onclick: fn }, '텍스트', child)
 export function h(tag, attrs, ...children) {
