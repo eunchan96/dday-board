@@ -15,7 +15,10 @@ const FIELDS = {
 
 const parseDate = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
 const parseTime = v => { const m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? { h: +m[1], m: +m[2] } : null; };
+// 'allday' = 종일 (시각 없는 일정)
+export const ALL_DAY = 'allday';
 export const timeLabel = v => {
+  if (v === ALL_DAY) return '종일';
   const t = parseTime(v);
   if (!t) return null;
   const ap = t.h < 12 ? '오전' : '오후';

@@ -90,6 +90,7 @@ async function push(fn) {
 const payload = t => ({
   id: t.id, kind: ['exam', 'todo', 'etc'].includes(t.kind) ? t.kind : 'assignment',
   etcType: t.kind === 'etc' ? t.etcType || null : null,
+  allDay: !!t.allDay,
   subject: t.subject || '', title: t.title, due: t.due, endAt: t.endAt || null,
   location: t.location || '', done: !!t.done, memo: t.memo || '', starred: !!t.starred,
 });

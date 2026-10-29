@@ -36,7 +36,8 @@ export function taskRow(t, ctx, { compact = false } = {}) {
   // 남은 시간은 이틀 안일 때만 (그 밖에는 오른쪽 D-day로 충분)
   let remain = null;
   if (!t.done) {
-    if (exam && info.ms < 0) remain = examOver(t, now) ? null : '지금 시험 중';
+    if (t.allDay) remain = null;
+    else if (exam && info.ms < 0) remain = examOver(t, now) ? null : '지금 시험 중';
     else if (info.ms >= 0 && info.ms < 2 * 864e5) remain = `${fmtDuration(info.ms)} 남음`;
   }
 
@@ -60,7 +61,7 @@ export function taskRow(t, ctx, { compact = false } = {}) {
     t.kind === 'todo' && !isLecture(t) ? h('span', { class: 'todo-word' }, '할 일') : null,
     t.kind === 'etc' || isLecture(t) ? h('span', { class: 'etc-word', style: { '--e': etcColor(t) } }, etcLabel(t)) : null,
     !compact && t.subject && displayTitle(t) === t.title ? h('span', { class: 'subj' }, t.subject) : null,
-    exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, fmtShort(due)),
+    exam ? h('span', null, `${fmtShort(due, false)} ${timeRange(t)}`) : h('span', null, t.allDay ? `${fmtShort(due, false)} 종일` : fmtShort(due)),
     exam && t.location ? h('span', { class: 'place' }, t.location) : null,
     remain ? h('span', { class: 'remain' }, remain) : null,
     !compact && t.done ? submissionLine(t) : null,

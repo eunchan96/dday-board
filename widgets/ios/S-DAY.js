@@ -316,8 +316,8 @@ function calendarWidget(w, d, now, fam) {
   w.addSpacer(big ? 4 : 2);
   const dow = w.addStack();
   W.split('').forEach((ch, i) => {
-    const c = dow.addStack(); c.size = new Size(CW, 15); c.centerAlignContent();
-    const t = c.addText(ch); t.font = Font.boldSystemFont(10); t.textColor = i === 0 ? C.red : i === 6 ? BLUE : C.faint;
+    const c = dow.addStack(); c.size = new Size(CW, 17); c.centerAlignContent();
+    const t = c.addText(ch); t.font = Font.boldSystemFont(11.5); t.textColor = i === 0 ? C.red : i === 6 ? BLUE : C.faint;
   });
   for (let r = 0; r < weeks; r++) {
     const row = w.addStack();

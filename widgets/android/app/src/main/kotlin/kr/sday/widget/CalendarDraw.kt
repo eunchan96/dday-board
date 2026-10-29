@@ -38,11 +38,11 @@ object CalendarDraw {
 
         // 요일
         val colW = w / 7f
-        val dowH = 18 * s
-        p.textSize = 11 * s; p.textAlign = Paint.Align.CENTER; p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val dowH = 20 * s
+        p.textSize = 12.5f * s; p.textAlign = Paint.Align.CENTER; p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         "일월화수목금토".forEachIndexed { i, ch ->
             p.color = if (i == 0) red else if (i == 6) blue else pencil
-            c.drawText(ch.toString(), colW * i + colW / 2, 12.5f * s, p)
+            c.drawText(ch.toString(), colW * i + colW / 2, 14f * s, p)
         }
         val top = dowH
         val rowH = (h - top) / weeks

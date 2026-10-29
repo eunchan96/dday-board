@@ -7,7 +7,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Task = {
-  id: string; kind: string; title: string; subject: string; due: string; endAt: string | null;
+  id: string; kind: string; title: string; subject: string; due: string; endAt: string | null; allDay?: boolean;
   location: string; done: boolean; link: string | null; memo: string; missing?: boolean;
 };
 
@@ -29,6 +29,9 @@ function fold(line: string) {
   return out.join("\r\n ");
 }
 
+// 한국 날짜 yyyymmdd (+days)
+const kstDate = (d: Date, days: number) => new Date(d.getTime() + 9 * 3600e3 + days * 864e5).toISOString().slice(0, 10).replace(/-/g, "");
+
 export function toIcs(tasks: Task[], now = new Date()) {
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//dday-board//KO", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
@@ -39,14 +42,15 @@ export function toIcs(tasks: Task[], now = new Date()) {
     const start = new Date(t.due);
     // 과제는 마감 시각에 30분짜리, 시험은 시작~끝(없으면 1시간)
     const end = exam && t.endAt ? new Date(t.endAt) : new Date(start.getTime() + (exam ? 60 : 30) * 60000);
-    const head = exam ? "[시험] " : t.done ? "[완료] " : t.missing ? "[미제출] " : "[마감] ";
+    const head = exam ? "[시험] " : t.kind === "etc" ? (t.done ? "[완료] " : "") : t.done ? "[완료] " : t.missing ? "[미제출] " : "[마감] ";
     const desc = [t.subject, t.memo, t.link].filter(Boolean).join("\n");
     lines.push(
       "BEGIN:VEVENT",
       `UID:${t.id}@dday-board`,
       `DTSTAMP:${stamp(now.toISOString())}`,
-      `DTSTART:${stamp(start.toISOString())}`,
-      `DTEND:${stamp(end.toISOString())}`,
+      // 종일 일정은 날짜만 (한국 날짜 기준, 끝은 다음 날)
+      ...(t.allDay ? [`DTSTART;VALUE=DATE:${kstDate(start, 0)}`, `DTEND;VALUE=DATE:${kstDate(start, 1)}`]
+                   : [`DTSTART:${stamp(start.toISOString())}`, `DTEND:${stamp(end.toISOString())}`]),
       fold(`SUMMARY:${esc(head + (t.subject ? `${t.subject} ` : "") + t.title)}`),
     );
     if (desc) lines.push(fold(`DESCRIPTION:${esc(desc)}`));

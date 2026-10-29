@@ -5,7 +5,7 @@ import {
   createBoard, connect, disconnect, loadLms, lmsSync, setFeed, setToken, setOrigin, importBackup, exportBackup, canvasImport, storage,
 } from './store.js';
 import { parseCanvasData, summarize, bookmarkletSource, listenForCanvasData } from './canvas.js';
-import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel } from './picker.js';
+import { initPickers, setField, refreshPickLabels, setTimePresets, closePicker, pickerOpen, timeLabel, ALL_DAY } from './picker.js';
 import { pushSupport, pushStatus, enablePush, disablePush, setLeads, testPush, LEAD_OPTIONS, DEFAULT_LEADS } from './push.js';
 import { errText, api, CALENDAR_FEED_URL, WIDGET_URL } from './api.js';
 import {
@@ -1143,13 +1143,13 @@ const minutesBetween = (a, b) => {
 };
 function autoEnd(min) {
   ui.settingEnd = true;
-  setField('fEnd', addMinutes($('#fTime').value || '10:30', min));
+  setField('fEnd', addMinutes(/^\d/.test($('#fTime').value) ? $('#fTime').value : '10:30', min));
   ui.settingEnd = false;
   ui.endAuto = true;
   ui.examLength = min;
 }
 function renderDurations() {
-  const start = $('#fTime').value || '10:30';
+  const start = /^\d/.test($('#fTime').value) ? $('#fTime').value : '10:30';
   const cur = $('#fEnd').value ? minutesBetween(start, $('#fEnd').value) : null;
   const opts = [[50, '50분'], [60, '1시간'], [75, '1시간 15분'], [90, '1시간 30분'], [120, '2시간']];
   $('#durations').replaceChildren(
@@ -1175,7 +1175,9 @@ function setKind(kind, { isNew }) {
   $('#fMemo').placeholder = exam ? '시험 범위, 준비물' : '메모';
   renderDoneBtn();
   // 새로 만들 때 시각 기본값만 템플릿에 맞춤 (사용자가 바꾼 값은 유지)
-  setTimePresets('fTime', exam ? ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'] : ['09:00', '12:00', '18:00', '23:59']);
+  // 시험 말고는 '종일'도 (휴강처럼 시각이 없는 일정)
+  setTimePresets('fTime', exam ? ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'] : [ALL_DAY, '09:00', '12:00', '18:00', '23:59']);
+  if (exam && $('#fTime').value === ALL_DAY) setField('fTime', '10:30');
   if (isNew) {
     const t = $('#fTime').value;
     if (exam && (t === '23:59' || !t)) setField('fTime', '10:30');
@@ -1260,7 +1262,7 @@ function openPanel(task, presetDay, kind) {
   subjPick.set(task ? task.subject || '' : (state.prefs.subject || ''));
   const due = task ? new Date(task.due) : (presetDay ? new Date(presetDay) : addDays(startOfDay(new Date()), 7));
   $('#fDate').value = toDateInput(due);
-  $('#fTime').value = task ? toTimeInput(due) : '23:59';
+  $('#fTime').value = task ? (task.allDay ? ALL_DAY : toTimeInput(due)) : '23:59';
   ui.endAuto = !(task && task.endAt);
   $('#fStar').checked = !!(task && task.starred);
   $('#fDone').checked = !!(task && task.done);
@@ -1346,7 +1348,8 @@ function savePanel() {
   if (!title && ui.kind === 'etc') { msg.textContent = '일정 이름을 적거나 종류를 골라 주세요'; $('#fTitle').focus(); return; }
   if (!title) { msg.textContent = ui.kind === 'exam' ? '시험 이름을 적어 주세요' : ui.kind === 'todo' ? '할 일을 적어 주세요' : '과제명을 적어 주세요'; $('#fTitle').focus(); return; }
   if (!$('#fDate').value) { msg.textContent = '날짜를 골라 주세요'; $('#fDateBtn').focus(); return; }
-  const due = new Date(`${$('#fDate').value}T${$('#fTime').value || '23:59'}`);
+  const allDay = $('#fTime').value === ALL_DAY && ui.kind !== 'exam';
+  const due = new Date(`${$('#fDate').value}T${allDay ? '23:59:59' : ($('#fTime').value || '23:59')}`);
   if (isNaN(due)) { msg.textContent = '마감 날짜를 다시 확인해 주세요'; return; }
   const isNew = !ui.editingId;
   const exam = ui.kind === 'exam';
@@ -1359,6 +1362,7 @@ function savePanel() {
   const fields = {
     kind: exam ? 'exam' : ['todo', 'etc'].includes(ui.kind) ? ui.kind : 'assignment',
     etcType: ui.kind === 'etc' ? ui.etcType || null : null,
+    allDay,
     title: title.slice(0, 200),
     subject: subjPick.value.slice(0, 40),
     due: due.toISOString(),
