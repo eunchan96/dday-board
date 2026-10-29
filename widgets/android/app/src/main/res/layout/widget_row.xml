@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 다가오는 일정 한 줄: 요일(그날 첫 줄만) · 색 막대 · 이름 -->
+<!-- 다가오는 일정 한 줄: "토 31"(그날 첫 줄만) · 색 막대 · 이름 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/row"
     android:layout_width="match_parent"
@@ -9,15 +9,16 @@
     android:paddingTop="3dp"
     android:paddingBottom="3dp">
     <LinearLayout
-        android:layout_width="34dp"
+        android:layout_width="40dp"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
         <TextView
             android:id="@+id/wd"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:includeFontPadding="false"
+            android:maxLines="1"
             android:textColor="@color/ink"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -25,16 +26,17 @@
             android:id="@+id/date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
             android:includeFontPadding="false"
-            android:paddingTop="1dp"
+            android:maxLines="1"
             android:textColor="@color/faint"
-            android:textSize="9.5sp" />
+            android:textSize="12sp" />
     </LinearLayout>
     <ImageView
         android:id="@+id/bar"
         android:layout_width="4dp"
         android:layout_height="16dp"
-        android:layout_marginStart="6dp"
+        android:layout_marginStart="4dp"
         android:importantForAccessibility="no"
         android:scaleType="fitXY"
         android:src="@drawable/bar" />

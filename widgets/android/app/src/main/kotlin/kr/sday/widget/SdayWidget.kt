@@ -166,7 +166,8 @@ object Widgets {
                 ctx, 30, Intent(ctx, OpenActivity::class.java).putExtra("url", APP_URL + "#list").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 PendingIntent.FLAG_UPDATE_CURRENT or (if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)))
             views.setEmptyView(R.id.list, R.id.empty)
-            views.setTextViewText(R.id.empty, if (data == null) message else "2주 안에 남은 일정이 없어요")
+            // 목록은 첫 줄이 늘 오늘이라 비는 건 아직 못 받았을 때뿐
+            views.setTextViewText(R.id.empty, message)
             pal.text(views, R.id.empty, R.color.faint)
             manager.updateAppWidget(id, views)
         }
@@ -198,7 +199,6 @@ object Widgets {
             views.setOnClickPendingIntent(R.id.cal_today, shift(12, 0))
             views.setOnClickPendingIntent(R.id.cal_add, open(ctx, "#new", 13))
             views.setOnClickPendingIntent(R.id.cal, open(ctx, "#calendar", 4))
-            views.setOnClickPendingIntent(R.id.cal_night, open(ctx, "#calendar", 4))
             val opts = manager.getAppWidgetOptions(id)
             val dm = ctx.resources.displayMetrics
             val wDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250).coerceAtLeast(110)
@@ -207,16 +207,8 @@ object Widgets {
             val scale = minOf(dm.density, 2.5f)
             val bw = ((wDp - 16) * scale).toInt(); val bh = ((hDp - 54) * scale).toInt()
             val items = data?.month.orEmpty()
-            if (pal.forced) {
-                // 밝게 · 어둡게로 정함: 그 모드 그림 하나만
-                views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(pal.now, bw, bh, scale, month, today, items))
-                views.setViewVisibility(R.id.cal, View.VISIBLE)
-                views.setViewVisibility(R.id.cal_night, View.GONE)
-            } else {
-                // 폰 설정 따라: 밝은 그림 · 어두운 그림을 둘 다 넣어 두면 화면 모드가 바뀌어도 바로 맞는 쪽이 보임
-                views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(Palette.themed(ctx, false), bw, bh, scale, month, today, items))
-                views.setImageViewBitmap(R.id.cal_night, CalendarDraw.draw(Palette.themed(ctx, true), bw, bh, scale, month, today, items))
-            }
+            // 그림은 정한 모드(폰 설정 따라면 지금 폰 모드)로 하나만 (두 장을 넣으면 위젯을 못 올리는 폰이 있음)
+            views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(pal.now, bw, bh, scale, month, today, items))
             manager.updateAppWidget(id, views)
         }
     }

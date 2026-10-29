@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 캘린더 위젯 그림: 밝은 그림 · 어두운 그림을 둘 다 넣고 폰 설정에 맞는 쪽만 보이게 (0 = 보임, 8 = 숨김) -->
-<resources>
-    <integer name="vis_day">0</integer>
-    <integer name="vis_night">8</integer>
-</resources>

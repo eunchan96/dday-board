@@ -212,33 +212,37 @@ function upcomingWidget(w, d, now, fam) {
     });
     return;
   }
-  if (!list.length) { w.addSpacer(); text(w, '2주 안에 남은 일정이 없어요', 13, C.faint, 'medium'); w.addSpacer(); return; }
+  // 첫 줄은 늘 오늘 (오늘 일정이 없으면 "일정이 없어요"), 날짜는 "토 31"처럼 한 줄
   // 위젯은 스크롤이 안 돼서 들어가는 만큼만 (넘치면 맨 아래 +n)
   const lines = fam === 'small' ? 5 : fam === 'medium' ? 5 : 12;
   const size = fam === 'small' ? 12 : 13;
   const todayKey = dayOf({ due: nowD.toISOString() });
+  const rows = list.filter(t => dayOf(t) >= todayKey);
+  if (!rows.length || dayOf(rows[0]) !== todayKey) rows.unshift({ none: true, d: todayKey });
   let shown = 0, prev = null;
-  for (const t of list) {
-    if (shown >= lines - (list.length > lines ? 1 : 0)) break;
+  for (const t of rows) {
+    if (shown >= lines - (rows.length > lines ? 1 : 0)) break;
     const k = dayOf(t);
     const first = k !== prev; prev = k;
     if (shown) w.addSpacer(first ? 6 : 3);
     const row = w.addStack(); row.centerAlignContent();
-    const col = row.addStack(); col.size = new Size(fam === 'small' ? 20 : 34, 0); col.layoutVertically();
+    const col = row.addStack(); col.size = new Size(fam === 'small' ? 34 : 40, 0); col.centerAlignContent();
     if (first) {
       const dt = new Date(`${k}T00:00:00`);
-      const isToday = k === todayKey;
-      text(col, W[dt.getDay()], size, isToday ? C.pen : dt.getDay() === 0 ? C.red : C.ink, 'bold');
-      if (fam !== 'small') text(col, `${dt.getMonth() + 1}/${dt.getDate()}`, 9.5, C.faint, 'medium');
+      text(col, W[dt.getDay()], size, k === todayKey ? C.pen : dt.getDay() === 0 ? C.red : C.ink, 'bold');
+      col.addSpacer(3);
+      text(col, String(dt.getDate()), size - 1, C.faint, 'medium');
     }
-    row.addSpacer(6);
+    col.addSpacer();
+    row.addSpacer(4);
+    if (t.none) { text(row, '일정이 없어요', size, C.faint, 'medium'); row.addSpacer(); shown++; continue; }
     const bar = row.addStack(); bar.size = new Size(3.5, 15); bar.cornerRadius = 1.75; bar.backgroundColor = kindColor(t);
     row.addSpacer(7);
     text(row, labelOf(t), size, t.missing ? C.red : C.ink, 'medium');
     row.addSpacer();
     shown++;
   }
-  if (list.length > shown) { w.addSpacer(4); text(w, `+${list.length - shown}개 더`, 10.5, C.faint, 'medium'); }
+  if (rows.length > shown) { w.addSpacer(4); text(w, `+${rows.length - shown}개 더`, 10.5, C.faint, 'medium'); }
   w.addSpacer();
 }
 

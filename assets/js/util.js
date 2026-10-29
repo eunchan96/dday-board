@@ -189,16 +189,20 @@ export const etcTypeOf = t => {
 };
 export const etcLabel = t => etcTypeOf(t)?.name || '기타';
 export const etcColor = t => etcTypeOf(t)?.color || ETC_DEFAULT_COLOR;
-// 캘린더 · 위젯처럼 좁은 곳의 이름: 과목(줄임말) + 종류 — 데이터베이스 과제 · 데이터베이스 휴강 · 데이터베이스 영상 시청
-// 시험은 과목 + 시험 이름, 직접 넣은 할 일은 이름 그대로, 과목이 없으면 이름 그대로
+// 캘린더 · 위젯처럼 좁은 곳의 이름 (위젯 서버의 app.widget_label과 같은 규칙)
+//  과제: 과목 과제 · 강의 영상: 과목 영상 시청
+//  시험 · 기타: 과목 + 이름 (기타 이름을 비워 종류 이름이 됐으면 과목 + 종류 → 데이터베이스 휴강)
+//  이름에 과목(줄임말)이 이미 있으면 다시 붙이지 않음, 과목이 없으면 이름 그대로
 export function shortLabel(t) {
-  const subj = t.subject ? shortSubject(t.subject) : '';
-  if (t.kind === 'exam') {
-    if (!t.subject) return t.title;
-    return t.title.includes(t.subject) ? t.title.replace(t.subject, subj) : `${subj} ${t.title}`;
+  if (!t.subject) return t.title;
+  const subj = shortSubject(t.subject);
+  if (isLecture(t)) return `${subj} ${etcLabel(t)}`;
+  if (t.kind === 'exam' || t.kind === 'etc') {
+    if (t.kind === 'etc' && t.title === etcLabel(t)) return `${subj} ${t.title}`;
+    if (t.title.includes(t.subject)) return t.title.replace(t.subject, subj);
+    if (t.title.includes(subj)) return t.title;
+    return `${subj} ${t.title}`;
   }
-  if (!subj) return t.title;
-  if (isLecture(t) || t.kind === 'etc') return `${subj} ${etcLabel(t)}`;
   if (t.kind === 'todo') return t.title;
   return `${subj} 과제`;
 }

@@ -13,7 +13,7 @@ import {
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
-  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, savedEtcTypes, ETC_DEFAULT_COLOR, VIDEO_TYPE,
+  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, savedEtcTypes, ETC_DEFAULT_COLOR, VIDEO_TYPE, isLecture,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import {
@@ -1161,6 +1161,9 @@ function renderDurations() {
 
 // 과제 / 시험 템플릿 전환
 function setKind(kind, { isNew }) {
+  // 할 일은 기타의 한 종류 (스마트캠퍼스 강의 영상만 할 일 그대로, 종류 고르기는 숨김)
+  const lecture = ui.editingId && isLecture(state.tasks.find(t => t.id === ui.editingId));
+  if (kind === 'todo' && !lecture) { kind = 'etc'; ui.etcType = etcTypes().some(e => e.id === 'todo') ? 'todo' : ui.etcType; }
   ui.kind = kind;
   const exam = kind === 'exam';
   $('#panel').classList.toggle('is-exam', exam);

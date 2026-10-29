@@ -40,6 +40,8 @@ data class WidgetData(
     val timerColor: String?,
     /** 캘린더 위젯: 날짜(yyyy-MM-dd) → 그날 일정들 */
     val month: Map<String, List<CalItem>> = emptyMap(),
+    /** 서버 기준 오늘 (yyyy-MM-dd, 한국 시간) */
+    val today: String = "",
     val stale: Boolean = false,
 )
 
@@ -144,6 +146,7 @@ object Api {
         }
         return WidgetData(
             month = month,
+            today = o.optString("today"),
             upcoming = tasks,
             todaySec = study.optLong("today", 0L),
             goalSec = study.optLong("goal", 0L),
