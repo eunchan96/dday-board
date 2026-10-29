@@ -188,6 +188,8 @@ export const etcTypeOf = t => {
   return t && t.kind === 'etc' ? etcTypes().find(e => e.id === t.etcType) || null : null;
 };
 export const etcLabel = t => etcTypeOf(t)?.name || '기타';
+// 목록에 안 보이게 한 종류(예: 휴강 → 캘린더 · 위젯에만)
+export const hiddenInList = t => !!etcTypeOf(t)?.hide;
 export const etcColor = t => etcTypeOf(t)?.color || ETC_DEFAULT_COLOR;
 // 캘린더 · 위젯처럼 좁은 곳의 이름 (위젯 서버의 app.widget_label과 같은 규칙)
 //  과제: 과목 과제 · 강의 영상: 과목 영상 시청

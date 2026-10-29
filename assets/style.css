@@ -2314,3 +2314,5 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
 .etc-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .etc-actions .danger-text { margin-right: auto; }
 .sd-short { width: 112px; height: 34px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: inherit; font-size: 14px; text-align: center; }
+.etc-hide { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--pencil); cursor: pointer; }
+.etc-hide input { width: 16px; height: 16px; accent-color: var(--pen); }

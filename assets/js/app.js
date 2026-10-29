@@ -13,7 +13,7 @@ import {
   startOfWeek, toDateInput, toTimeInput, DAY, isExam, groupOf, timeRange, dday,
   semesterOf, semesterKey, semesterLabel, parseSemesterKey, semesterRange, taskSemesterKey, fmtSize, displayTitle,
   setSubjectColors, customColorOf, SUBJECT_PALETTE, setSubjectOrder, orderSubjects,
-  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, savedEtcTypes, ETC_DEFAULT_COLOR, VIDEO_TYPE, isLecture,
+  setSubjectShorts, subjectShortOf, setEtcTypes, etcTypes, savedEtcTypes, ETC_DEFAULT_COLOR, VIDEO_TYPE, isLecture, hiddenInList,
 } from './util.js';
 import { renderList, renderCalendar, taskRow } from './views.js';
 import {
@@ -558,7 +558,7 @@ function renderNext() {
   const now = new Date();
   const byDue = (a, b) => new Date(a.due) - new Date(b.due);
   const scoped = scopedTasks();
-  const assignments = scoped.filter(t => !isExam(t));
+  const assignments = scoped.filter(t => !isExam(t) && !hiddenInList(t));
   const pending = assignments.filter(t => !t.done);
   const upcoming = pending.filter(t => new Date(t.due) >= now).sort(byDue);
   const over = pending.length - upcoming.length;
@@ -776,9 +776,11 @@ function renderView() {
   studyShown = false;
   const root = $('#view');
   const tasks = visibleTasks();
-  if (isCompact) renderCompact(root, tasks);
+  // 목록에 안 보이게 한 기타 종류(휴강 등)는 캘린더에만 (검색할 때는 보임)
+  const listed = ui.query.trim() ? tasks : tasks.filter(t => !hiddenInList(t));
+  if (isCompact) renderCompact(root, listed);
   else if (view === 'calendar') renderCalendar(root, tasks, ctx());
-  else renderList(root, tasks, ctx());
+  else renderList(root, listed, ctx());
 }
 
 /* ───── 노션 임베드용 간단 모드 (?compact) ───── */
@@ -1205,7 +1207,8 @@ function renderEtcPicker() {
       if (!n) { msg.textContent = '이름을 적어 주세요'; name.focus(); return; }
       if (list.some(e => e.name === n && e.id !== edit.id)) { msg.textContent = '이미 있는 종류예요'; name.select(); return; }
       const id = edit.id || Math.random().toString(36).slice(2, 10);
-      const next = edit.id ? list.map(e => (e.id === id ? { id, name: n, color: edit.color } : e)) : [...list, { id, name: n, color: edit.color }];
+      const item = { id, name: n, color: edit.color, ...(edit.hide ? { hide: true } : {}) };
+      const next = edit.id ? list.map(e => (e.id === id ? item : e)) : [...list, item];
       ui.etcType = id; ui.etcEdit = null;
       saveEtcTypes(next);
     };
@@ -1219,8 +1222,11 @@ function renderEtcPicker() {
       h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': '종류 색' },
         ETC_PALETTE.map(c => h('button', {
           type: 'button', class: 'swatch', role: 'radio', 'aria-checked': edit.color.toUpperCase() === c.toUpperCase() ? 'true' : 'false',
-          style: { '--s': c }, 'aria-label': `색 ${c}`, onclick: () => { edit.color = c; edit.name = name.value; renderEtcPicker(); },
+          style: { '--s': c }, 'aria-label': `색 ${c}`, onclick: () => { edit.color = c; edit.name = name.value; edit.hide = box.querySelector('.etc-hide input')?.checked; renderEtcPicker(); },
         }))),
+      h('label', { class: 'etc-hide' },
+        h('input', { type: 'checkbox', checked: !!edit.hide, onchange: e => { edit.hide = e.target.checked; } }),
+        h('span', null, '목록에는 안 보이게 (캘린더 · 위젯에만)')),
       msg,
       h('div', { class: 'etc-actions' },
         edit.id && !fixed ? h('button', { type: 'button', class: 'btn sm ghost danger-text', onclick: () => {
