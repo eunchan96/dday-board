@@ -2346,3 +2346,6 @@ dialog .settings-body, dialog .panel-body { overscroll-behavior: contain; }
   .cal-day { padding: 3px 2px 4px; }
   .cal-day .cal-pill { border-radius: 3px; padding: 0 3px; line-height: 15px; }
 }
+
+/* 스크롤바가 생기고 없어질 때 화면이 옆으로 밀리지 않게 자리를 늘 비워 둠 */
+html { scrollbar-gutter: stable; }
