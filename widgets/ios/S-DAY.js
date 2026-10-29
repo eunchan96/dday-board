@@ -214,8 +214,8 @@ function upcomingWidget(w, d, now, fam) {
   }
   // 첫 줄은 늘 오늘 (오늘 일정이 없으면 "일정이 없어요"), 날짜는 "토 31"처럼 한 줄
   // 위젯은 스크롤이 안 돼서 들어가는 만큼만 (넘치면 맨 아래 +n)
-  const lines = fam === 'small' ? 5 : fam === 'medium' ? 5 : 12;
-  const size = fam === 'small' ? 12 : 13;
+  const lines = fam === 'small' ? 4 : fam === 'medium' ? 4 : 11;
+  const size = fam === 'small' ? 13 : 14.5;
   const todayKey = dayOf({ due: nowD.toISOString() });
   const rows = list.filter(t => dayOf(t) >= todayKey);
   if (!rows.length || dayOf(rows[0]) !== todayKey) rows.unshift({ none: true, d: todayKey });
@@ -226,7 +226,7 @@ function upcomingWidget(w, d, now, fam) {
     const first = k !== prev; prev = k;
     if (shown) w.addSpacer(first ? 6 : 3);
     const row = w.addStack(); row.centerAlignContent();
-    const col = row.addStack(); col.size = new Size(fam === 'small' ? 34 : 38, 0); col.centerAlignContent(); col.setPadding(0, fam === 'small' ? 2 : 6, 0, 0);
+    const col = row.addStack(); col.size = new Size(fam === 'small' ? 38 : 44, 0); col.centerAlignContent(); col.setPadding(0, fam === 'small' ? 2 : 6, 0, 0);
     if (first) {
       const dt = new Date(`${k}T00:00:00`);
       text(col, W[dt.getDay()], size, k === todayKey ? C.pen : dt.getDay() === 0 ? C.red : C.ink, 'bold');
@@ -236,7 +236,7 @@ function upcomingWidget(w, d, now, fam) {
     col.addSpacer();
     row.addSpacer(2);
     if (t.none) { text(row, '일정이 없어요', size, C.faint, 'medium'); row.addSpacer(); shown++; continue; }
-    const bar = row.addStack(); bar.size = new Size(3.5, 15); bar.cornerRadius = 1.75; bar.backgroundColor = kindColor(t);
+    const bar = row.addStack(); bar.size = new Size(3.5, 17); bar.cornerRadius = 1.75; bar.backgroundColor = kindColor(t);
     row.addSpacer(7);
     text(row, labelOf(t), size, t.missing ? C.red : C.ink, 'medium');
     row.addSpacer();

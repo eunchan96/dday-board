@@ -1,105 +1,177 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 위젯 앱 첫 화면: 연결(위젯 주소) 카드 하나 + 위젯마다 배경 · 화면 모드 카드 하나 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/paper"
     android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="20dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="S-DAY 위젯"
-            android:textColor="@color/ink"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:lineSpacingExtra="3dp"
-            android:text="S-DAY 설정 → 위젯에서 만든 주소를 붙여 넣고 저장하세요. 그다음 홈 화면을 길게 눌러 위젯 → S-DAY에서 오늘 공부 · 타이머 · 다가오는 일정 · 캘린더 중 원하는 것을 따로 추가하면 돼요."
-            android:textColor="@color/pencil"
-            android:textSize="14sp" />
-
-        <EditText
-            android:id="@+id/url"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:hint="https://…/functions/v1/widget?k=…"
-            android:importantForAutofill="no"
-            android:inputType="textUri"
-            android:maxLines="3"
-            android:textSize="14sp" />
-
+        <!-- 머리 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
-            <Button
-                android:id="@+id/paste"
-                android:layout_width="wrap_content"
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:importantForAccessibility="no"
+                android:src="@mipmap/ic_launcher" />
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="붙여 넣기" />
-            <Button
-                android:id="@+id/save"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="저장" />
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="S-DAY 위젯"
+                    android:textColor="@color/ink"
+                    android:textSize="21sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="홈 화면에 일정 · 공부를 띄워요"
+                    android:textColor="@color/pencil"
+                    android:textSize="13sp" />
+            </LinearLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/status"
+        <!-- 연결 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <ImageView
+                    android:id="@+id/conn_dot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/status_dot" />
+                <TextView
+                    android:id="@+id/conn_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="연결 안 됨"
+                    android:textColor="@color/ink"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/change"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp"
+                    android:text="주소 바꾸기"
+                    android:textColor="@color/pen"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="2dp"
+                android:text="S-DAY 설정 → 위젯에서 주소를 복사해 오세요."
+                android:textColor="@color/pencil"
+                android:textSize="13.5sp" />
+            <LinearLayout
+                android:id="@+id/url_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <EditText
+                    android:id="@+id/url"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/field_bg"
+                    android:hint="위젯 주소"
+                    android:importantForAutofill="no"
+                    android:inputType="textUri"
+                    android:maxLines="1"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:textColor="@color/ink"
+                    android:textColorHint="@color/faint"
+                    android:textSize="14sp" />
+                <Button
+                    android:id="@+id/connect"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/btn_primary"
+                    android:stateListAnimator="@null"
+                    android:text="붙여 넣고 연결"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 위젯마다 배경 · 화면 모드 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="26dp"
+            android:text="위젯 모양"
             android:textColor="@color/pencil"
-            android:textSize="14sp" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <LinearLayout
+            android:id="@+id/opacity_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="4dp" />
+
+        <Button
+            android:id="@+id/open"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/btn_outline"
+            android:stateListAnimator="@null"
+            android:text="S-DAY 열기"
+            android:textColor="@color/ink"
+            android:textSize="15sp"
+            android:textStyle="bold" />
         <TextView
             android:id="@+id/open_target"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:textColor="@color/pencil"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="위젯 배경 · 화면 모드"
-            android:textColor="@color/ink"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="위젯마다 따로 정해요. 진하기 왼쪽 끝은 완전히 투명해요. 어둡게 해도 진하기는 그대로예요."
-            android:textColor="@color/pencil"
-            android:textSize="13sp" />
-        <!-- 위젯 종류마다 막대 하나씩 (MainActivity가 채움) -->
-        <LinearLayout
-            android:id="@+id/opacity_box"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="vertical" />
-
-        <Button
-            android:id="@+id/open"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="S-DAY 열기" />
+            android:gravity="center"
+            android:textColor="@color/faint"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

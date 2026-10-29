@@ -1,7 +1,8 @@
+<!-- 크기는 웹 앱(maskable) 아이콘과 같은 비율로 맞춤 (보이는 원 지름의 약 45%) -->
 <!-- 앱 아이콘: 테두리가 S로 이어지는 달력 (웹 아이콘 assets/icons/icon.svg와 같은 모양) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="17.2" android:translateY="17.2" android:scaleX="1.15" android:scaleY="1.15">
+    <group android:translateX="25.8" android:translateY="25.8" android:scaleX="0.88" android:scaleY="0.88">
         <path android:pathData="M50,24A7,7 0,0 0,43 17H21A7,7 0,0 0,14 24V31H50V43A7,7 0,0 1,43 50H21A7,7 0,0 1,14 43V38"
             android:strokeColor="#FFFFFF" android:strokeWidth="4.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
         <path android:pathData="M23,11.5v8M41,11.5v8"

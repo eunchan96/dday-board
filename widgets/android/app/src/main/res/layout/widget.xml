@@ -32,7 +32,7 @@
         android:paddingTop="14dp"
         android:text="불러오는 중…"
         android:textColor="@color/faint"
-        android:textSize="13sp" />
+        android:textSize="15sp" />
     <ImageView
         android:id="@+id/refresh"
         android:layout_width="30dp"
