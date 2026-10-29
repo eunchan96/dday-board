@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "kr.sday.widget",
+    "sha256_cert_fingerprints": ["7E:8B:54:B9:8C:47:D0:A0:62:1B:47:8F:72:C0:39:4D:6B:6E:9B:C0:B7:A4:9B:4B:F2:F3:36:3F:F0:06:D9:B9"]
+  }
+}]

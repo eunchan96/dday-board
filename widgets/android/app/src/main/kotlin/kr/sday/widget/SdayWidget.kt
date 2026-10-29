@@ -95,24 +95,28 @@ object Widgets {
 
     /**
      * 위젯을 눌렀을 때 열 곳 (누르는 순간에 찾음)
-     *  1) 홈 화면에 설치한 S-DAY 앱 (크롬 · 삼성 인터넷이 만든 WebAPK: 시작 주소 메타데이터로 확인)
-     *  2) 삼성 인터넷
-     *  3) 기본 브라우저
+     *  1) 홈 화면에 설치한 S-DAY 앱 (크롬이 만든 WebAPK)
+     *  2) 없으면 이 앱 안에서 S-DAY를 앱처럼 띄움 (TWA: 기본 브라우저가 주소창 없이 전체 화면, 그 브라우저에 저장된 보드 그대로)
      */
     fun appIntent(ctx: Context, url: String): Intent {
-        val view = { pkg: String? -> Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).also { if (pkg != null) it.setPackage(pkg) } }
         val pm = ctx.packageManager
         findApp(ctx)?.let { pkg ->
-            val i = view(pkg)
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (i.resolveActivity(pm) != null) return i
             pm.getLaunchIntentForPackage(pkg)?.let { return it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         }
-        for (pkg in SAMSUNG) {
-            val i = view(pkg)
-            if (i.resolveActivity(pm) != null) return i
-        }
-        return view(null)
+        return twaIntent(ctx, url)
     }
+    fun twaIntent(ctx: Context, url: String): Intent =
+        Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .setClassName(ctx, "com.google.androidbrowserhelper.trusted.LauncherActivity")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** TWA로 띄울 브라우저 이름 */
+    fun twaBrowser(ctx: Context): String? = runCatching {
+        val pkg = com.google.androidbrowserhelper.trusted.TwaProviderPicker.pickProvider(ctx.packageManager).provider ?: return null
+        ctx.packageManager.getApplicationLabel(ctx.packageManager.getApplicationInfo(pkg, 0)).toString()
+    }.getOrNull()
+
     private val SAMSUNG = listOf("com.sec.android.app.sbrowser", "com.sec.android.app.sbrowser.beta")
 
     /** S-DAY 주소를 열 수 있다고 한 앱들 (브라우저 포함) */

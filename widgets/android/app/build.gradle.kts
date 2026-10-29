@@ -44,4 +44,6 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // 위젯 앱 안에서 S-DAY를 앱처럼(주소창 없이 전체 화면) 여는 TWA
+    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.5.0")
 }

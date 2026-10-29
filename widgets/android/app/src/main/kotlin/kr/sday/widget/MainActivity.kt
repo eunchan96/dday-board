@@ -36,8 +36,7 @@ class MainActivity : Activity() {
         val names = handlers.joinToString(", ") { pkg -> runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg) }
         target.text = when {
             app != null -> "위젯을 누르면: 설치한 S-DAY 앱 ($app)"
-            packageManager.getLaunchIntentForPackage("com.sec.android.app.sbrowser") != null -> "위젯을 누르면: 삼성 인터넷 (설치한 S-DAY 앱을 찾지 못했어요)"
-            else -> "위젯을 누르면: 기본 브라우저 (설치한 S-DAY 앱을 찾지 못했어요)"
+            else -> "위젯을 누르면: S-DAY를 앱 화면으로 (${Widgets.twaBrowser(this) ?: "브라우저"}로 띄움, 그 브라우저에 넣어 둔 보드 그대로)"
         } + if (names.isNotBlank()) "\nS-DAY 주소를 열 수 있는 앱: $names" else ""
 
         findViewById<Button>(R.id.paste).setOnClickListener {

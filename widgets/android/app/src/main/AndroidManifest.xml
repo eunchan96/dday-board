@@ -25,6 +25,26 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
+
+        <!-- S-DAY를 앱처럼 여는 화면 (TWA: 브라우저가 주소창 없이 전체 화면으로 띄움, 브라우저에 저장된 보드 그대로) -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="false"
+            android:excludeFromRecents="false"
+            android:label="S-DAY"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <meta-data
+                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:value="https://dday-board-pink.vercel.app/" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:resource="@color/paper" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:resource="@color/paper" />
+        </activity>
+
         <activity
             android:name=".OpenActivity"
             android:exported="false"

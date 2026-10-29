@@ -8,4 +8,6 @@
     <string name="timer_widget_desc">공부 중이면 흘러가는 타이머</string>
     <string name="calendar_widget_name">S-DAY 캘린더</string>
     <string name="calendar_widget_desc">이번 달 달력과 날짜별 일정</string>
+    <!-- TWA: S-DAY 사이트가 이 앱을 믿는다는 확인 (사이트의 /.well-known/assetlinks.json과 짝) -->
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://dday-board-pink.vercel.app\"}}]</string>
 </resources>
