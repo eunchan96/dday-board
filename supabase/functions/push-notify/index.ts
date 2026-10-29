@@ -10,7 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-const APP_URL = "https://dday-board-pink.vercel.app/";
+const APP_URL = "https://s-day-board.vercel.app/";
 // 공개 키 (앱의 assets/js/push.js와 같은 값)
 const VAPID_PUBLIC = "BJtAnRQJ6vP-1pfTFyPeu15elS218tZA-FSGkUqV-sWIQOJXJ3gGeXieJPb6e-WdIVF5w4AS34e6VLsRMqgyUww";
 

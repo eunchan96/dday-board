@@ -2,7 +2,7 @@
 
 스마트캠퍼스 과제, 직접 적은 과제, 시험 일정을 마감 순으로 모아 보는 학기 플래너입니다. 단독 웹으로도, 노션 페이지에 임베드해서도 씁니다. 같은 보드 코드를 입력한 기기끼리 과제가 동기화됩니다.
 
-- 서비스: https://dday-board-pink.vercel.app
+- 서비스: https://s-day-board.vercel.app
 - 프론트엔드: HTML / CSS / Vanilla JS ES 모듈 (빌드 없음)
 - 백엔드: Supabase (PostgreSQL, RPC 함수, Edge Function, pg_cron)
 - 배포: Vercel (GitHub `main` push 시 자동 배포)

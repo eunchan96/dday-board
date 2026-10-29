@@ -20,7 +20,7 @@ const OPACITY_SET = '__OPACITY__';  // 배경 진하기 0~100 (%)
 const OPACITY = /^\d{1,3}$/.test(OPACITY_SET) ? Number(OPACITY_SET) : 100;
 const THEME_SET = '__THEME__';      // system | light | dark (위젯마다 스크립트를 따로 복사하니 위젯별로 정할 수 있음)
 const THEME = ['light', 'dark'].includes(THEME_SET) ? THEME_SET : 'system';
-const APP_URL = 'https://dday-board-pink.vercel.app/';
+const APP_URL = 'https://s-day-board.vercel.app/';
 const MODES = { watch: null, p25: { focus: 25, rest: 5 }, p50: { focus: 50, rest: 10 } };
 
 // 밝게 · 어둡게로 고정했으면 그 색만, 아니면 아이폰 화면 모드를 따라감 (a = 불투명도)

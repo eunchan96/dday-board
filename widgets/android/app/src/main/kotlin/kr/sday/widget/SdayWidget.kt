@@ -65,7 +65,7 @@ class CalendarWidget : BaseWidget() {
 object Widgets {
     const val ACTION_REFRESH = "kr.sday.widget.REFRESH"
     const val ACTION_CAL = "kr.sday.widget.CAL"
-    const val APP_URL = "https://dday-board-pink.vercel.app/"
+    const val APP_URL = "https://s-day-board.vercel.app/"
     private val MODES = mapOf("p25" to (25 to 5), "p50" to (50 to 10))
 
     private fun ids(ctx: Context, cls: Class<*>) = AppWidgetManager.getInstance(ctx).getAppWidgetIds(ComponentName(ctx, cls))
@@ -128,16 +128,17 @@ object Widgets {
     /** 설치된 S-DAY 앱(WebAPK) 패키지 이름. 없으면 null */
     fun findApp(ctx: Context): String? {
         val pm = ctx.packageManager
-        val host = Uri.parse(APP_URL).host ?: return null
+        // 지금 주소와 예전 주소(dday-board-pink, 지금은 새 주소로 넘겨줌) 어느 쪽으로 설치했어도 찾음
+        val hosts = listOf("s-day-board.vercel.app", "dday-board-pink.vercel.app")
         return runCatching {
             // 1) 시작 주소 · 범위 메타데이터가 S-DAY인 앱 (크롬 WebAPK)
             pm.getInstalledApplications(android.content.pm.PackageManager.GET_META_DATA).firstOrNull { app ->
                 if (app.packageName == ctx.packageName) return@firstOrNull false
                 val md = app.metaData ?: return@firstOrNull false
-                md.keySet().any { k -> (md.get(k)?.toString() ?: "").contains(host) }
+                md.keySet().any { k -> val v = md.get(k)?.toString() ?: ""; hosts.any { v.contains(it) } }
             }?.packageName
             // 2) S-DAY 주소는 받는데 다른 주소(example.com)는 안 받는 앱 = 브라우저가 아닌 S-DAY 앱
-                ?: (handlers(ctx) - handlers(ctx, "https://example.com/").toSet() - ctx.packageName).firstOrNull()
+                ?: hosts.firstNotNullOfOrNull { h -> (handlers(ctx, "https://$h/") - handlers(ctx, "https://example.com/").toSet() - ctx.packageName).firstOrNull() }
         }.getOrNull()
     }
 

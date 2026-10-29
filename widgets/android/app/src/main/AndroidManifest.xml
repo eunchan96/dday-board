@@ -10,6 +10,10 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="s-day-board.vercel.app" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" android:host="dday-board-pink.vercel.app" />
         </intent>
         <intent>
@@ -36,7 +40,7 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <meta-data
                 android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="https://dday-board-pink.vercel.app/" />
+                android:value="https://s-day-board.vercel.app/" />
             <meta-data
                 android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
                 android:resource="@color/paper" />

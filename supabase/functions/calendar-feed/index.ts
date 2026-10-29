@@ -11,7 +11,7 @@ type Task = {
   location: string; done: boolean; link: string | null; memo: string; missing?: boolean;
 };
 
-const APP_URL = "https://dday-board-pink.vercel.app/";
+const APP_URL = "https://s-day-board.vercel.app/";
 
 // RFC 5545: 쉼표 · 세미콜론 · 역슬래시 · 줄바꿈 이스케이프, 75바이트마다 줄 접기
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
