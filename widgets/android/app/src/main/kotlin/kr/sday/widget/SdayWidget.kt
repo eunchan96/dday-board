@@ -45,6 +45,11 @@ abstract class BaseWidget : AppWidgetProvider() {
                 done.finish()
             }.start()
         }
+        // 캘린더 위젯에서 날짜를 누름: 그 날을 고름 (고른 날을 한 번 더 누르는 건 바로 앱을 여는 PendingIntent)
+        if (intent.action == Widgets.ACTION_CAL_PICK) {
+            Store.setCalSel(ctx, intent.getStringExtra("day").orEmpty())
+            Widgets.render(ctx)
+        }
         // 캘린더 위젯의 ‹ › · 오늘: 보는 달만 바꿔 다시 그림 (인터넷 없이)
         if (intent.action == Widgets.ACTION_CAL) {
             val shift = intent.getIntExtra("shift", 0)
@@ -65,9 +70,19 @@ class CalendarWidget : BaseWidget() {
 object Widgets {
     const val ACTION_REFRESH = "kr.sday.widget.REFRESH"
     const val ACTION_CAL = "kr.sday.widget.CAL"
+    const val ACTION_CAL_PICK = "kr.sday.widget.CAL_PICK"
     const val APP_URL = "https://s-day-board.vercel.app/"
     private val MODES = mapOf("p25" to (25 to 5), "p50" to (50 to 10))
 
+    private val ROW_IDS = intArrayOf(R.id.calrow_0, R.id.calrow_1, R.id.calrow_2, R.id.calrow_3, R.id.calrow_4, R.id.calrow_5)
+    private val CELL_IDS = arrayOf(
+        intArrayOf(R.id.cell_0_0, R.id.cell_0_1, R.id.cell_0_2, R.id.cell_0_3, R.id.cell_0_4, R.id.cell_0_5, R.id.cell_0_6),
+        intArrayOf(R.id.cell_1_0, R.id.cell_1_1, R.id.cell_1_2, R.id.cell_1_3, R.id.cell_1_4, R.id.cell_1_5, R.id.cell_1_6),
+        intArrayOf(R.id.cell_2_0, R.id.cell_2_1, R.id.cell_2_2, R.id.cell_2_3, R.id.cell_2_4, R.id.cell_2_5, R.id.cell_2_6),
+        intArrayOf(R.id.cell_3_0, R.id.cell_3_1, R.id.cell_3_2, R.id.cell_3_3, R.id.cell_3_4, R.id.cell_3_5, R.id.cell_3_6),
+        intArrayOf(R.id.cell_4_0, R.id.cell_4_1, R.id.cell_4_2, R.id.cell_4_3, R.id.cell_4_4, R.id.cell_4_5, R.id.cell_4_6),
+        intArrayOf(R.id.cell_5_0, R.id.cell_5_1, R.id.cell_5_2, R.id.cell_5_3, R.id.cell_5_4, R.id.cell_5_5, R.id.cell_5_6),
+    )
     private fun ids(ctx: Context, cls: Class<*>) = AppWidgetManager.getInstance(ctx).getAppWidgetIds(ComponentName(ctx, cls))
     fun any(ctx: Context) = listOf(SdayWidget::class.java, StudyWidget::class.java, TimerWidget::class.java, CalendarWidget::class.java).any { ids(ctx, it).isNotEmpty() }
 
@@ -202,8 +217,26 @@ object Widgets {
             views.setOnClickPendingIntent(R.id.cal_prev, shift(10, -1))
             views.setOnClickPendingIntent(R.id.cal_next, shift(11, 1))
             views.setOnClickPendingIntent(R.id.cal_today, shift(12, 0))
-            views.setOnClickPendingIntent(R.id.cal_add, open(ctx, "#new", 13))
-            views.setOnClickPendingIntent(R.id.cal, open(ctx, "#calendar", 4))
+            // 날짜 칸: 누르면 고르고, 고른 날을 또 누르면 앱에서 그 날짜 캘린더
+            val sel = Store.calSel(ctx)
+            val selDate = runCatching { java.time.LocalDate.parse(sel) }.getOrNull()
+            val weeks = ((month.dayOfWeek.value % 7) + month.lengthOfMonth() + 6) / 7
+            val gridStart = month.minusDays((month.dayOfWeek.value % 7).toLong())
+            for (r in 0 until 6) {
+                views.setViewVisibility(ROW_IDS[r], if (r < weeks) View.VISIBLE else View.GONE)
+                if (r >= weeks) continue
+                for (c in 0 until 7) {
+                    val day = gridStart.plusDays((r * 7 + c).toLong())
+                    val code = 200 + r * 7 + c
+                    val pi = if (day == selDate) open(ctx, "#day=$day", code)
+                        else PendingIntent.getBroadcast(ctx, code,
+                            Intent(ctx, CalendarWidget::class.java).setAction(ACTION_CAL_PICK).putExtra("day", day.toString()),
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                    views.setOnClickPendingIntent(CELL_IDS[r][c], pi)
+                }
+            }
+            // + : 고른 날이 있으면 그 날 마감으로 새 과제
+            views.setOnClickPendingIntent(R.id.cal_add, open(ctx, if (selDate != null) "#new=$selDate" else "#new", 13))
             val opts = manager.getAppWidgetOptions(id)
             val dm = ctx.resources.displayMetrics
             val wDp = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250).coerceAtLeast(110)
@@ -213,7 +246,7 @@ object Widgets {
             val bw = ((wDp - 16) * scale).toInt(); val bh = ((hDp - 54) * scale).toInt()
             val items = data?.month.orEmpty()
             // 그림은 정한 모드(폰 설정 따라면 지금 폰 모드)로 하나만 (두 장을 넣으면 위젯을 못 올리는 폰이 있음)
-            views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(pal.now, bw, bh, scale, month, today, items))
+            views.setImageViewBitmap(R.id.cal, CalendarDraw.draw(pal.now, bw, bh, scale, month, today, items, selDate))
             manager.updateAppWidget(id, views)
         }
     }

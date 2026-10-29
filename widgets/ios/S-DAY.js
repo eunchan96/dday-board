@@ -327,10 +327,12 @@ function calendarWidget(w, d, now, fam) {
       const isToday = key(day) === key(today);
       const cell = row.addStack(); cell.size = new Size(CW, CH); cell.layoutVertically();
       cell.setPadding(2, 1, 0, 1);
+      // 날짜 칸을 누르면 앱에서 그 날짜 캘린더 (아이폰 위젯은 고르기 상태를 둘 수 없어 바로 엶)
+      cell.url = `${APP_URL}#day=${key(day)}`;
       // 날짜: 칸 가운데
       const nr = cell.addStack(); nr.addSpacer();
       const n = nr.addStack(); n.centerAlignContent();
-      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = 8; n.size = new Size(20, 16); }
+      if (isToday) { n.backgroundColor = C.pen; n.cornerRadius = 4; n.size = new Size(20, 15); }
       const t = n.addText(String(day.getDate()));
       t.font = isToday ? Font.boldSystemFont(11.5) : Font.mediumSystemFont(11.5);
       t.textColor = isToday ? Color.white() : !inMonth ? C.faint : dayColor(i);

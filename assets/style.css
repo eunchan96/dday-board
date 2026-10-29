@@ -2378,3 +2378,26 @@ html.ov-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
 }
 .flt-reset { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 11px 16px; border-top: 1px solid var(--rule); font-size: 14px; font-weight: 650; color: var(--red); text-align: center; cursor: pointer; }
 .flt-reset:hover { background: var(--sheet-2); }
+
+/* 중간 너비(641~960px): 분류 고르기와 필터를 하나로 합쳐 목록 · 캘린더 오른쪽에 */
+@media (min-width: 641px) and (max-width: 960px) {
+  .topbar:has(.flt-slot:not(:empty)) { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+  .topbar:has(.flt-slot:not(:empty)) #scopeWrap { display: none; }
+  .topbar:has(.flt-slot:not(:empty)) .semester { grid-column: 1; grid-row: 1; }
+  .topbar:has(.flt-slot:not(:empty)) #planViews { grid-column: 2; grid-row: 1; }
+  .topbar:has(.flt-slot:not(:empty)) .actions { grid-column: 4; grid-row: 1; }
+  .flt-slot { display: block; grid-column: 3; grid-row: 1; justify-self: start; min-width: 0; max-width: 100%; }
+  .flt-slot:empty { display: none; }
+  .study-mode .flt-slot { display: none; }
+  .rail { display: none; }
+  .flt-slot .flt-btn.with-scope { position: relative; height: 38px; max-width: 100%; }
+  .flt-scope { font-weight: 750; }
+  .flt-scope-sub { font-size: 13px; font-weight: 600; color: var(--pencil); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .flt-slot .flt-on-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--pen); box-shadow: 0 0 0 2px var(--sheet); }
+}
+
+/* 오늘 날짜: 동그라미 대신 둥근 네모 (아래 일정 줄을 덮지 않게 낮게) */
+.cal-day .num { border-radius: 6px; }
+.cal-day.today .num { border-radius: 6px; height: 21px; min-width: 24px; width: auto; padding: 0 4px; }
+.cal-day.selected:not(.today) .num { border-radius: 6px; }
+@media (max-width: 640px) { .cal-day.today .num { height: 19px; min-width: 21px; padding: 0 3px; border-radius: 5px; } }

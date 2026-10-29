@@ -68,6 +68,9 @@ object Store {
     fun setTheme(ctx: Context, kind: String, v: String) =
         ctx.getSharedPreferences(PREFS, 0).edit().putString("theme_$kind", if (v in THEMES) v else "system").apply()
     val THEMES = listOf("system", "light", "dark")
+    /** 캘린더 위젯에서 고른 날 (yyyy-MM-dd, 없으면 빈 값) */
+    fun calSel(ctx: Context): String = ctx.getSharedPreferences(PREFS, 0).getString("calSel", "") ?: ""
+    fun setCalSel(ctx: Context, v: String) = ctx.getSharedPreferences(PREFS, 0).edit().putString("calSel", v).apply()
     /** 캘린더 위젯에서 넘겨 본 달 (0 = 이번 달) */
     fun calOffset(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt("calOffset", 0)
     fun setCalOffset(ctx: Context, v: Int) = ctx.getSharedPreferences(PREFS, 0).edit().putInt("calOffset", v.coerceIn(-3, 6)).apply()

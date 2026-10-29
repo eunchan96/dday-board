@@ -23,7 +23,7 @@ object CalendarDraw {
         return (0xFF shl 24) or ch(16) or ch(8) or ch(0)
     }
 
-    fun draw(ctx: Context, w: Int, h: Int, s: Float, month: LocalDate, today: LocalDate, items: Map<String, List<CalItem>>): Bitmap {
+    fun draw(ctx: Context, w: Int, h: Int, s: Float, month: LocalDate, today: LocalDate, items: Map<String, List<CalItem>>, selected: LocalDate? = null): Bitmap {
         val bmp = Bitmap.createBitmap(w.coerceAtLeast(50), h.coerceAtLeast(50), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val first = month.withDayOfMonth(1)
@@ -61,11 +61,19 @@ object CalendarDraw {
             val y0 = top + rowH * (i / 7)
             val cx = x0 + colW / 2
             val inMonth = d.monthValue == month.monthValue
-            // 날짜: 칸 가운데 (오늘은 파란 동그라미)
+            // 고른 날: 칸 둘레에 얇은 회색 선 (+를 누르면 이 날 마감으로, 한 번 더 누르면 앱에서 이 날)
+            if (d == selected) {
+                val sel = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.3f * s; color = pencil; alpha = 170 }
+                val ins = 1.2f * s
+                c.drawRoundRect(RectF(x0 + ins, y0 + ins, x0 + colW - ins, y0 + rowH - ins), 4f * s, 4f * s, sel)
+            }
+            // 날짜: 칸 가운데 (오늘은 파란 둥근 네모, 아래 일정 줄을 덮지 않게 낮게)
             val numY = y0 + 3f * s + num.textSize
             if (d == today) {
-                p.color = pen
-                c.drawCircle(cx, numY - num.textSize * 0.36f, num.textSize * 0.92f, p)
+                p.color = pen; p.style = Paint.Style.FILL
+                val hw = maxOf(num.measureText(d.dayOfMonth.toString()) / 2 + 3.5f * s, 9.5f * s)
+                val nTop = numY - num.textSize * 0.98f
+                c.drawRoundRect(RectF(cx - hw, nTop, cx + hw, nTop + num.textSize * 1.26f), 4f * s, 4f * s, p)
             }
             num.color = if (d == today) 0xFFFFFFFF.toInt() else if (!inMonth) faint else dayColor(i)
             num.typeface = if (d == today) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
