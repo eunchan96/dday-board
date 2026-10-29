@@ -2401,3 +2401,9 @@ html.ov-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
 .cal-day.today .num { border-radius: 6px; height: 21px; min-width: 24px; width: auto; padding: 0 4px; }
 .cal-day.selected:not(.today) .num { border-radius: 6px; }
 @media (max-width: 640px) { .cal-day.today .num { height: 19px; min-width: 21px; padding: 0 3px; border-radius: 5px; } }
+
+/* 중간 너비: 합친 버튼을 펼치면 분류 고르기도 (폰과 같은 칩) · 창은 넉넉한 폭으로 */
+@media (min-width: 641px) and (max-width: 960px) {
+  .flt-slot .flt-sem { display: flex; }
+  .flt-slot .flt-pop { width: 340px; }
+}
