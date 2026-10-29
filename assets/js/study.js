@@ -12,7 +12,7 @@ import { inScope } from './groups.js';
 import { initPip, togglePip, pipSupported, pipOpen, renderPip } from './pip.js';
 import {
   $, h, pad, newId, dayKey, addDays, startOfWeek, startOfDay, WEEK, DAY,
-  subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects,
+  subjectColor, displayTitle, dday, isExam, semesterOf, semesterKey, taskSemesterKey, fmtClock, orderSubjects, hiddenInList,
 } from './util.js';
 
 const KEYS = { timer: 'ddayboard.timer', queue: 'ddayboard.studyQueue' };
@@ -786,7 +786,8 @@ function renderPlans() {
   // 7일 안의 과제 · 시험: 과목 | 과제 · 시험 이름 | D-day | ▶ (내가 넣은 줄과 같은 칸에 맞춤)
   const now = new Date();
   const soon = state.tasks
-    .filter(t => !t.done && new Date(t.due) > now && Math.round((startOfDay(new Date(t.due)) - startOfDay(now)) / DAY) <= 7)
+    // 목록에 안 보이게 한 기타 종류(휴강 등)는 공부 탭에도 안 보임
+    .filter(t => !t.done && !hiddenInList(t) && new Date(t.due) > now && Math.round((startOfDay(new Date(t.due)) - startOfDay(now)) / DAY) <= 7)
     .sort((a, b) => new Date(a.due) - new Date(b.due));
   const upcoming = soon.map(t => {
     const nowT = !idle && timer.taskId === t.id;
