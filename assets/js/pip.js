@@ -136,12 +136,16 @@ async function openVideoPip() {
     drawCanvas(api.get());
     stream = canvas.captureStream(4);
     video.srcObject = stream;
-    // 창 안의 버튼(영상은 늘 재생 중이라 ❚❚로 보임)을 누르면: 대기 중이면 시작, 공부 중이면 끝내기
+    // 창 안의 버튼(영상은 늘 재생 중이라 ❚❚로 보임)은 아래 미디어 세션 동작(play · pause)으로 받는다.
+    // 그 밖에 영상이 멈추는 건 폰이 멈춘 것(화면 끔 · 백그라운드)이라 타이머는 그대로 두고 바로 다시 재생해 창을 살려 둔다.
+    // (미디어 세션을 못 쓰는 브라우저만 예전처럼 멈춤 = 시작 · 끝내기)
     video.addEventListener('pause', () => {
-      if (!pipOpen() || !playArmed) return;
-      toggle();
+      if (!pipOpen()) return;
+      if (!sessionControls && playArmed) toggle();
       resume();
     });
+    // 화면을 다시 켜거나 S-DAY로 돌아왔을 때 멈춰 있으면 다시 재생
+    document.addEventListener('visibilitychange', () => { if (video && video.paused && pipOpen()) resume(); });
     video.addEventListener('leavepictureinpicture', () => { onLeave(); api.onChange?.(); });
     video.addEventListener('webkitpresentationmodechanged', () => { if (video.webkitPresentationMode !== 'picture-in-picture') onLeave(); api.onChange?.(); });
   }
@@ -155,13 +159,16 @@ async function openVideoPip() {
       navigator.mediaSession.metadata = new MediaMetadata({ title: 'S-DAY 타이머', artist: '공부' });
       navigator.mediaSession.setActionHandler('play', () => { if (api.get().phase === 'idle') api.start(); resume(); });
       navigator.mediaSession.setActionHandler('pause', () => { toggle(); resume(); });
-    } catch { /* 지원 안 함 */ }
+      navigator.mediaSession.playbackState = 'playing';
+      sessionControls = true;
+    } catch { sessionControls = false; }
   }
   lastKey = '';
   renderPip(true);
   api.onChange?.();
 }
 let playArmed = false;
+let sessionControls = false;          // 창의 버튼이 미디어 세션 동작으로 오는지
 function toggle() {
   const s = api.get();
   if (s.phase === 'idle') api.start(); else if (s.phase === 'rest') api.endRest(); else api.stop();
