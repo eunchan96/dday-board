@@ -1684,6 +1684,7 @@ function bind() {
   $$('#kindPicker button').forEach(b => b.addEventListener('click', () => setKind(b.dataset.kind, { isNew: !ui.editingId })));
   // 새로 불러오기: 다른 기기 변경 + (연동돼 있으면) 스마트캠퍼스까지
   $('#btnSync').addEventListener('click', e => {
+    loadColors();                   // 과목 · 기타 종류 설정도 함께 새로
     if (state.lms.connected) runLmsSync(e.currentTarget, { quiet: true });
     else { pull(); loadLms(); }
   });
@@ -1971,11 +1972,12 @@ openTaskFromHash();
 
 setInterval(() => {
   if (!state.code) return;
-  if ($('#panel').hidden) pull();
+  if ($('#panel').hidden) { pull(); loadColors(); }
   renderNext();                     // 남은 시간 갱신
 }, SYNC_INTERVAL);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.code) { pull(); loadLms(); if (isStudying()) loadStudy(); }
+  // 돌아올 때 과제와 함께 과목 색 · 줄임말 · 기타 종류도 새로 (다른 기기에서 바꾼 것)
+  if (!document.hidden && state.code) { pull(); loadLms(); loadColors(); if (isStudying()) loadStudy(); }
 });
 
 // 홈 화면에 추가했을 때 오프라인에서도 열리도록
