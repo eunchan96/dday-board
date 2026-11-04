@@ -7,7 +7,7 @@
 //   - 첨부 파일은 이름과 크기만 남긴다 (다운로드 주소에는 인증 값이 붙어 있어서 저장하지 않음)
 //   - submission.missing: 마감이 지났는데 내지 않은 과제 (Canvas가 판단, 면제된 과제 제외)
 // GET /api/v1/announcements?context_codes[]=course_:id  (지금 듣는 과목의 최근 30일 공지)
-// 강의 영상: learningx(LTI)의 학습 목록에서 기한이 있는 영상 · 자료를 '할 일'로 (아래 fetchLectures)
+// 강의 영상: learningx(LTI)의 학습 목록에서 기한이 있는 영상만 '할 일'로 (파일 자료는 뺌, 아래 fetchLectures)
 //   - 다 봤으면(completed) 완료
 
 import type { CanvasItem } from "./ics.ts";
@@ -104,7 +104,8 @@ type ModuleItem = { id: number; type?: string; external_url?: string };
 type Module = { id: number; items?: ModuleItem[] };
 type LxItem = {
   module_item_id?: number; title?: string; content_type?: string; content_id?: number; completed?: boolean;
-  content_data?: { due_at?: string | null; omit_progress?: boolean; item_content_type?: string } | null;
+  content_data?: { due_at?: string | null; omit_progress?: boolean; item_content_type?: string;
+    item_content_data?: { content_type?: string; progress_support?: boolean } | null } | null;
 };
 
 const decode = (v: string) => v.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -157,6 +158,8 @@ async function learningxSession(base: string, token: string, courses: Course[]) 
   return xn ? { xn, cookie: cookie() } : null;
 }
 
+const NOT_VIDEO = /^(file|pdf|document|image|text|link|url)$/i;
+
 export async function fetchLectures(base: string, token: string, courses: Course[]): Promise<ApiItem[]> {
   const ses = await learningxSession(base, token, courses);
   if (!ses) return [];
@@ -193,6 +196,10 @@ export async function fetchLectures(base: string, token: string, courses: Course
       }
       // 강의 영상(학습 항목)
       if (it?.content_type !== 'attendance_item' || !it.content_id) continue;
+      // 영상만 (교수님이 올린 파일 · 문서 학습 항목은 넣지 않음)
+      //   item_content_data.content_type: 영상 'everlec' 등, 파일 'file' / 파일은 progress_support도 false
+      const inner = cd.item_content_data ?? {};
+      if (NOT_VIDEO.test(String(inner.content_type ?? '')) || inner.progress_support === false) continue;
       // 진도를 세지 않는 영상은 봤는지 알 수 없어서 넣지 않음
       if (cd.omit_progress === true) continue;
       const due = typeof cd.due_at === 'string' ? cd.due_at : null;
