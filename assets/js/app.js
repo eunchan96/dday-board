@@ -605,6 +605,7 @@ function subjectsWithCounts() {
   const map = new Map();
   const now = new Date();
   for (const t of scopedTasks()) {
+    if (hiddenInList(t)) continue;   // 목록에 안 보이는 종류(휴강 · 알바 등)는 개수에서도 뺌
     const k = t.subject || '';
     const v = map.get(k) || { total: 0, pending: 0 };
     v.total++; if (groupOf(t, now) !== 'done') v.pending++;   // 끝난 시험은 남은 일로 세지 않음
@@ -622,7 +623,7 @@ function renderRail() {
   const cur = state.prefs.subject;
   const subjects = subjectsWithCounts();
   const now = new Date();
-  const pendingAll = scopedTasks().filter(t => groupOf(t, now) !== 'done').length;
+  const pendingAll = scopedTasks().filter(t => !hiddenInList(t) && groupOf(t, now) !== 'done').length;
 
   const item = (label, value, count, color) => h('li', null,
     h('button', {
