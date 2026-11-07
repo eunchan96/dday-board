@@ -553,6 +553,19 @@ const copyIcon = () => svgIcon(['M7 7h9v9H7zM4 13V4h9']);
 const personIcon = () => svgIcon(['M10 9.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z', 'M3.8 17c.6-3.2 3-5 6.2-5s5.6 1.8 6.2 5']);
 const userPlusIcon = () => svgIcon(['M8 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 16.5c.6-3 2.6-4.6 5.2-4.6s4.1 1 4.9 3M15.5 10v5M13 12.5h5']);
 const xIcon = () => svgIcon(['M6 6l8 8M14 6l-8 8']);
+
+/* 오늘 공부에 자동으로 나온 과제 · 시험 중 사용자가 ✕로 뺀 것 (이 기기에만 저장, 과제 자체는 그대로) */
+const SOON_KEY = 'ddayboard.studySoonHidden';
+const soonHidden = new Set((() => { try { const v = JSON.parse(storage.get(SOON_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })());
+const saveSoonHidden = () => {
+  // 없어진 과제는 정리 (목록을 받아 온 뒤에만)
+  if (state.tasks.length) for (const id of soonHidden) if (!state.tasks.some(t => t.id === id)) soonHidden.delete(id);
+  storage.set(SOON_KEY, JSON.stringify([...soonHidden]));
+};
+function hideSoon(t) {
+  soonHidden.add(t.id); saveSoonHidden(); render();
+  ctx.toast('오늘 공부에서 뺐어요', '되돌리기', () => { soonHidden.delete(t.id); saveSoonHidden(); render(); });
+}
 const checkIcon = () => svgIcon(['M5.5 10.5l3 3 6-7']);
 const trashIcon = () => svgIcon(['M4.5 6h11M8 6V4.5h4V6M6 6l.7 9.5h6.6L14 6M8.5 9v4M11.5 9v4']);
 const prevIcon = () => svgIcon(['M12 5l-5 5 5 5']);
@@ -827,11 +840,11 @@ function renderPlans() {
       h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '지우기', 'aria-label': `${p.subject || memo} 지우기`, onclick: () => removePlan(p) }, xIcon()));
   });
 
-  // 7일 안의 과제 · 시험: 과목 | 과제 · 시험 이름 | D-day | ▶ (내가 넣은 줄과 같은 칸에 맞춤)
+  // 7일 안의 과제 · 시험만 (영상 시청 · 기타 일정은 빼고): 과목 | 이름 | D-day | ▶ | ✕ (내가 넣은 줄과 같은 칸에 맞춤)
   const now = new Date();
   const soon = state.tasks
-    // 목록에 안 보이게 한 기타 종류(휴강 등)는 공부 탭에도 안 보임
-    .filter(t => !t.done && !hiddenInList(t) && new Date(t.due) > now && Math.round((startOfDay(new Date(t.due)) - startOfDay(now)) / DAY) <= 7)
+    .filter(t => !t.done && (t.kind === 'assignment' || isExam(t)) && !hiddenInList(t) && !soonHidden.has(t.id)
+      && new Date(t.due) > now && Math.round((startOfDay(new Date(t.due)) - startOfDay(now)) / DAY) <= 7)
     .sort((a, b) => new Date(a.due) - new Date(b.due));
   const upcoming = soon.map(t => {
     const nowT = !idle && timer.taskId === t.id;
@@ -843,7 +856,7 @@ function renderPlans() {
       h('span', { class: 'plan-dday' }, dday(t, now).label),
       h('span', { class: 'plan-time' }),
       playBtn(name, { subject: t.subject, taskId: t.id, label: displayTitle(t) }),
-      h('span', { class: 'sm-icon' }));
+      h('button', { type: 'button', class: 'btn icon ghost sm-icon row-x', title: '오늘 공부에서 빼기', 'aria-label': `${name} 오늘 공부에서 빼기`, onclick: () => hideSoon(t) }, xIcon()));
   });
 
   // 지난 날(최근 7일)에 넣고 못 한 계획: 끝에 흐리게, 오늘로 옮길 수 있게
