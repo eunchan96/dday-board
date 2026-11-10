@@ -61,7 +61,7 @@ class UpcomingService : RemoteViewsService() {
                     date.dayOfWeek.value == 7 -> R.color.red
                     else -> R.color.ink
                 }
-                pal.paint(v, R.id.wd, "setTextColor", wdColor, always = wdColor != R.color.ink)
+                pal.paint(v, R.id.wd, "setTextColor", wdColor, always = true)
             } else {
                 v.setTextViewText(R.id.wd, "")
                 v.setTextViewText(R.id.date, "")
@@ -74,8 +74,10 @@ class UpcomingService : RemoteViewsService() {
                 pal.paint(v, R.id.label, "setTextColor", R.color.faint, always = true)
                 v.setViewVisibility(R.id.bar, View.INVISIBLE)
             } else {
+                // 런처가 줄을 재사용하므로 '일정이 없어요'에서 바꾼 색 · 숨긴 막대를 매번 되돌림
+                v.setViewVisibility(R.id.bar, View.VISIBLE)
                 v.setTextViewText(R.id.label, t.label)
-                pal.paint(v, R.id.label, "setTextColor", if (t.missing) R.color.red else R.color.ink, always = t.missing)
+                pal.paint(v, R.id.label, "setTextColor", if (t.missing) R.color.red else R.color.ink, always = true)
                 val light = CalendarDraw.baseColor(Palette.themed(ctx, false), t.kind, t.etcColor)
                 val dark = CalendarDraw.baseColor(Palette.themed(ctx, true), t.kind, t.etcColor)
                 pal.paintInt(v, R.id.bar, "setColorFilter", light, dark)
