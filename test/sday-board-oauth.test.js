@@ -126,7 +126,10 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
     assert.equal(res.status,200);
     assert.match(res.headers.get('content-security-policy'),/frame-ancestors 'none'/);
     assert.equal(res.headers.get('referrer-policy'),'strict-origin');
-    const cookie=res.headers.get('set-cookie').split(';')[0];
+    const header=res.headers.get('set-cookie');
+    assert.match(header,/^__Host-sday-mcp-consent-[0-9a-f]{64}=[0-9a-f]{64};/);
+    assert.match(header,/Secure; HttpOnly; SameSite=Lax; Path=\/; Max-Age=600/);
+    const cookie=header.split(';')[0];
     const html=await res.text();
     assert.doesNotMatch(html,new RegExp(ownerCode));
     return {cookie,ticket:/name="ticket" value="([^"]+)"/.exec(html)[1]};
@@ -142,11 +145,24 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   compat.searchParams.set('resource','https://another.example/api/mcp');
   assert.equal((await fetcher(compat)).status,400);
   const pending=await screen(consent);
-  assert.equal((await submit('authorize',pending,ownerCode,'https://other.example')).status,403);
+  const second=await screen(consent);
+  assert.notEqual(pending.cookie.split('=')[0],second.cookie.split('=')[0]);
+  const originalNow=Date.now();
+  const mocked=t.mock.method(Date,'now',()=>originalNow+601000);
+  try{
+    const expired=await submit('authorize',second,ownerCode);
+    assert.equal(expired.status,403);
+    assert.match(await expired.text(),/consent_expired/);
+  } finally {mocked.mock.restore();}
+  const cookieWrong=await submit('authorize',{...pending,cookie:second.cookie},ownerCode);
+  assert.equal(cookieWrong.status,403);
+  assert.match(await cookieWrong.text(),/consent_cookie_missing/);
+  const sameJar={...pending,cookie:pending.cookie+'; '+second.cookie};
+  assert.equal((await submit('authorize',sameJar,ownerCode,'https://other.example')).status,403);
   assert.equal((await submit('authorize',pending,ownerCode,'null')).status,403);
   assert.equal((await submit('authorize',{...pending,cookie:''},ownerCode)).status,403);
   assert.equal((await submit('authorize',pending,otherCode)).status,403);
-  const approval=await submit('authorize',pending,ownerCode);
+  const approval=await submit('authorize',sameJar,ownerCode);
   assert.equal(approval.status,303);
   assert.equal(approval.headers.get('referrer-policy'),'no-referrer');
   assert.equal((await submit('authorize',pending,ownerCode)).status,403);
