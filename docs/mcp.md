@@ -42,3 +42,15 @@ MCP 엔드포인트와 보호 리소스 메타데이터는 설정이 없을 때 
 ChatGPT 웹에서 [비공개 MCP 서버 추가 안내](https://developers.openai.com/api/docs/guides/custom-mcp-server)에 따라 배포 주소의 `/api/mcp`를 연결합니다. 해당 워크스페이스가 비공개 플러그인을 허용하는지, Dot 대화에 도구가 실제로 노출되는지 확인합니다. 실제 보드에는 별도 동의를 받은 뒤 테스트 환경에서 확인한 설정을 적용합니다.
 
 즉시 읽기를 끊으려면 DB 관리자가 해당 읽기 권한 행을 `key_hash`로 지웁니다. 키 교체는 새 해시를 등록하고 서버 설정을 바꾼 뒤 이전 행을 제거합니다. 기존 보드 코드에 영향은 없습니다.
+
+## S-DAY 보드 코드로 승인하는 방식
+
+기존 S-DAY의 로그인 방식과 보드 코드는 그대로 둡니다. 별도 계정을 만들지 않아도 됩니다. ChatGPT의 연결 화면에서 S-DAY로 이동해 보드 코드를 한 번 입력하고 **읽기 허용**을 누릅니다. 코드는 S-DAY에 HTTPS POST로만 보내며 ChatGPT, 리다이렉트 주소 또는 토큰에는 포함하지 않습니다. ChatGPT에 발급하는 권한은 한 보드의 `sday:read`뿐입니다.
+
+- 인증 제공자 대신 S-DAY의 OAuth 엔드포인트를 쓸 때는 두 MCP 마이그레이션을 파일 순서대로 적용하고 서버에서 `SDAY_MCP_AUTH_MODE=board`를 지정합니다. 기존 JWT 방식과 동시에 활성화하지 않습니다.
+- `SDAY_MCP_RESOURCE`, `SDAY_SUPABASE_URL`, `SDAY_SUPABASE_PUBLISHABLE_KEY`는 위와 동일합니다. 운영 URL과 테스트 URL 및 키를 섞지 않습니다.
+- 비공개 ChatGPT 연결에는 OAuth 제공 클라이언트(public client, token endpoint auth method `none`)를 사용합니다. `SDAY_MCP_OAUTH_CLIENT`에는 이 연결에 등록한 ID, `SDAY_MCP_OAUTH_REDIRECT`에는 ChatGPT가 연결 관리 화면에 표시한 **정확한 HTTPS 콜백**을 넣습니다. 목록을 느슨하게 만들거나 임의 호스트를 허용하지 않습니다. 발견 주소는 `/.well-known/oauth-authorization-server`입니다.
+- `SDAY_MCP_OAUTH_SERVER_KEY`는 서버 전용 32바이트 난수의 소문자 hex입니다. 기존 보드 코드 및 JWT 방식의 DB 키와는 별개입니다. 이 문자열의 SHA-256만 `app.mcp_oauth_config(server_hash, board_id)`에 두고, 보드 소유자가 지정한 보드 하나에만 매핑합니다. 키를 리포지토리, URL, 클라이언트 또는 채팅에 넣지 않습니다.
+- 최초 승인 코드는 2분 안에 고정 클라이언트·콜백·리소스와 S256 PKCE를 확인한 뒤 한 번만 교환됩니다. 액세스 토큰은 15분, 갱신 토큰은 최대 90일 비활성 기간 뒤 만료됩니다. 갱신 시 이전 액세스 및 갱신 토큰은 폐기됩니다. 암호화된 HTTPS 연결에서만 사용합니다.
+- `/api/mcp-oauth/revoke`에서 보드 코드를 입력하면 이 보드의 승인 코드·액세스 토큰·갱신 토큰을 즉시 무효화합니다. 일반 보드 코드 및 일정에는 영향이 없습니다. 이 설정을 제거할 때는 먼저 이 화면을 통해 연결을 해제합니다.
+- 배포 전 샘플 테스트에는 실제 OAuth 핸들러와 DB 마이그레이션을 함께 실행해 콜백 바꿔치기, 다른 보드의 코드, 인증 코드 및 갱신 토큰 재사용, 만료, 즉시 철회와 직접 입력·LMS 공통 조회를 확인합니다.
