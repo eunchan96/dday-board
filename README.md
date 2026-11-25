@@ -306,3 +306,8 @@ Edge Function `push-notify`에 `{ "code", "endpoint" }`를 보내면 그 기기�
 생각 중인 것:
 
 - `boards.owner_id`를 이용한 로그인 계정 연결
+
+## 읽기 전용 MCP (별도 설정)
+
+브라우저 보드 코드를 공유하지 않고 기간·출처별 일정을 조회하는 선택적 통합입니다.
+[샘플 환경 설정 및 검증 방법](docs/mcp.md)
