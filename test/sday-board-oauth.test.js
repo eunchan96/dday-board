@@ -125,6 +125,7 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
     const res=await fetcher(path);
     assert.equal(res.status,200);
     assert.match(res.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+    assert.match(res.headers.get('content-security-policy'),/connect-src 'self'; script-src 'nonce-[0-9a-f]{64}'/);
     assert.equal(res.headers.get('referrer-policy'),'strict-origin');
     const header=res.headers.get('set-cookie');
     assert.match(header,/^__Host-sday-mcp-consent-[0-9a-f]{64}=[0-9a-f]{64};/);
@@ -132,7 +133,11 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
     const cookie=header.split(';')[0];
     const html=await res.text();
     assert.doesNotMatch(html,new RegExp(ownerCode));
-    return {cookie,ticket:/name="ticket" value="([^"]+)"/.exec(html)[1]};
+    const formKey=/data-form-proof="([0-9a-f]{64})"/.exec(html)[1];
+    const ticket=/name="ticket" value="([^"]+)"/.exec(html)[1];
+    assert.notEqual(cookie.split('=')[1],formKey);
+    assert.ok(!Buffer.from(ticket.split('.')[0],'base64url').toString().includes(formKey));
+    return {cookie,ticket,formKey};
   };
   const origin=cfg.issuer;
   const submit=(path,info,board,from=origin)=>fetcher(cfg.issuer+'/api/mcp-oauth/'+path,{method:'POST',
@@ -162,11 +167,24 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   assert.equal((await submit('authorize',pending,ownerCode,'null')).status,403);
   assert.equal((await submit('authorize',{...pending,cookie:''},ownerCode)).status,403);
   assert.equal((await submit('authorize',pending,otherCode)).status,403);
-  const approval=await submit('authorize',sameJar,ownerCode);
-  assert.equal(approval.status,303);
+  const legacyWrongBoard=await submit('authorize',sameJar,otherCode);
+  assert.equal(legacyWrongBoard.status,403);
+  assert.match(await legacyWrongBoard.text(),/보드 코드 또는 승인 요청을 확인/);
+  const jsSubmit=(proof,from=origin,fetchSite='same-origin')=>fetcher(cfg.issuer+'/api/mcp-oauth/authorize',{
+    method:'POST',headers:{origin:from,'sec-fetch-site':fetchSite,'x-sday-consent-proof':proof},
+    body:new URLSearchParams({ticket:pending.ticket,board_code:ownerCode}),
+  });
+  const otherProof=await jsSubmit(second.formKey);
+  assert.equal(otherProof.status,403);
+  assert.deepEqual(await otherProof.json(),{error:'consent_proof_invalid'});
+  assert.equal((await jsSubmit(pending.formKey,'https://another.example')).status,403);
+  assert.equal((await jsSubmit(pending.formKey,origin,'cross-site')).status,403);
+  const approval=await jsSubmit(pending.formKey);
+  assert.equal(approval.status,200);
   assert.equal(approval.headers.get('referrer-policy'),'no-referrer');
+  assert.equal((await jsSubmit(pending.formKey)).status,403);
   assert.equal((await submit('authorize',pending,ownerCode)).status,403);
-  const returnUrl=new URL(approval.headers.get('location'));
+  const returnUrl=new URL((await approval.json()).callback);
   assert.equal(returnUrl.pathname,new URL(cfg.redirect).pathname);
   assert.equal(returnUrl.searchParams.get('iss'),origin);
   assert.equal(returnUrl.searchParams.get('state'),'test-state');
