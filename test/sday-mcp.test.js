@@ -183,3 +183,151 @@ test('MCP HTTP sample end-to-end with signed access tokens and the real SQL migr
   assert.deepEqual(defaultResult.structuredContent.events.map(e=>e.source), ['manual','canvas','manual']);
   assert.equal(reads,2);
 });
+
+test('isolated HTTPS preview exchanges an OAuth code with PKCE, then reads both sources via the actual API route', async (t) => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const tls = await import('node:tls');
+  const { createServer: createHttpsServer } = await import('node:https');
+  const { exportJWK } = await import('jose');
+  const { auth } = await import('@modelcontextprotocol/sdk/client/auth.js');
+  const { default: mcpRoute } = await import('../api/mcp.js');
+
+  const dir = await mkdtemp(join(tmpdir(), 'sday-https-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const certPath = join(dir, 'preview.crt'), keyPath = join(dir, 'preview.key');
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+    '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=IP:127.0.0.1',
+    '-keyout', keyPath, '-out', certPath], { stdio: 'pipe' });
+  const cert = await readFile(certPath, 'utf8');
+  const initialTrust = tls.getCACertificates('default');
+  tls.setDefaultCACertificates([...initialTrust, cert]);
+  t.after(() => tls.setDefaultCACertificates(initialTrust));
+  const db = await sampleDatabase();
+  t.after(() => db.close());
+  await db.exec('set role anon');
+
+  const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const jwk = { ...await exportJWK(publicKey), alg: 'RS256', kid: 'sample' };
+  const discoveryPath = '/.well-known/oauth-protected-resource/api/mcp';
+  const issuerPath = '/.well-known/oauth-authorization-server';
+  const fixedCode = 'sample-authorized-code';
+  let base, challenge, used = false, rpcReads = 0;
+  const resourceUrl = () => base + '/api/mcp';
+  const json = (res, status, body) => res.writeHead(status,
+    { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(body));
+  const readBody = async req => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    return body;
+  };
+  const server = createHttpsServer({ cert, key: await readFile(keyPath) }, (req, res) => {
+    (async () => {
+      const url = new URL(req.url, base);
+      switch (url.pathname) {
+        case '/api/mcp': return mcpRoute(req, res);
+        case discoveryPath: return protectedResource(req, res);
+        case issuerPath: return json(res, 200, {
+          issuer: base, authorization_endpoint: base + '/oauth/authorize', token_endpoint: base + '/oauth/token',
+          jwks_uri: base + '/oauth/jwks', response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code'], code_challenge_methods_supported: ['S256'],
+          token_endpoint_auth_methods_supported: ['none'], scopes_supported: ['sday:read'],
+        });
+        case '/oauth/jwks': return json(res, 200, { keys: [jwk] });
+        case '/oauth/authorize': {
+          const p = url.searchParams;
+          if (p.get('resource') !== resourceUrl() || p.get('client_id') !== 'sample-client' ||
+              p.get('redirect_uri') !== base + '/callback' || p.get('scope') !== 'sday:read' ||
+              p.get('response_type') !== 'code' || p.get('code_challenge_method') !== 'S256' ||
+              !/^[A-Za-z0-9_-]{43}$/.test(p.get('code_challenge') ?? ''))
+            return json(res, 400, { error: 'invalid_request' });
+          challenge = p.get('code_challenge');
+          const callback = new URL('/callback', base);
+          callback.search = new URLSearchParams({ code: fixedCode, state: p.get('state') });
+          return res.writeHead(302, { Location: callback.href }).end();
+        }
+        case '/oauth/token': {
+          const p = new URLSearchParams(await readBody(req));
+          if (used || req.method !== 'POST' || p.get('code') !== fixedCode ||
+              p.get('grant_type') !== 'authorization_code' || p.get('resource') !== resourceUrl() ||
+              p.get('client_id') !== 'sample-client' || p.get('redirect_uri') !== base + '/callback' ||
+              createHash('sha256').update(p.get('code_verifier') ?? '').digest('base64url') !== challenge)
+            return json(res, 400, { error: 'invalid_grant' });
+          used = true;
+          const token = await new SignJWT({ scope: 'sday:read' }).setProtectedHeader({ alg: 'RS256', kid: 'sample' })
+            .setIssuer(base).setSubject('sample-owner').setAudience(resourceUrl()).setExpirationTime('5m').sign(privateKey);
+          return json(res, 200, { access_token: token, token_type: 'Bearer', expires_in: 300 });
+        }
+        case '/rest/v1/rpc/dday_mcp_list_events': {
+          if (req.method !== 'POST' || req.headers.apikey !== env.SDAY_SUPABASE_PUBLISHABLE_KEY ||
+              req.headers.authorization) return json(res, 401, {});
+          const p = JSON.parse(await readBody(req));
+          rpcReads++;
+          try {
+            return json(res, 200, (await db.query('select public.dday_mcp_list_events($1,$2,$3,$4) as result',
+              [p.p_key, p.p_from, p.p_to, p.p_source])).rows[0].result);
+          } catch { return json(res, 403, { error: 'read_denied' }); }
+        }
+        default: return res.writeHead(404).end();
+      }
+    })().catch(() => { if (!res.headersSent) res.writeHead(500); res.end(); });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  base = 'https://127.0.0.1:' + server.address().port;
+  const previewEnv = {
+    ...env, SDAY_MCP_ISSUER: base, SDAY_MCP_JWKS_URL: base + '/oauth/jwks',
+    SDAY_MCP_RESOURCE: resourceUrl(), SDAY_SUPABASE_URL: base,
+  };
+  const prior = Object.fromEntries(Object.keys(previewEnv).map(k => [k, process.env[k]]));
+  Object.assign(process.env, previewEnv);
+  t.after(() => {
+    for (const [k, v] of Object.entries(prior)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  let tokens, verifier, consent;
+  const oauth = {
+    redirectUrl: base + '/callback',
+    clientMetadata: { redirect_uris: [base + '/callback'], token_endpoint_auth_method: 'none',
+      grant_types: ['authorization_code'], response_types: ['code'] },
+    state: () => 'sample-client-state',
+    clientInformation: () => ({ client_id: 'sample-client', issuer: base }),
+    tokens: () => tokens, saveTokens: v => { tokens = v; },
+    redirectToAuthorization: url => { consent = url; },
+    saveCodeVerifier: v => { verifier = v; }, codeVerifier: () => verifier,
+  };
+  const mc = new Client({ name: 'isolated-preview', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(resourceUrl()), { authProvider: oauth });
+  await mc.connect(transport);
+  t.after(() => mc.close());
+  assert.deepEqual((await mc.listTools()).tools.map(x => x.name), ['list_events']);
+  const args = { name: 'list_events', arguments: dates };
+  const denied = await mc.callTool(args);
+  assert.equal(denied.isError, true);
+  assert.equal(rpcReads, 0);
+  const header = denied._meta['mcp/www_authenticate'][0];
+  const opts = { serverUrl: resourceUrl(), scope: 'sday:read',
+    resourceMetadataUrl: new URL(/resource_metadata="([^"]+)"/.exec(header)[1]) };
+  assert.equal(await auth(oauth, opts), 'REDIRECT');
+  const redirect = await fetch(consent, { redirect: 'manual' });
+  assert.equal(redirect.status, 302);
+  const callback = new URL(redirect.headers.get('Location'));
+  assert.equal(callback.searchParams.get('state'), 'sample-client-state');
+  const authorizationCode = callback.searchParams.get('code');
+  assert.ok(authorizationCode);
+  await assert.rejects(auth({ ...oauth, codeVerifier: () => 'z'.repeat(43) }, { ...opts, authorizationCode }),
+    { name: "InvalidGrantError" });
+  assert.equal(await auth(oauth, { ...opts, authorizationCode }), 'AUTHORIZED');
+  await assert.rejects(auth(oauth, { ...opts, authorizationCode }), { name: "InvalidGrantError" });
+  const read = await mc.callTool(args);
+  assert.equal(read.isError, undefined);
+  assert.deepEqual(titles(read.structuredContent), ['Sample exam', 'Sample LMS assignment', 'Sample all-day']);
+  assert.deepEqual(read.structuredContent.events.map(e => e.source), ['manual', 'canvas', 'manual']);
+  assert.equal(rpcReads, 1);
+  assert.doesNotMatch(JSON.stringify(read), /Hidden task|Other board|private fixture|board_id|p_key/);
+});
