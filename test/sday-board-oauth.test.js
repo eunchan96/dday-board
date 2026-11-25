@@ -125,6 +125,7 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
     const res=await fetcher(path);
     assert.equal(res.status,200);
     assert.match(res.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+    assert.equal(res.headers.get('referrer-policy'),'strict-origin');
     const cookie=res.headers.get('set-cookie').split(';')[0];
     const html=await res.text();
     assert.doesNotMatch(html,new RegExp(ownerCode));
@@ -142,10 +143,12 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   assert.equal((await fetcher(compat)).status,400);
   const pending=await screen(consent);
   assert.equal((await submit('authorize',pending,ownerCode,'https://other.example')).status,403);
+  assert.equal((await submit('authorize',pending,ownerCode,'null')).status,403);
   assert.equal((await submit('authorize',{...pending,cookie:''},ownerCode)).status,403);
   assert.equal((await submit('authorize',pending,otherCode)).status,403);
   const approval=await submit('authorize',pending,ownerCode);
   assert.equal(approval.status,303);
+  assert.equal(approval.headers.get('referrer-policy'),'no-referrer');
   assert.equal((await submit('authorize',pending,ownerCode)).status,403);
   const returnUrl=new URL(approval.headers.get('location'));
   assert.equal(returnUrl.pathname,new URL(cfg.redirect).pathname);
