@@ -117,7 +117,9 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   assert.equal(await auth(provider,authOptions),'REDIRECT');
   const bad=new URL(consent);
   bad.searchParams.set('redirect_uri','https://example.org/wrong');
-  assert.equal((await fetcher(bad)).status,400);
+  const wrongCallback=await fetcher(bad);
+  assert.equal(wrongCallback.status,400);
+  assert.deepEqual(await wrongCallback.json(),{error:'invalid_request',error_description:'callback_mismatch'});
   assert.equal((await fetcher(new URL(consent+'&state=extra'))).status,400);
   const screen=async path=>{
     const res=await fetcher(path);
@@ -131,6 +133,13 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   const origin=cfg.issuer;
   const submit=(path,info,board,from=origin)=>fetcher(cfg.issuer+'/api/mcp-oauth/'+path,{method:'POST',
     headers:{origin:from,cookie:info.cookie},body:new URLSearchParams({ticket:info.ticket,board_code:board})});
+  const compat = new URL(consent);
+  compat.searchParams.delete('scope');
+  compat.searchParams.set('state','signed-client-state-'.repeat(70));
+  compat.searchParams.set('client_extension','a-supported-opaque-client-parameter');
+  assert.equal((await fetcher(compat)).status,200);
+  compat.searchParams.set('resource','https://another.example/api/mcp');
+  assert.equal((await fetcher(compat)).status,400);
   const pending=await screen(consent);
   assert.equal((await submit('authorize',pending,ownerCode,'https://other.example')).status,403);
   assert.equal((await submit('authorize',{...pending,cookie:''},ownerCode)).status,403);
@@ -157,7 +166,7 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
   const refreshBody={client_id:cfg.client,grant_type:'refresh_token',refresh_token:first.refresh_token,resource};
   const exchange=p=>fetcher(cfg.issuer+'/api/mcp-oauth/token',{method:'POST',body:new URLSearchParams(p)});
   assert.equal((await exchange({...refreshBody,resource:'https://other.example/mcp'})).status,400);
-  const refreshed=await exchange(refreshBody);
+  const refreshed=await exchange({...refreshBody,client_extension:'opaque-client-value'});
   assert.equal(refreshed.status,200);
   tokens=await refreshed.json();
   assert.equal((await exchange(refreshBody)).status,400);
