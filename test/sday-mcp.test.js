@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { SignJWT, generateKeyPair } from 'jose';
+import protectedResource from '../api/mcp-resource.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createAuthorizer, createDatabaseReader, createMcpHandler, loadConfig, metadata } from '../lib/sday-mcp.js';
@@ -69,6 +70,14 @@ test('configuration fails closed, and metadata advertises only sday:read', () =>
   assert.throws(() => loadConfig({ ...env, SDAY_MCP_RESOURCE: 'https://sday.example/api/mcp?key=example' }));
   assert.deepEqual(metadata(config), { resource: env.SDAY_MCP_RESOURCE,
     authorization_servers: [env.SDAY_MCP_ISSUER], scopes_supported: ['sday:read'], bearer_methods_supported: ['header'] });
+});
+
+test('deployed discovery route does not send 200 before checking configuration', () => {
+  const headers = [];
+  const res = { writeHead(status) { headers.push(status); return this; }, end(value) { this.value = value; } };
+  protectedResource({method:'GET'}, res);
+  assert.deepEqual(headers, [503]);
+  assert.equal(res.value, 'S-DAY MCP is not configured.');
 });
 
 test('SQL reads only its board, filters by Seoul date and source, omits private fields, and revokes instantly', async () => {
@@ -168,4 +177,9 @@ test('MCP HTTP sample end-to-end with signed access tokens and the real SQL migr
   const json = JSON.stringify(result);
   assert.doesNotMatch(json,/private fixture|https:\/\/example.com\/private|board_id|p_key/);
   assert.equal(reads,1);
+  const defaultResult = await user.callTool({ name:'list_events', arguments:dates });
+  assert.equal(defaultResult.isError, undefined);
+  assert.deepEqual(titles(defaultResult.structuredContent), ['Sample exam','Sample LMS assignment','Sample all-day']);
+  assert.deepEqual(defaultResult.structuredContent.events.map(e=>e.source), ['manual','canvas','manual']);
+  assert.equal(reads,2);
 });
