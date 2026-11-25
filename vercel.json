@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/.well-known/oauth-protected-resource/api/mcp",
+      "destination": "/api/mcp-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/mcp-oauth/metadata"
+    }
+  ]
+}
