@@ -13,6 +13,7 @@ import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { boardSettings, createOauthDatabase, createOauthHandler } from '../lib/sday-board-oauth.js';
+import { oauthRoute } from '../lib/sday-oauth-route.js';
 import { createAuthorizer, createDatabaseReader, createMcpHandler, metadata } from '../lib/sday-mcp.js';
 
 const A='11111111-1111-1111-1111-111111111111', B='22222222-2222-2222-2222-222222222222';
@@ -78,15 +79,18 @@ test('board code approval, SDK PKCE and read-only data, rotation and immediate r
     if(req.url==='/.well-known/oauth-protected-resource/api/mcp'){
       res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(metadata(cfg)));return;
     }
-    return oauth(req,res);
+    return (routes[new URL(req.url,cfg.issuer).pathname] ?? ((_req,res)=>res.writeHead(404).end()))(req,res);
   });
   server.listen(0,'127.0.0.1');await once(server,'listening');
   t.after(()=>{server.closeAllConnections();server.close();});
   const resource='https://127.0.0.1:'+server.address().port+'/api/mcp';
-  const cfg=boardSettings({SDAY_MCP_RESOURCE:resource,SDAY_SUPABASE_URL:'https://database.example',
+  const env={SDAY_MCP_AUTH_MODE:'board',SDAY_MCP_RESOURCE:resource,SDAY_SUPABASE_URL:'https://database.example',
     SDAY_MCP_OAUTH_REDIRECT:'https://chatgpt.com/connector/oauth/example-flow',SDAY_MCP_OAUTH_CLIENT:'sday-preview-client',
-    SDAY_MCP_OAUTH_SERVER_KEY:key,SDAY_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic'});
-  const oauth=createOauthHandler(cfg,createOauthDatabase(cfg,dataFetch));
+    SDAY_MCP_OAUTH_SERVER_KEY:key,SDAY_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic'};
+  const cfg=boardSettings(env);
+  const routes=Object.fromEntries(['/.well-known/oauth-authorization-server','/api/mcp-oauth/authorize',
+    '/api/mcp-oauth/token','/api/mcp-oauth/revoke'].map(path=>[path,
+      oauthRoute(path,env,c=>createOauthHandler(c,createOauthDatabase(c,dataFetch)))]));
   const mcp=createMcpHandler({config:cfg,authorize:createAuthorizer(cfg),read:createDatabaseReader(cfg,dataFetch)});
   const fetcher=(u,init={})=>{
     assert.equal(new URL(u).origin,cfg.issuer);
